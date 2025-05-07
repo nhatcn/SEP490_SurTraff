@@ -1,0 +1,101 @@
+.sidebar {
+  width: 223px;
+  background-color: #fff;
+  border-right: 1px solid #dee2e6;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.05);
+  z-index: 1000;
+  transition: all 0.3s ease;
+}
+
+.sidebar-header {
+  padding: 1.25rem;
+  border-bottom: 1px solid #eaeaea;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-brand {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #4a80ff;
+  text-align: center;
+  margin: 0;
+  letter-spacing: -0.5px;
+}
+
+.sidebar-body {
+  flex: 1;
+  overflow-y: auto;
+  padding-top: 0.75rem;
+}
+
+.sidebar-body::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-body::-webkit-scrollbar-thumb {
+  background: #e0e0e0;
+  border-radius: 10px;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  padding: 0.65rem 1.25rem;
+  color: #495057;
+  text-decoration: none;
+  border-radius: 6px;
+  margin: 0.2rem 0.75rem;
+  transition: all 0.2s ease;
+}
+
+.nav-link:hover {
+  color: #4a80ff;
+  background-color: #f8f9fa;
+}
+
+.nav-icon {
+  margin-right: 0.85rem;
+
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-link-highlight {
+  background-color: #4a80ff;
+  color: white;
+  box-shadow: 0 4px 10px rgba(74, 128, 255, 0.3);
+}
+
+.nav-link-highlight:hover {
+  background-color: #3a70ef;
+  color: white;
+}
+
+.pages-header {
+  padding: 0.75rem 1.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #6c757d;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  margin-top: 0.5rem;
+}
+
+.sidebar-footer {
+  padding-bottom: 1rem;
+}
+
+.nav {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
