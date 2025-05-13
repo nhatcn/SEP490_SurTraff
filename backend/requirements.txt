@@ -1,11 +1,11 @@
-fastapi==0.104.1
-uvicorn==0.24.0
-sqlalchemy==2.0.23
-psycopg2-binary==2.9.9
-python-dotenv==1.0.0
+fastapi>=0.68.0
+uvicorn>=0.15.0
+sqlalchemy>=1.4.23
+psycopg2-binary>=2.9.1
+python-dotenv>=0.19.0
 pydantic==2.5.2
 ultralytics==8.0.196
-python-multipart==0.0.6
+python-multipart>=0.0.5
 requests==2.31.0
 torch==2.1.0
 torchvision==0.16.0
@@ -19,4 +19,6 @@ beautifulsoup4==4.12.2
 matplotlib==3.8.0
 scipy==1.11.3
 pillow==10.0.0
-motpy==0.0.1 
+motpy==0.0.1
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4 
