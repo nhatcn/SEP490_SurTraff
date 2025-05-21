@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+
 import Sidebar from "../../components/Layout/Sidebar";
 import Header from "../../components/Layout/Header";
 
@@ -10,7 +10,7 @@ export default function UserDashboard() {
     <div className="flex h-screen">
       <Sidebar />
       <div className="flex flex-col flex-grow overflow-hidden">
-        <Header title="Camera Surveillance Dashboard" />
+        <Header title="User Dashboard" />
         
         
         <div className="flex-grow overflow-y-auto p-4">

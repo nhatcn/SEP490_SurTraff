@@ -3,6 +3,7 @@ import Sidebar from "../../components/Layout/Sidebar";
 import Header from "../../components/Layout/Header";
 import CameraCard from "../../components/Camera/CameraCard";
 import CameraDetail from "../../components/Camera/CameraDetail";
+import { Link } from "react-router-dom";
 
 interface CameraType {
   id: string | number;
@@ -68,7 +69,14 @@ export default function CameraDashboard() {
       <Sidebar />
       <div className="flex flex-col flex-grow overflow-hidden">
         <Header title="Camera Surveillance Dashboard" />
-
+        <div className="p-4">
+          <Link
+            to="/addcamera"
+            className="mb-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 inline-block"
+          >
+            Add Camera
+          </Link>
+        </div>
         <div className="flex p-4 gap-6 flex-grow overflow-hidden">
           {loading ? (
             <div className="w-full flex items-center justify-center">

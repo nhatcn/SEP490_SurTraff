@@ -10,6 +10,7 @@ import TrafficMonitoringAuth from '../Pages/Auth/LoginPage';
 import RegisterPage from '../Pages/Auth/RegisterPage';
 import ForgotPasswordPage from '../Pages/Auth/ForgotPasswordPage';
 import UserDashboard from '../Pages/Dashboard/UserDashboard';
+import AddCameraDashboard from '../Pages/Dashboard/AddCamera';
 
 
 const RoutesConfig = () => {
@@ -22,6 +23,7 @@ const RoutesConfig = () => {
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/forgotpassword" element={<ForgotPasswordPage />} />
       <Route path="/userdashboard" element={<UserDashboard />} />
+      <Route path="/addcamera" element={<AddCameraDashboard />} />
     </Routes>
   );
 };
