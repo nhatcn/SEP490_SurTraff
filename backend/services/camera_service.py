@@ -1,16 +1,18 @@
-# camera_service.py
-from crud import violation_crud
+import os
 import cv2
 import math
+import time
 from datetime import datetime
+from collections import deque
+
 from ultralytics import YOLO
-from utils.yt_stream import get_stream_url
-from collections import defaultdict
-import os
 from database import SessionLocal
 from models.model import Violation
 from schemas.violation_schema import ViolationCreate
+from utils.yt_stream import get_stream_url
+from crud import violation_crud  
 import traceback
+
 
 model_vehicle = YOLO("yolov8m.pt")
 model_light = YOLO("final.pt")  # Đèn đỏ
@@ -47,7 +49,7 @@ def stream_normal_video_service(youtube_url: str):
             )
     finally:
         cap.release()
-
+        
 def stream_violation_video_service(youtube_url: str, camera_id: int):
     stream_url = get_stream_url(youtube_url)
     cap = cv2.VideoCapture(stream_url)
@@ -55,7 +57,9 @@ def stream_violation_video_service(youtube_url: str, camera_id: int):
         raise ValueError("Cannot open stream")
 
     red_light_history = []
-    vehicle_states = {}  # track_id: {prev_y, violated, photo_saved}
+    vehicle_states = {}  # track_id: {prev_y, violated, video_saved}
+    frame_buffer = deque(maxlen=30)  # 1 giây (30fps)
+    recording_tasks = {}  # track_id: {writer, frames_remaining, file_path}
     db = SessionLocal()
 
     try:
@@ -67,7 +71,13 @@ def stream_violation_video_service(youtube_url: str, camera_id: int):
                 continue
 
             h, w, _ = frame.shape
-            stop_line_y = h * 4 // 10  # Line nằm 40% chiều cao
+            stop_line_y = h * 4 // 10
+
+            # 1 bản để annotate đầy đủ hiển thị stream
+            frame_annotated = frame.copy()
+
+            # 1 bản riêng chỉ vẽ line và xe vi phạm (để ghi video)
+            frame_for_video = frame.copy()
 
             # Detect đèn đỏ
             light_results = model_light(frame)[0]
@@ -85,16 +95,19 @@ def stream_violation_video_service(youtube_url: str, camera_id: int):
 
             is_red = red_light_history.count(True) > red_light_buffer_size // 2
 
-            # Detect và track vehicle
+            # Vẽ vạch dừng và trạng thái đèn lên cả 2 bản
+            line_color = (0, 0, 255) if is_red else (0, 255, 0)
+            for f in [frame_annotated, frame_for_video]:
+                cv2.line(f, (0, stop_line_y), (w, stop_line_y), line_color, 1)
+                cv2.putText(f, f"Red Light: {'YES' if is_red else 'NO'}", (10, 30),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, line_color, 2)
+
             results = model_vehicle.track(source=frame, persist=True, conf=0.3, iou=0.5, tracker="bytetrack.yaml")[0]
             if results.boxes is None or results.boxes.id is None:
+                frame_buffer.append(frame_for_video.copy())
                 continue
 
             boxes = results.boxes
-
-            # Tạo bản sao frame để annotate ảnh chụp khi cần
-            annotated_frame_for_capture = frame.copy()
-
             for i in range(len(boxes)):
                 cls_id = int(boxes.cls[i])
                 class_name = model_vehicle.names[cls_id]
@@ -108,68 +121,87 @@ def stream_violation_video_service(youtube_url: str, camera_id: int):
                 center_y = (y1 + y2) // 2
 
                 if track_id not in vehicle_states:
-                    vehicle_states[track_id] = {'prev_y': center_y, 'violated': False, 'photo_saved': False}
+                    vehicle_states[track_id] = {'prev_y': center_y, 'violated': False, 'video_saved': False}
                 else:
                     prev_y = vehicle_states[track_id]['prev_y']
                     violated = vehicle_states[track_id]['violated']
-                    photo_saved = vehicle_states[track_id]['photo_saved']
+                    video_saved = vehicle_states[track_id]['video_saved']
 
                     if is_red and not violated:
                         if prev_y > stop_line_y >= center_y:
                             vehicle_states[track_id]['violated'] = True
 
-                            if not photo_saved:
-                                # Annotate lại để lưu ảnh chụp
-                                color = (0, 0, 255)
-                                cv2.rectangle(annotated_frame_for_capture, (x1, y1), (x2, y2), color, 1)
-                                cv2.putText(annotated_frame_for_capture, f"ID:{track_id}|violation", (x1, y1 - 10),
-                                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 1)
-                                cv2.line(annotated_frame_for_capture, (0, stop_line_y), (w, stop_line_y), color, 1)
-                                cv2.putText(annotated_frame_for_capture, f"Red Light: YES", (10, 30),
-                                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 1)
-
-                                # Lưu ảnh
+                            if not video_saved:
                                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                                filename = f"violation_{track_id}_{timestamp}.jpg"
+                                filename = f"violation_{track_id}_{timestamp}.mp4"
                                 filepath = os.path.join(VIOLATIONS_DIR, filename)
-                                cv2.imwrite(filepath, annotated_frame_for_capture)
 
-                                # Ghi DB
-                                violation = ViolationCreate(
-                                    camera_id=camera_id,
-                                    violation_type_id=1,
-                                    license_plate="Unknown",
-                                    vehicle_color="Unknown",
-                                    vehicle_brand="Unknown",
-                                    image_url=filepath,
-                                    violation_time=datetime.now()
-                                )
-                                try:
-                                    db_violation = Violation(**violation.model_dump())
-                                    db.add(db_violation)
-                                    db.commit()
-                                    vehicle_states[track_id]['photo_saved'] = True
-                                except Exception as e:
-                                    print(f"Error saving violation to database: {e}")
-                                    db.rollback()
+                                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                                fps = 30
+                                writer = cv2.VideoWriter(filepath, fourcc, fps, (w, h))
+
+                                for buf_frame in frame_buffer:
+                                    writer.write(buf_frame)
+
+                                recording_tasks[track_id] = {
+                                    'writer': writer,
+                                    'frames_remaining': 30,
+                                    'file_path': filepath
+                                }
+
+                                vehicle_states[track_id]['video_saved'] = True
 
                     vehicle_states[track_id]['prev_y'] = center_y
 
                 violated = vehicle_states[track_id]['violated']
-                color = (0, 0, 255) if violated else (0, 255, 0)
-                status = 'violation' if violated else 'normal'
 
-                # Annotate lên frame đang stream
-                cv2.rectangle(frame, (x1, y1), (x2, y2), color, 1)
-                cv2.putText(frame, f"ID:{track_id}|{status}", (x1, y1 - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 1)
+                if violated:
+                    # Vẽ box chỉ cho xe vi phạm vào cả stream và video
+                    color = (0, 0, 255)
+                    label = f"ID:{track_id}|violation"
+                    for f in [frame_annotated, frame_for_video]:
+                        cv2.rectangle(f, (x1, y1), (x2, y2), color, 1)
+                        cv2.putText(f, label, (x1, y1 - 10),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 1)
+                else:
+                    # Vẽ lên frame stream thôi (không buffer)
+                    cv2.rectangle(frame_annotated, (x1, y1), (x2, y2), (0, 255, 0), 1)
+                    cv2.putText(frame_annotated, f"ID:{track_id}|normal", (x1, y1 - 10),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 1)
 
-            line_color = (0, 0, 255) if is_red else (0, 255, 0)
-            cv2.line(frame, (0, stop_line_y), (w, stop_line_y), line_color, 1)
-            cv2.putText(frame, f"Red Light: {'YES' if is_red else 'NO'}", (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, line_color, 2)
+            # Buffer bản ghi video (chỉ line + xe vi phạm)
+            frame_buffer.append(frame_for_video.copy())
 
-            _, jpeg = cv2.imencode('.jpg', frame)
+            # Xử lý các video đang ghi
+            for track_id in list(recording_tasks.keys()):
+                task = recording_tasks[track_id]
+                if task['frames_remaining'] > 0:
+                    task['writer'].write(frame_for_video)
+                    task['frames_remaining'] -= 1
+                else:
+                    task['writer'].release()
+                    filepath = task['file_path']
+
+                    violation = ViolationCreate(
+                        camera_id=camera_id,
+                        violation_type_id=1,
+                        license_plate="Unknown",
+                        vehicle_color="Unknown",
+                        vehicle_brand="Unknown",
+                        image_url=filepath,
+                        violation_time=datetime.now()
+                    )
+                    try:
+                        db_violation = Violation(**violation.model_dump())
+                        db.add(db_violation)
+                        db.commit()
+                    except Exception as e:
+                        print(f"Error saving violation to database: {e}")
+                        db.rollback()
+
+                    del recording_tasks[track_id]
+
+            _, jpeg = cv2.imencode('.jpg', frame_annotated)
             yield (
                 b"--frame\r\n"
                 b"Content-Type: image/jpeg\r\n\r\n" + jpeg.tobytes() + b"\r\n"
@@ -178,6 +210,9 @@ def stream_violation_video_service(youtube_url: str, camera_id: int):
     finally:
         cap.release()
         db.close()
+        for task in recording_tasks.values():
+            task['writer'].release()
+
 
 def stream_count_video_service(youtube_url: str):
     stream_url = get_stream_url(youtube_url)
