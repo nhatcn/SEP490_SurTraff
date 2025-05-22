@@ -11,6 +11,7 @@ import RegisterPage from '../Pages/Auth/RegisterPage';
 import ForgotPasswordPage from '../Pages/Auth/ForgotPasswordPage';
 import UserDashboard from '../Pages/Dashboard/UserDashboard';
 import AddCameraDashboard from '../Pages/Dashboard/AddCamera';
+import AccidentDashboard from '../Pages/Dashboard/AccidentDashboard';
 
 
 const RoutesConfig = () => {
@@ -24,6 +25,7 @@ const RoutesConfig = () => {
       <Route path="/forgotpassword" element={<ForgotPasswordPage />} />
       <Route path="/userdashboard" element={<UserDashboard />} />
       <Route path="/addcamera" element={<AddCameraDashboard />} />
+      <Route path="/accidentdashboard" element={<AccidentDashboard />} />
     </Routes>
   );
 };
