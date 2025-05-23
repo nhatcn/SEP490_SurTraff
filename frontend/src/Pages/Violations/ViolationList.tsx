@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { AlertDialog } from "./AlertDialog";
 import { format } from "date-fns";
 import { toast } from "react-toastify";
+import { EyeIcon, TrashIcon } from "@heroicons/react/24/outline";
 
 interface ViolationType {
   id: number;
@@ -127,21 +128,23 @@ export default function ViolationList() {
                         ? format(new Date(violation.violationTime), "dd/MM/yyyy HH:mm:ss")
                         : "N/A"}
                     </td>
-                    <td className="p-3 space-x-2">
+                    <td className='p-3 space-x-2'>
                       <button
-                        className="px-3 py-1 rounded bg-blue-500 text-white hover:bg-blue-600"
+                        className='p-2 rounded bg-blue-100 text-blue-600 hover:bg-blue-200'
                         onClick={() => navigate(`/violations/${violation.id}`)}
+                        title='Xem chi tiết'
                       >
-                        Xem
+                        <EyeIcon className='h-5 w-5' />
                       </button>
                       <button
-                        className="px-3 py-1 rounded bg-red-500 text-white hover:bg-red-600"
+                        className='p-2 rounded bg-red-100 text-red-600 hover:bg-red-200'
                         onClick={() => {
-                          setSelectedId(violation.id);
-                          setOpenDialog(true);
+                          setSelectedId(violation.id)
+                          setOpenDialog(true)
                         }}
+                        title='Xóa vi phạm'
                       >
-                        Xóa
+                        <TrashIcon className='h-5 w-5' />
                       </button>
                     </td>
                   </tr>
