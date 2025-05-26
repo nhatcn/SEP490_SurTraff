@@ -6,10 +6,9 @@ from fastapi.encoders import jsonable_encoder
 from services.camera_service import (
     stream_normal_video_service,
     stream_violation_video_service,
-    stream_count_video_service,stream_accident_video_service,stream_plate_with_ocr_video_service,
-    stream_violation_wrongway_video_service
-
+    stream_count_video_service,stream_accident_video_service,stream_plate_with_ocr_video_service
 )
+from services.traffic_density_service import (analyze_traffic_video)
 from db.session import get_db
 from models.model import Camera
 from schemas.camera_schema  import CameraCreate, CameraUpdate
@@ -93,11 +92,11 @@ def stream_video(camera_id: int, db: Session = Depends(get_db)):
         )
     elif camera_id == 6:
         return StreamingResponse(
-            stream_violation_wrongway_video_service(camera.stream_url),
+            analyze_traffic_video(camera.stream_url, camera.id),
             media_type="multipart/x-mixed-replace; boundary=frame"
         )
     else:
         return StreamingResponse(
-            stream_normal_video_service(camera.stream_url),
+            analyze_traffic_video(camera.stream_url, camera.id),
             media_type="multipart/x-mixed-replace; boundary=frame"
         )
