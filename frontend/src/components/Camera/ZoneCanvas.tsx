@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Zone } from "../../Pages/Dashboard/AddCamera";
+import { Zone } from "../../Pages/Dashboard/Camera/AddCamera";
 
 interface ZoneCanvasProps {
   activeZoneType: string | null;
@@ -10,6 +10,11 @@ interface ZoneCanvasProps {
   setNextZoneId: React.Dispatch<React.SetStateAction<number>>;
   onDeleteZone: (id: string) => void;
 }
+
+// CHUẨN HÓA KÍCH THƯỚC - Kích thước chuẩn để lưu vào DB
+const STANDARD_WIDTH = 640;
+const STANDARD_HEIGHT = 480;
+const STANDARD_ASPECT_RATIO = STANDARD_WIDTH / STANDARD_HEIGHT; // 4:3
 
 export default function ZoneCanvas({ 
   activeZoneType,
@@ -23,7 +28,8 @@ export default function ZoneCanvas({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const [currentPoints, setCurrentPoints] = useState<number[][]>([]);
-  const [canvasSize, setCanvasSize] = useState({ width: 600, height: 400 });
+  const [displaySize, setDisplaySize] = useState({ width: 640, height: 480 });
+  const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
@@ -31,6 +37,7 @@ export default function ZoneCanvas({
     img.src = thumbnailUrl;
     img.onload = () => {
       imgRef.current = img;
+      setImageSize({ width: img.naturalWidth, height: img.naturalHeight });
       redrawCanvas();
     };
   }, [thumbnailUrl]);
@@ -38,18 +45,42 @@ export default function ZoneCanvas({
   useEffect(() => {
     if (!containerRef.current) return;
     
-    const containerWidth = containerRef.current.clientWidth;
-    setCanvasSize({
-      width: containerWidth,
-      height: containerWidth * 0.66
+    const containerWidth = containerRef.current.clientWidth - 20; // padding
+    const maxWidth = Math.min(containerWidth, 800); // giới hạn tối đa
+    
+    // Tính kích thước hiển thị dựa trên tỷ lệ chuẩn
+    let displayWidth, displayHeight;
+    
+    if (maxWidth / STANDARD_ASPECT_RATIO <= 600) { // chiều cao không vượt quá 600px
+      displayWidth = maxWidth;
+      displayHeight = maxWidth / STANDARD_ASPECT_RATIO;
+    } else {
+      displayHeight = 600;
+      displayWidth = 600 * STANDARD_ASPECT_RATIO;
+    }
+    
+    setDisplaySize({
+      width: Math.floor(displayWidth),
+      height: Math.floor(displayHeight)
     });
     
     const handleResize = () => {
       if (!containerRef.current) return;
-      const newWidth = containerRef.current.clientWidth;
-      setCanvasSize({
-        width: newWidth,
-        height: newWidth * 0.66
+      const newContainerWidth = containerRef.current.clientWidth - 20;
+      const newMaxWidth = Math.min(newContainerWidth, 800);
+      
+      let newDisplayWidth, newDisplayHeight;
+      if (newMaxWidth / STANDARD_ASPECT_RATIO <= 600) {
+        newDisplayWidth = newMaxWidth;
+        newDisplayHeight = newMaxWidth / STANDARD_ASPECT_RATIO;
+      } else {
+        newDisplayHeight = 600;
+        newDisplayWidth = 600 * STANDARD_ASPECT_RATIO;
+      }
+      
+      setDisplaySize({
+        width: Math.floor(newDisplayWidth),
+        height: Math.floor(newDisplayHeight)
       });
     };
     
@@ -59,15 +90,37 @@ export default function ZoneCanvas({
 
   useEffect(() => {
     if (canvasRef.current) {
-      canvasRef.current.width = canvasSize.width;
-      canvasRef.current.height = canvasSize.height;
+      canvasRef.current.width = displaySize.width;
+      canvasRef.current.height = displaySize.height;
       redrawCanvas();
     }
-  }, [canvasSize]);
+  }, [displaySize]);
 
   useEffect(() => {
     redrawCanvas();
   }, [zones, currentPoints]);
+
+  // Chuyển đổi tọa độ từ kích thước chuẩn sang kích thước hiển thị
+  const convertFromStandardToDisplay = (standardCoords: number[][]): number[][] => {
+    const scaleX = displaySize.width / STANDARD_WIDTH;
+    const scaleY = displaySize.height / STANDARD_HEIGHT;
+    
+    return standardCoords.map(([x, y]) => [
+      Math.round(x * scaleX),
+      Math.round(y * scaleY)
+    ]);
+  };
+
+  // Chuyển đổi tọa độ từ kích thước hiển thị sang kích thước chuẩn
+  const convertFromDisplayToStandard = (displayCoords: number[][]): number[][] => {
+    const scaleX = STANDARD_WIDTH / displaySize.width;
+    const scaleY = STANDARD_HEIGHT / displaySize.height;
+    
+    return displayCoords.map(([x, y]) => [
+      Math.round(x * scaleX),
+      Math.round(y * scaleY)
+    ]);
+  };
 
   const redrawCanvas = () => {
     if (!canvasRef.current) return;
@@ -78,19 +131,22 @@ export default function ZoneCanvas({
     
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
+    // Vẽ background image
     if (imgRef.current) {
       ctx.drawImage(imgRef.current, 0, 0, canvas.width, canvas.height);
     }
     
-    // Draw existing zones
+    // Vẽ zones đã lưu (chuyển đổi từ tọa độ chuẩn sang hiển thị)
     zones.forEach(zone => {
+      const displayCoords = convertFromStandardToDisplay(zone.coordinates);
+      
       ctx.beginPath();
       
-      if (zone.coordinates.length > 0) {
-        ctx.moveTo(zone.coordinates[0][0], zone.coordinates[0][1]);
+      if (displayCoords.length > 0) {
+        ctx.moveTo(displayCoords[0][0], displayCoords[0][1]);
         
-        for (let i = 1; i < zone.coordinates.length; i++) {
-          ctx.lineTo(zone.coordinates[i][0], zone.coordinates[i][1]);
+        for (let i = 1; i < displayCoords.length; i++) {
+          ctx.lineTo(displayCoords[i][0], displayCoords[i][1]);
         }
         
         if (zone.type !== 'line') {
@@ -107,10 +163,10 @@ export default function ZoneCanvas({
         ctx.fill();
       }
 
-      // Draw zone name for lane zones
-      if (zone.type === 'lane' && zone.coordinates.length > 0) {
-        const centerX = zone.coordinates.reduce((sum, coord) => sum + coord[0], 0) / zone.coordinates.length;
-        const centerY = zone.coordinates.reduce((sum, coord) => sum + coord[1], 0) / zone.coordinates.length;
+      // Vẽ tên zone cho lane zones
+      if (zone.type === 'lane' && displayCoords.length > 0) {
+        const centerX = displayCoords.reduce((sum, coord) => sum + coord[0], 0) / displayCoords.length;
+        const centerY = displayCoords.reduce((sum, coord) => sum + coord[1], 0) / displayCoords.length;
         
         ctx.fillStyle = "#000";
         ctx.font = "14px Arial";
@@ -119,9 +175,9 @@ export default function ZoneCanvas({
       }
     });
     
-    // Draw current points and connecting lines
+    // Vẽ các điểm đang vẽ (tọa độ hiển thị)
     if (currentPoints.length > 0) {
-      // Draw points
+      // Vẽ điểm
       currentPoints.forEach((point, index) => {
         ctx.beginPath();
         ctx.arc(point[0], point[1], 4, 0, Math.PI * 2);
@@ -134,7 +190,7 @@ export default function ZoneCanvas({
         ctx.fillText(`${index + 1}`, point[0] + 6, point[1] - 6);
       });
       
-      // Connect points with lines
+      // Nối các điểm
       ctx.beginPath();
       ctx.moveTo(currentPoints[0][0], currentPoints[0][1]);
       
@@ -172,6 +228,7 @@ export default function ZoneCanvas({
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
     
+    // Tọa độ click trên canvas hiển thị
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
@@ -198,10 +255,13 @@ export default function ZoneCanvas({
     }
     
     if (isValid) {
+      // Chuyển đổi tọa độ từ hiển thị sang chuẩn trước khi lưu
+      const standardCoords = convertFromDisplayToStandard(currentPoints);
+      
       const newZone: Zone = {
         id: nextZoneId.toString(),
         type: activeZoneType as "lane" | "line" | "light",
-        coordinates: currentPoints,
+        coordinates: standardCoords, // Lưu tọa độ chuẩn
         name: `${activeZoneType.charAt(0).toUpperCase() + activeZoneType.slice(1)} Zone ${nextZoneId}`,
         color: getZoneColor(activeZoneType)
       };
@@ -226,12 +286,19 @@ export default function ZoneCanvas({
 
   return (
     <div>
-      <div ref={containerRef} className="relative border rounded">
+      {/* Thông tin kích thước để debug */}
+      <div className="mb-2 text-sm text-gray-600">
+        Display: {displaySize.width}x{displaySize.height} | 
+        Standard: {STANDARD_WIDTH}x{STANDARD_HEIGHT} |
+        Image: {imageSize.width}x{imageSize.height}
+      </div>
+      
+      <div ref={containerRef} className="relative border rounded flex justify-center">
         <canvas
           ref={canvasRef}
-          width={canvasSize.width}
-          height={canvasSize.height}
-          className="cursor-crosshair"
+          width={displaySize.width}
+          height={displaySize.height}
+          className="cursor-crosshair border"
           onClick={handleCanvasClick}
         />
         {!activeZoneType && (
@@ -258,7 +325,7 @@ export default function ZoneCanvas({
               onClick={handleClearPoints}
               className="px-2 py-1 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 text-sm"
             >
-              Clear All
+            Clear All
             </button>
             <button 
               onClick={handleFinishZone}

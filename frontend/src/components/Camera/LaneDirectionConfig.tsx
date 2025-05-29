@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Zone, LaneDirection } from "../../Pages/Dashboard/AddCamera";
+import { Zone, LaneDirection } from "../../Pages/Dashboard/Camera/AddCamera";
 
 interface LaneDirectionConfigProps {
   zones: Zone[];
