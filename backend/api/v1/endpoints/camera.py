@@ -5,7 +5,7 @@ from fastapi.encoders import jsonable_encoder
 
 from services.camera_service import (
     stream_normal_video_service,
-    stream_violation_video_service,
+    stream_violation_video_service,stream_violation_video_service1,
     stream_count_video_service,stream_accident_video_service,stream_plate_with_ocr_video_service,
     stream_violation_wrongway_video_service
 
@@ -94,6 +94,11 @@ def stream_video(camera_id: int, db: Session = Depends(get_db)):
     elif camera_id == 6:
         return StreamingResponse(
             stream_violation_wrongway_video_service(camera.stream_url),
+            media_type="multipart/x-mixed-replace; boundary=frame"
+        )
+    elif camera_id >= 25:
+        return StreamingResponse(
+            stream_violation_video_service1(camera.stream_url, camera.id),
             media_type="multipart/x-mixed-replace; boundary=frame"
         )
     else:
