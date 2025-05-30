@@ -11,7 +11,7 @@ This is the backend service for the SurTraff application, providing API endpoint
    ```
 3. Create a `.env` file with the following variables:
    ```
-   DATABASE_URL=postgresql://postgres:postgres@localhost:5432/surtraff
+   DATABASE_URL=postgresql://postgres:postgres@localhost:5432/SurTraff3
    ENVIRONMENT=development
    ```
 4. Make sure you have the YOLOv8 model file `bestCOCO.pt` in the backend directory

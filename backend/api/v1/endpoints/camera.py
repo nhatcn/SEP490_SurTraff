@@ -5,23 +5,25 @@ from fastapi.encoders import jsonable_encoder
 
 from services.camera_service import (
     stream_normal_video_service,
-    stream_violation_video_service,stream_violation_video_service1,
-    stream_count_video_service,stream_accident_video_service,stream_plate_with_ocr_video_service,
-    stream_violation_wrongway_video_service
-
+    stream_violation_video_service,
+    stream_violation_video_service1,
+    stream_count_video_service,
+    stream_accident_video_service,
+    stream_plate_with_ocr_video_service,
+    stream_violation_wrongway_video_service,
+   
 )
+from services.stream_overspeed_video_service_updated import  stream_overspeed_video_service
 from db.session import get_db
 from models.model import Camera
-from schemas.camera_schema  import CameraCreate, CameraUpdate
+from schemas.camera_schema import CameraCreate, CameraUpdate
 
 router = APIRouter()
-
 
 @router.get("/cameras")
 def get_all_cameras(db: Session = Depends(get_db)):
     cameras = db.query(Camera).all()
     return jsonable_encoder(cameras)
-
 
 @router.post("/cameras")
 def create_camera(camera: CameraCreate, db: Session = Depends(get_db)):
@@ -39,7 +41,6 @@ def create_camera(camera: CameraCreate, db: Session = Depends(get_db)):
     db.refresh(new_camera)
     return new_camera
 
-
 @router.put("/cameras/{camera_id}")
 def update_camera(camera_id: int, camera: CameraUpdate, db: Session = Depends(get_db)):
     db_camera = db.query(Camera).filter(Camera.id == camera_id).first()
@@ -53,7 +54,6 @@ def update_camera(camera_id: int, camera: CameraUpdate, db: Session = Depends(ge
     db.commit()
     db.refresh(db_camera)
     return db_camera
-
 
 @router.delete("/cameras/{camera_id}")
 def delete_camera(camera_id: int, db: Session = Depends(get_db)):
@@ -94,6 +94,11 @@ def stream_video(camera_id: int, db: Session = Depends(get_db)):
     elif camera_id == 6:
         return StreamingResponse(
             stream_violation_wrongway_video_service(camera.stream_url),
+            media_type="multipart/x-mixed-replace; boundary=frame"
+        )
+    elif camera_id == 7:
+        return StreamingResponse(
+            stream_overspeed_video_service(camera.stream_url, camera.id, speed_limit_kmh=60.0, pixels_per_meter=10.0),
             media_type="multipart/x-mixed-replace; boundary=frame"
         )
     elif camera_id >= 25:
