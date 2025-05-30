@@ -9,7 +9,7 @@ load_dotenv()
 
 SQLALCHEMY_DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://postgres:postgres@localhost:5432/SurTraff3"
+    "postgresql://postgres:postgres@localhost:5432/SurTraff"
 )
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL)

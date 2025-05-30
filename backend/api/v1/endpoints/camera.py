@@ -11,6 +11,7 @@ from services.camera_service import (
     stream_accident_video_service,
     stream_plate_with_ocr_video_service,
     stream_violation_wrongway_video_service,
+    streamAccidentService
    
 )
 from services.stream_overspeed_video_service_updated import  stream_overspeed_video_service
@@ -99,6 +100,11 @@ def stream_video(camera_id: int, db: Session = Depends(get_db)):
     elif camera_id == 7:
         return StreamingResponse(
             stream_overspeed_video_service(camera.stream_url, camera.id, speed_limit_kmh=60.0, pixels_per_meter=10.0),
+            media_type="multipart/x-mixed-replace; boundary=frame"
+        )
+    elif camera_id == 8:
+        return StreamingResponse(
+            streamAccidentService(camera.stream_url),
             media_type="multipart/x-mixed-replace; boundary=frame"
         )
     elif camera_id >= 25:

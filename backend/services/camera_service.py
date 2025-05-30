@@ -724,4 +724,77 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
     finally:
         cap.release()
         
+def streamAccidentService(youtube_url: str):
+    accident_model = YOLO("accident.pt")
+    car_model = YOLO("yolov8m.pt")             
+
+    stream_url = get_stream_url(youtube_url)
+    cap = cv2.VideoCapture(stream_url)
+
+    if not cap.isOpened():
+        raise ValueError("Cannot open stream")
+
+    alert_triggered = False  
+
+    try:
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                cap.release()
+                cap = cv2.VideoCapture(stream_url)
+                continue
+
+            accident_results = accident_model(frame)
+            accident_detected = False
+
+            for result in accident_results:
+                for box in result.boxes:
+                    class_id = int(box.cls[0])
+                    if accident_model.names[class_id] == 'accident' and box.conf[0] > 0.5:
+                        accident_detected = True
+                        break
+
+            if accident_detected:
+                
+                for result in accident_results:
+                    for box in result.boxes:
+                        class_id = int(box.cls[0])
+                        if accident_model.names[class_id] != 'accident':
+                            continue
+                        x1, y1, x2, y2 = map(int, box.xyxy[0])
+                        conf = float(box.conf[0])
+                        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+                        cv2.putText(frame, f"accident {conf:.2f}", (x1, y1 - 10),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+               
+                if not alert_triggered:
+                    alert_triggered = True
+                    print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Accident detected!")
+                cv2.putText(frame, 'ALERT: ACCIDENT DETECTED!', (50, 50),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
+            else:
+                
+                car_results = car_model(frame)
+                for result in car_results:
+                    for box in result.boxes:
+                        class_id = int(box.cls[0])
+                        if car_model.names[class_id] != 'car':
+                            continue
+                        x1, y1, x2, y2 = map(int, box.xyxy[0])
+                        conf = float(box.conf[0])
+                        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                        cv2.putText(frame, f"car {conf:.2f}", (x1, y1 - 10),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                alert_triggered = False  
+
+            
+            _, jpeg = cv2.imencode('.jpg', frame)
+            yield (
+                b"--frame\r\n"
+                b"Content-Type: image/jpeg\r\n\r\n" + jpeg.tobytes() + b"\r\n"
+            )
+
+    finally:
+        cap.release()
+        
 
