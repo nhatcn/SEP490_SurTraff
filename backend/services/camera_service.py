@@ -723,3 +723,5 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
 
     finally:
         cap.release()
+        
+

@@ -19,4 +19,4 @@ beautifulsoup4==4.12.2
 matplotlib==3.8.0
 scipy==1.11.3
 pillow==10.0.0
-motpy==0.0.1 
+motpy==0.0.6 
