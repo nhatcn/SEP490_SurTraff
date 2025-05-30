@@ -73,7 +73,7 @@ def stream_video(camera_id: int, db: Session = Depends(get_db)):
 
     if camera_id == 2:
         return StreamingResponse(
-            stream_overspeed_video_service(camera.stream_url, camera.id),
+            stream_violation_video_service(camera.stream_url, camera.id),
             media_type="multipart/x-mixed-replace; boundary=frame"
         )
     elif camera_id == 3:
