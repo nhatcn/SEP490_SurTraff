@@ -1,32 +1,104 @@
 import { Search, Bell, User, ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface HeaderProps {
   title: string;
 }
 
+interface UserData {
+  id: string;
+  name: string;
+  email: string;
+  avatar?: string;
+  role: string;
+}
+
 export default function Header({ title }: HeaderProps) {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const userId = localStorage.getItem('userId');
+        const role = localStorage.getItem('role') || 'Admin';
+        
+        if (!userId) {
+          setUserData({ 
+            id: '', 
+            name: 'Admin', 
+            email: '', 
+            role: role 
+          });
+          setLoading(false);
+          return;
+        }
+
+        const response = await fetch(`http://localhost:8081/api/users/${userId}`);
+        
+        if (response.ok) {
+          const user = await response.json();
+          console.log('User data from API:', user); // Debug log
+          setUserData({ 
+            ...user, 
+            role: role || user.role || 'Admin' 
+          });
+        } else {
+          // Fallback if API call fails
+          setUserData({ 
+            id: userId, 
+            name: 'User', 
+            email: '', 
+            role: role 
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+        // Fallback on error
+        const userId = localStorage.getItem('userId') || '';
+        const role = localStorage.getItem('role') || 'Admin';
+        setUserData({ 
+          id: userId, 
+          name: 'User', 
+          email: '', 
+          role: role 
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserData();
+  }, []);
+
+  // Generate avatar initials from name or email
+  const getAvatarInitials = (user: UserData) => {
+    if (user.name) {
+      const words = user.name.split(' ').filter(word => word.length > 0);
+      if (words.length >= 2) {
+        return (words[0][0] + words[1][0]).toUpperCase();
+      }
+      return user.name.substring(0, 2).toUpperCase();
+    }
+    
+    if (user.email) {
+      const namePart = user.email.split('@')[0];
+      return namePart.substring(0, 2).toUpperCase();
+    }
+    
+    return 'AD';
+  };
   
   return (
-    <header className="bg-white  border-gray-200 py-4 px-6 flex items-center justify-between">
+    <header className="bg-white border-gray-200 py-4 px-6 flex items-center justify-between">
       <div>
         <h1 className="text-xl font-semibold text-gray-800">{title}</h1>
       </div>
       
       <div className="flex items-center space-x-4">
-        <div className="relative">
-          <div className="flex items-center bg-gray-100 rounded-lg px-3 py-2">
-            <Search size={18} className="text-gray-500" />
-            <input 
-              type="text" 
-              placeholder="Search cameras..." 
-              className="bg-transparent border-none outline-none ml-2 text-sm w-48 placeholder-gray-400"
-            />
-          </div>
-        </div>
-        
+
         <div className="relative">
           <button 
             className="relative p-2 rounded-full hover:bg-gray-100 transition-colors"
@@ -71,10 +143,27 @@ export default function Header({ title }: HeaderProps) {
             className="flex items-center space-x-2 rounded-lg hover:bg-gray-100 py-1 px-2 transition-colors"
             onClick={() => setShowUserMenu(!showUserMenu)}
           >
-            <div className="bg-blue-100 text-blue-600 w-8 h-8 rounded-full flex items-center justify-center font-medium">
-              AD
+            {userData?.avatar ? (
+              <img 
+                src={userData.avatar} 
+                alt="User Avatar" 
+                className="w-8 h-8 rounded-full object-cover"
+                onError={(e) => {
+                  // Fallback to initials if image fails to load
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                  target.nextElementSibling?.classList.remove('hidden');
+                }}
+              />
+            ) : null}
+            <div 
+              className={`bg-blue-100 text-blue-600 w-8 h-8 rounded-full flex items-center justify-center font-medium ${userData?.avatar ? 'hidden' : ''}`}
+            >
+              {loading ? '...' : (userData ? getAvatarInitials(userData) : 'AD')}
             </div>
-            <span className="text-sm text-gray-700 font-medium">Admin</span>
+            <span className="text-sm text-gray-700 font-medium">
+              {loading ? 'Loading...' : (userData?.name || userData?.role || 'Admin')}
+            </span>
             <ChevronDown size={16} className="text-gray-500" />
           </button>
           

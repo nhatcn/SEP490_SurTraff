@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from "react";
 import { Zone } from "../../Pages/Dashboard/Camera/AddCamera";
 
 interface ZoneCanvasProps {
-  activeZoneType: string | null;
   zones: Zone[];
   setZones: React.Dispatch<React.SetStateAction<Zone[]>>;
   thumbnailUrl: string;
@@ -17,7 +16,6 @@ const STANDARD_HEIGHT = 480;
 const STANDARD_ASPECT_RATIO = STANDARD_WIDTH / STANDARD_HEIGHT; // 4:3
 
 export default function ZoneCanvas({ 
-  activeZoneType,
   zones,
   setZones,
   thumbnailUrl,
@@ -31,6 +29,17 @@ export default function ZoneCanvas({
   const [displaySize, setDisplaySize] = useState({ width: 640, height: 480 });
   const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  // State cho việc chọn zone type - đã di chuyển vào component này
+  const [activeZoneType, setActiveZoneType] = useState<string | null>(null);
+  
+  // Danh sách các loại zone
+  const zoneTypes = [
+    { value: 'lane', label: 'Lane Zone', color: '#3B82F6', icon: '🛣️' },
+    { value: 'line', label: 'Line Zone', color: '#EF4444', icon: '📏' },
+    { value: 'light', label: 'Light Zone', color: '#F59E0B', icon: '🚦' },
+    { value: 'speed', label: 'Speed Zone', color: '#10B981', icon: '🚗' }
+  ];
   
   useEffect(() => {
     const img = new Image();
@@ -163,8 +172,8 @@ export default function ZoneCanvas({
         ctx.fill();
       }
 
-      // Vẽ tên zone cho lane zones
-      if (zone.type === 'lane' && displayCoords.length > 0) {
+      // Vẽ tên zone cho lane zones và speed zones
+      if ((zone.type === 'lane' || zone.type === 'speed') && displayCoords.length > 0) {
         const centerX = displayCoords.reduce((sum, coord) => sum + coord[0], 0) / displayCoords.length;
         const centerY = displayCoords.reduce((sum, coord) => sum + coord[1], 0) / displayCoords.length;
         
@@ -172,6 +181,18 @@ export default function ZoneCanvas({
         ctx.font = "14px Arial";
         ctx.textAlign = "center";
         ctx.fillText(zone.name, centerX, centerY);
+      }
+
+      // Thêm icon hoặc ký hiệu đặc biệt cho speed zone
+      if (zone.type === 'speed' && displayCoords.length > 0) {
+        const centerX = displayCoords.reduce((sum, coord) => sum + coord[0], 0) / displayCoords.length;
+        const centerY = displayCoords.reduce((sum, coord) => sum + coord[1], 0) / displayCoords.length;
+        
+        // Vẽ biểu tượng tốc độ (speedometer icon)
+        ctx.fillStyle = zone.color;
+        ctx.font = "16px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("🚗", centerX, centerY - 20);
       }
     });
     
@@ -218,7 +239,18 @@ export default function ZoneCanvas({
       case 'lane': return "#3B82F6";
       case 'line': return "#EF4444";
       case 'light': return "#F59E0B";
+      case 'speed': return "#10B981"; // Màu xanh lá cho speed zone
       default: return "#888";
+    }
+  };
+
+  const getZoneRequirements = (zoneType: string | null): { min: number; max?: number } => {
+    switch(zoneType) {
+      case 'line': return { min: 2, max: 2 };
+      case 'speed': return { min: 4, max: 4 }; // Speed zone cần đúng 4 điểm
+      case 'lane':
+      case 'light':
+      default: return { min: 4 }; // Minimum 4 points, no maximum
     }
   };
 
@@ -232,11 +264,21 @@ export default function ZoneCanvas({
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
+    const requirements = getZoneRequirements(activeZoneType);
+    
     if (activeZoneType === 'line') {
       if (currentPoints.length < 2) {
         setCurrentPoints([...currentPoints, [x, y]]);
       } else {
         setCurrentPoints([currentPoints[0], [x, y]]);
+      }
+    } else if (activeZoneType === 'speed') {
+      if (currentPoints.length < 4) {
+        setCurrentPoints([...currentPoints, [x, y]]);
+      } else {
+        // Replace the oldest point if already have 4 points
+        const newPoints = [...currentPoints.slice(1), [x, y]];
+        setCurrentPoints(newPoints);
       }
     } else {
       setCurrentPoints([...currentPoints, [x, y]]);
@@ -246,12 +288,15 @@ export default function ZoneCanvas({
   const handleFinishZone = () => {
     if (!activeZoneType) return;
     
+    const requirements = getZoneRequirements(activeZoneType);
     let isValid = false;
     
-    if (activeZoneType === 'line') {
-      isValid = currentPoints.length === 2;
+    if (requirements.max) {
+      // Fixed number of points required
+      isValid = currentPoints.length === requirements.min;
     } else {
-      isValid = currentPoints.length >= 4;
+      // Minimum number of points required
+      isValid = currentPoints.length >= requirements.min;
     }
     
     if (isValid) {
@@ -260,7 +305,7 @@ export default function ZoneCanvas({
       
       const newZone: Zone = {
         id: nextZoneId.toString(),
-        type: activeZoneType as "lane" | "line" | "light",
+        type: activeZoneType as "lane" | "line" | "light" | "speed",
         coordinates: standardCoords, // Lưu tọa độ chuẩn
         name: `${activeZoneType.charAt(0).toUpperCase() + activeZoneType.slice(1)} Zone ${nextZoneId}`,
         color: getZoneColor(activeZoneType)
@@ -269,8 +314,13 @@ export default function ZoneCanvas({
       setZones(prev => [...prev, newZone]);
       setNextZoneId(prev => prev + 1);
       setCurrentPoints([]);
-    } else if (activeZoneType !== 'line' && currentPoints.length < 4) {
-      alert(`${activeZoneType.charAt(0).toUpperCase() + activeZoneType.slice(1)} zones must have at least 4 points.`);
+    } else {
+      const requirements = getZoneRequirements(activeZoneType);
+      if (requirements.max) {
+        alert(`${activeZoneType.charAt(0).toUpperCase() + activeZoneType.slice(1)} zones must have exactly ${requirements.min} points.`);
+      } else {
+        alert(`${activeZoneType.charAt(0).toUpperCase() + activeZoneType.slice(1)} zones must have at least ${requirements.min} points.`);
+      }
     }
   };
 
@@ -284,8 +334,82 @@ export default function ZoneCanvas({
     }
   };
 
+  const getInstructionText = () => {
+    if (!activeZoneType) return "";
+    
+    const requirements = getZoneRequirements(activeZoneType);
+    
+    if (activeZoneType === 'line') {
+      return 'Exactly 2 points required for line zones.';
+    } else if (activeZoneType === 'speed') {
+      return 'Exactly 4 points required for speed measurement zone.';
+    } else {
+      return 'Minimum 4 points required for polygon zones.';
+    }
+  };
+
   return (
     <div>
+      {/* Zone Type Selection */}
+      <div className="mb-6">
+        <h3 className="text-lg font-semibold mb-3">Select Zone Type</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {zoneTypes.map(type => (
+            <button
+              key={type.value}
+              onClick={() => {
+                setActiveZoneType(type.value);
+                setCurrentPoints([]); // Clear current points when switching zone type
+              }}
+              className={`p-3 rounded-lg border-2 font-medium transition-all duration-200 ${
+                activeZoneType === type.value
+                  ? 'border-2 text-white shadow-lg'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400'
+              }`}
+              style={{
+                backgroundColor: activeZoneType === type.value ? type.color : undefined,
+                borderColor: activeZoneType === type.value ? type.color : undefined
+              }}
+            >
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-xl">{type.icon}</span>
+                <span className="text-sm">{type.label}</span>
+              </div>
+            </button>
+          ))}
+        </div>
+        
+        {/* Clear Selection Button */}
+        <button
+          onClick={() => {
+            setActiveZoneType(null);
+            setCurrentPoints([]);
+          }}
+          className="mt-3 px-4 py-2 rounded-lg border border-gray-300 bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+        >
+          Clear Selection
+        </button>
+        
+        {/* Zone Instructions */}
+        {activeZoneType && (
+          <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">{zoneTypes.find(t => t.value === activeZoneType)?.icon}</span>
+              <div>
+                <strong className="text-blue-800">
+                  {zoneTypes.find(t => t.value === activeZoneType)?.label}:
+                </strong>
+                <span className="text-blue-700 ml-2">
+                  {activeZoneType === 'line' && 'Click exactly 2 points to create a line.'}
+                  {activeZoneType === 'speed' && 'Click exactly 4 points to create a speed measurement zone.'}
+                  {(activeZoneType === 'lane' || activeZoneType === 'light') && 'Click at least 4 points to create a polygon zone.'}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Thông tin kích thước để debug */}
       <div className="mb-2 text-sm text-gray-600">
         Display: {displaySize.width}x{displaySize.height} | 
@@ -308,8 +432,7 @@ export default function ZoneCanvas({
         )}
         {activeZoneType && (
           <div className="absolute bottom-2 left-2 bg-white bg-opacity-75 px-2 py-1 text-sm rounded">
-            Click to add points. {activeZoneType !== 'line' ? 'Minimum 4 points required for polygon zones.' 
-              : 'Exactly 2 points required for line zones.'}
+            Click to add points. {getInstructionText()}
           </div>
         )}
         
@@ -330,10 +453,16 @@ export default function ZoneCanvas({
             <button 
               onClick={handleFinishZone}
               className="px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
-              disabled={(activeZoneType === 'line' && currentPoints.length !== 2) || 
-                (activeZoneType !== 'line' && currentPoints.length < 4)}
+              disabled={(() => {
+                const requirements = getZoneRequirements(activeZoneType);
+                if (requirements.max) {
+                  return currentPoints.length !== requirements.min;
+                } else {
+                  return currentPoints.length < requirements.min;
+                }
+              })()}
             >
-              Finish Zone
+              Finish Zone ({currentPoints.length}/{getZoneRequirements(activeZoneType).max || `${getZoneRequirements(activeZoneType).min}+`})
             </button>
           </div>
         )}
@@ -352,7 +481,10 @@ export default function ZoneCanvas({
                     className="w-4 h-4 mr-2 rounded-full" 
                     style={{ backgroundColor: zone.color }}
                   ></div>
-                  <span>{zone.name} ({zone.coordinates.length} points)</span>
+                  <span>
+                    {zone.name} ({zone.coordinates.length} points)
+                    {zone.type === 'speed' && <span className="ml-1 text-xs bg-green-100 text-green-800 px-1 rounded">SPEED</span>}
+                  </span>
                 </div>
                 <button
                   onClick={() => onDeleteZone(zone.id)}

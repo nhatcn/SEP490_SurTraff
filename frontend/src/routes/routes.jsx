@@ -1,6 +1,6 @@
 // routes.jsx
 import React from 'react';
-import { Route , Routes} from 'react-router-dom';
+import { Route, Routes } from 'react-router-dom';
 
 
 
@@ -16,13 +16,14 @@ import ViolationList from '../Pages/Violations/ViolationList';
 import ViolationDetail from '../Pages/Violations/ViolationDetail';
 import ViolationHistory from '../Pages/Violations/ViolationHistory';
 import EditCamera from '../Pages/Dashboard/Camera/EditCamera';
+import UserProfileDashboard from '../Pages/Dashboard/User/UserProfileDashboard';
 
 
 const RoutesConfig = () => {
   return (
     <Routes>
-        <Route path="/dashboard" element={<CameraDashboard/>} />
-
+      <Route path="/dashboard" element={<CameraDashboard />} />
+      <Route path="/cameras" element={<CameraDashboard />} />
       <Route path="/map" element={<MapDashboard />} />
       <Route path="/login" element={<TrafficMonitoringAuth />} />
       <Route path="/register" element={<RegisterPage />} />
@@ -34,6 +35,7 @@ const RoutesConfig = () => {
       <Route path="/violations" element={<ViolationList />} />
       <Route path="/violations/:id" element={<ViolationDetail />} />
       <Route path="/violations/history/:plate" element={<ViolationHistory />} />
+      <Route path="/profile" element={<UserProfileDashboard />} />
     </Routes>
   );
 };
