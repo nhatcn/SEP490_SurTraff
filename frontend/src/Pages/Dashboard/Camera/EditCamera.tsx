@@ -14,7 +14,7 @@ const markerShadowUrl = "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shad
 
 export interface Zone {
   id: string;
-  type: "lane" | "line" | "light";
+  type: "lane" | "line" | "light" | "speed";
   coordinates: number[][];
   name: string;
   color: string;
@@ -44,6 +44,7 @@ interface CameraData {
   latitude: number;
   longitude: number;
   location: string;
+  thumbnail?: string;
   zones: any[];
   laneDirections: any[];
   lightZoneMappings: any[];
@@ -58,23 +59,27 @@ const defaultIcon = new L.Icon({
   shadowSize: [41, 41]
 });
 
+// Custom marker for current location
+const currentLocationIcon = new L.Icon({
+  iconUrl: "data:image/svg+xml;base64," + btoa(`
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="blue" width="24" height="24">
+      <circle cx="12" cy="12" r="8" fill="#4285f4" stroke="white" stroke-width="2"/>
+      <circle cx="12" cy="12" r="3" fill="white"/>
+    </svg>
+  `),
+  iconSize: [24, 24],
+  iconAnchor: [12, 12],
+  popupAnchor: [0, -12]
+});
+
 function LocationPicker({ 
   onLocationSelect, 
-  initialPosition 
+  currentLocation 
 }: { 
   onLocationSelect: (lat: number, lng: number, address: string) => void;
-  initialPosition: [number, number] | null;
+  currentLocation: [number, number] | null;
 }) {
-  const [position, setPosition] = useState<[number, number] | null>(initialPosition);
-  const [searchQuery, setSearchQuery] = useState("");
-  const map = useMap();
-
-  useEffect(() => {
-    if (initialPosition) {
-      setPosition(initialPosition);
-      map.setView(initialPosition, 15);
-    }
-  }, [initialPosition, map]);
+  const [position, setPosition] = useState<[number, number] | null>(null);
 
   const MapEvents = () => {
     useMapEvents({
@@ -99,55 +104,17 @@ function LocationPicker({
     }
   };
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
-
-    try {
-      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}`);
-      const data = await response.json();
-
-      if (data && data.length > 0) {
-        const { lat, lon } = data[0];
-        const latNum = parseFloat(lat);
-        const lngNum = parseFloat(lon);
-
-        map.setView([latNum, lngNum], 15);
-        setPosition([latNum, lngNum]);
-        onLocationSelect(latNum, lngNum, data[0].display_name || "");
-      } else {
-        alert("Location not found. Please try another search term.");
-      }
-    } catch (error) {
-      console.error("Error searching location:", error);
-      alert("Error searching for location");
-    }
-  };
-
   return (
     <>
-      <div className="absolute top-2 left-2 z-1000 bg-white p-2 rounded shadow-md w-64">
-        <form onSubmit={handleSearch} className="flex">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search location..."
-            className="flex-grow p-2 text-sm border rounded-l"
-          />
-          <button
-            type="submit"
-            className="bg-blue-600 text-white px-3 rounded-r hover:bg-blue-700"
-          >
-            Search
-          </button>
-        </form>
-      </div>
-
       <MapEvents />
       {position && (
         <Marker position={position} icon={defaultIcon}>
           <Popup>Camera location</Popup>
+        </Marker>
+      )}
+      {currentLocation && (
+        <Marker position={currentLocation} icon={currentLocationIcon}>
+          <Popup>Your current location</Popup>
         </Marker>
       )}
     </>
@@ -165,11 +132,17 @@ export default function EditCamera() {
   const [location, setLocation] = useState({ lat: 0, lng: 0, selected: false });
   const [zones, setZones] = useState<Zone[]>([]);
   const [activeZoneType, setActiveZoneType] = useState<string | null>(null);
-  const [thumbnailUrl, setThumbnailUrl] = useState("https://cdn.discordapp.com/attachments/1242410259205591071/1377269674659811389/image.png?ex=683859d6&is=68370856&hm=ab8a11b4c25e432ffb136cbf4c0b0b31fb25cbb3e40d4d3c3e2829b888505523&");
+  const [thumbnailUrl, setThumbnailUrl] = useState("https://cdn.discordapp.com/attachments/1242410259205591071/1377269674659811389/image.png?ex=683a5416&is=68390296&hm=490eca1145356df872482526625906149950bef8b99763406476284304405471&");
   const [laneDirections, setLaneDirections] = useState<LaneDirection[]>([]);
   const [lightZoneMappings, setLightZoneMappings] = useState<LightZoneMapping[]>([]);
   const [nextZoneId, setNextZoneId] = useState<number>(1);
   const [originalCameraData, setOriginalCameraData] = useState<CameraData | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [mapRef, setMapRef] = useState<L.Map | null>(null);
+  const [searchSuggestions, setSearchSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [currentLocation, setCurrentLocation] = useState<[number, number] | null>(null);
 
   // Helper function to get zone color based on type
   const getZoneColor = (zoneType: string): string => {
@@ -177,9 +150,68 @@ export default function EditCamera() {
       case 'lane': return "#3B82F6";
       case 'line': return "#EF4444"; 
       case 'light': return "#F59E0B";
+      case 'speed': return "#10B981";
       default: return "#888";
     }
   };
+
+  // Get current location on component mount
+  useEffect(() => {
+    const getCurrentLocation = () => {
+      setIsGettingLocation(true);
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            setCurrentLocation([latitude, longitude]);
+            setIsGettingLocation(false);
+          },
+          (error) => {
+            console.warn("Error getting location:", error);
+            setIsGettingLocation(false);
+          },
+          { 
+            enableHighAccuracy: true, 
+            timeout: 5000, 
+            maximumAge: 0 
+          }
+        );
+      } else {
+        setIsGettingLocation(false);
+      }
+    };
+
+    if (mapRef) {
+      getCurrentLocation();
+    }
+  }, [mapRef]);
+
+  // Search suggestions
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      if (searchQuery.length < 3) {
+        setSearchSuggestions([]);
+        setShowSuggestions(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=5&countrycodes=vn`
+        );
+        const data = await response.json();
+        setSearchSuggestions(data);
+        setShowSuggestions(true);
+      } catch (error) {
+        console.error("Error fetching suggestions:", error);
+        setSearchSuggestions([]);
+        setShowSuggestions(false);
+      }
+    };
+
+    const debounceTimer = setTimeout(fetchSuggestions, 300);
+    return () => clearTimeout(debounceTimer);
+  }, [searchQuery]);
 
   // Load camera data on component mount
   useEffect(() => {
@@ -210,10 +242,15 @@ export default function EditCamera() {
           selected: true
         });
 
+        // Set thumbnail URL if available
+        if (cameraData.thumbnail) {
+          setThumbnailUrl(cameraData.thumbnail);
+        }
+
         // Transform and set zones
         const transformedZones: Zone[] = cameraData.zones.map(zone => ({
           id: zone.id.toString(),
-          type: zone.zoneType as "lane" | "line" | "light",
+          type: zone.zoneType as "lane" | "line" | "light" | "speed",
           coordinates: JSON.parse(zone.coordinates),
           name: zone.name,
           color: getZoneColor(zone.zoneType)
@@ -276,6 +313,89 @@ export default function EditCamera() {
     setLocationAddress(address);
   };
 
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim() || !mapRef) return;
+
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=vn`);
+      const data = await response.json();
+
+      if (data && data.length > 0) {
+        const { lat, lon } = data[0];
+        const latNum = parseFloat(lat);
+        const lngNum = parseFloat(lon);
+
+        mapRef.setView([latNum, lngNum], 15);
+        handleLocationSelect(latNum, lngNum, data[0].display_name || "");
+      } else {
+        alert("Location not found. Please try another search term.");
+      }
+    } catch (error) {
+      console.error("Error searching location:", error);
+      alert("Error searching for location");
+    }
+    
+    setShowSuggestions(false);
+  };
+
+  const handleSuggestionClick = (suggestion: any) => {
+    const latNum = parseFloat(suggestion.lat);
+    const lngNum = parseFloat(suggestion.lon);
+    
+    if (mapRef) {
+      mapRef.setView([latNum, lngNum], 15);
+      handleLocationSelect(latNum, lngNum, suggestion.display_name || "");
+    }
+    
+    setSearchQuery(suggestion.display_name);
+    setShowSuggestions(false);
+  };
+
+  const getCurrentLocationManually = () => {
+    setIsGettingLocation(true);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setCurrentLocation([latitude, longitude]);
+          if (mapRef) {
+            mapRef.setView([latitude, longitude], 15);
+            // Also reverse geocode to get address
+            reverseGeocode(latitude, longitude).then(address => {
+              handleLocationSelect(latitude, longitude, address);
+            });
+          }
+          setIsGettingLocation(false);
+        },
+        (error) => {
+          console.error("Error getting location:", error);
+          alert("Unable to get your current location. Please check your browser permissions.");
+          setIsGettingLocation(false);
+        },
+        { 
+          enableHighAccuracy: true, 
+          timeout: 10000, 
+          maximumAge: 0 
+        }
+      );
+    } else {
+      alert("Geolocation is not supported by this browser.");
+      setIsGettingLocation(false);
+    }
+  };
+
+  const reverseGeocode = async (lat: number, lng: number): Promise<string> => {
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+      const data = await response.json();
+      return data.display_name || "Address not found";
+    } catch (error) {
+      console.error("Error in reverse geocoding:", error);
+      return "Failed to get address";
+    }
+  };
+
   const handleDeleteZone = (zoneId: string) => {
     setZones(zones.filter(zone => zone.id !== zoneId));
 
@@ -303,6 +423,7 @@ export default function EditCamera() {
         latitude: location.lat,
         longitude: location.lng,
         location: locationAddress,
+        thumbnail: thumbnailUrl, // Add thumbnail to update data
         zones: zones.map(z => ({
           id: parseInt(z.id),
           name: z.name,
@@ -401,12 +522,77 @@ export default function EditCamera() {
 
             <div className="mb-6">
               <label className="block mb-2 font-medium">Location *</label>
+              
+              {/* Search box moved outside map */}
+              <div className="mb-4">
+                <div className="flex max-w-md gap-2">
+                  <div className="flex-grow relative">
+                    <form onSubmit={handleSearch} className="flex">
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onFocus={() => searchSuggestions.length > 0 && setShowSuggestions(true)}
+                        onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                        placeholder="Search location in Vietnam..."
+                        className="flex-grow p-2 text-sm border rounded-l focus:ring focus:ring-blue-300 focus:outline-none"
+                      />
+                      <button
+                        type="submit"
+                        className="bg-blue-600 text-white px-4 py-2 rounded-r hover:bg-blue-700"
+                      >
+                        Search
+                      </button>
+                    </form>
+                    
+                    {/* Search Suggestions */}
+                    {showSuggestions && searchSuggestions.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-b shadow-lg z-[1000] max-h-48 overflow-y-auto">
+                        {searchSuggestions.map((suggestion, index) => (
+                          <div
+                            key={index}
+                            onClick={() => handleSuggestionClick(suggestion)}
+                            className="p-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                          >
+                            <div className="text-sm font-medium text-gray-900">
+                              {suggestion.display_name.split(',')[0]}
+                            </div>
+                            <div className="text-xs text-gray-500 truncate">
+                              {suggestion.display_name}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <button
+                    type="button"
+                    onClick={getCurrentLocationManually}
+                    disabled={isGettingLocation}
+                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:bg-green-400 flex items-center gap-2"
+                  >
+                    {isGettingLocation ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Getting...
+                      </>
+                    ) : (
+                      <>
+                        📍 My Location
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
               <div className="h-80 border rounded">
                 <MapContainer
                   center={location.selected ? [location.lat, location.lng] : [21.0278, 105.8342]}
                   zoom={13}
                   style={{ height: "100%", width: "100%" }}
                   key={`${location.lat}-${location.lng}`} // Force re-render when location changes
+                  ref={setMapRef}
                 >
                   <TileLayer
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -414,7 +600,7 @@ export default function EditCamera() {
                   />
                   <LocationPicker 
                     onLocationSelect={handleLocationSelect}
-                    initialPosition={location.selected ? [location.lat, location.lng] : null}
+                    currentLocation={currentLocation}
                   />
                 </MapContainer>
               </div>
@@ -450,44 +636,46 @@ export default function EditCamera() {
                   New zones: {zones.filter(z => parseInt(z.id) > (originalCameraData?.zones.length || 0)).length}
                 </p>
                 
-                <div className="flex space-x-4">
-                  <button
-                    onClick={() => setActiveZoneType("lane")}
-                    className={`px-4 py-2 rounded ${activeZoneType === "lane"
-                      ? "bg-blue-600 text-white"
-                      : "bg-blue-100 text-blue-800 hover:bg-blue-200"}`}
-                  >
-                    Add Lane Zone
-                  </button>
-                  <button
-                    onClick={() => setActiveZoneType("line")}
-                    className={`px-4 py-2 rounded ${activeZoneType === "line"
-                      ? "bg-red-600 text-white"
-                      : "bg-red-100 text-red-800 hover:bg-red-200"}`}
-                  >
-                    Add Line Zone
-                  </button>
-                  <button
-                    onClick={() => setActiveZoneType("light")}
-                    className={`px-4 py-2 rounded ${activeZoneType === "light"
-                      ? "bg-amber-600 text-white"
-                      : "bg-amber-100 text-amber-800 hover:bg-amber-200"}`}
-                  >
-                    Add Light Zone
-                  </button>
-                  {activeZoneType && (
+                <div className="mb-4">
+                  <label className="block mb-2 font-medium">Select Zone Type to Draw</label>
+                  <div className="flex space-x-4">
                     <button
-                      onClick={() => setActiveZoneType(null)}
-                      className="px-4 py-2 rounded bg-gray-200 text-gray-800 hover:bg-gray-300"
+                      onClick={() => setActiveZoneType("lane")}
+                      className={`px-4 py-2 rounded ${activeZoneType === "lane"
+                        ? "bg-blue-600 text-white"
+                        : "bg-blue-100 text-blue-800 hover:bg-blue-200"}`}
                     >
-                      Cancel
+                      Lane Zone
                     </button>
-                  )}
+                    <button
+                      onClick={() => setActiveZoneType("line")}
+                      className={`px-4 py-2 rounded ${activeZoneType === "line"
+                        ? "bg-red-600 text-white"
+                        : "bg-red-100 text-red-800 hover:bg-red-200"}`}
+                    >
+                      Line Zone
+                    </button>
+                    <button
+                      onClick={() => setActiveZoneType("light")}
+                      className={`px-4 py-2 rounded ${activeZoneType === "light"
+                        ? "bg-amber-600 text-white"
+                        : "bg-amber-100 text-amber-800 hover:bg-amber-200"}`}
+                    >
+                      Light Zone
+                    </button>
+                    {activeZoneType && (
+                      <button
+                        onClick={() => setActiveZoneType(null)}
+                        className="px-4 py-2 rounded bg-gray-200 text-gray-800 hover:bg-gray-300"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
               <ZoneCanvas
-                activeZoneType={activeZoneType}
                 zones={zones}
                 setZones={setZones}
                 thumbnailUrl={thumbnailUrl}

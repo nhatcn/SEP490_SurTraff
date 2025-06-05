@@ -8,7 +8,7 @@ import TableUser from "../../../components/User/TableUser";
 export default function UserDashboard() {
   return (
     <div className="flex h-screen">
-      <Sidebar />
+      <Sidebar defaultActiveItem="users"/>
       <div className="flex flex-col flex-grow overflow-hidden">
         <Header title="User Dashboard" />
         
