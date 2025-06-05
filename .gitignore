@@ -16,7 +16,7 @@ frontend/.env.*
 # --------------------
 # Python (FastAPI Backend)
 # --------------------
-backend/__pycache__/
+**/__pycache__/
 backend/*.py[cod]
 backend/*.so
 backend/*.egg
