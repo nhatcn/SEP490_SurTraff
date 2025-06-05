@@ -14,14 +14,14 @@ function getLast7Days() {
   return days;
 }
 
-// Đếm số vụ mỗi ngày
-function countAccidentsByDay(accidents, days) {
+// Đếm số vi phạm mỗi ngày
+function countViolationsByDay(violations, days) {
   return days.map(day =>
-    accidents.filter(acc => acc.accident_time && acc.accident_time.slice(0, 10) === day).length
+    violations.filter(vio => vio.created_at && vio.created_at.slice(0, 10) === day).length
   );
 }
 
-export default function CardLineChart({ accidents }) {
+export default function CardLineChartViolations({ violations }) {
   const chartRef = useRef(null);
   const chartInstanceRef = useRef(null);
 
@@ -33,7 +33,7 @@ export default function CardLineChart({ accidents }) {
     }
 
     const days = getLast7Days();
-    const counts = countAccidentsByDay(accidents, days);
+    const counts = countViolationsByDay(violations, days);
 
     const config = {
       type: "line",
@@ -44,7 +44,7 @@ export default function CardLineChart({ accidents }) {
         }),
         datasets: [
           {
-            label: "Accidents",
+            label: "Violations",
             backgroundColor: "#4c51bf",
             borderColor: "#4c51bf",
             data: counts,
@@ -67,7 +67,7 @@ export default function CardLineChart({ accidents }) {
           },
           title: {
             display: false,
-            text: "Accident by Week",
+            text: "Violations by Week",
           },
           tooltip: {
             mode: "index",
@@ -102,7 +102,7 @@ export default function CardLineChart({ accidents }) {
             },
             title: {
               display: false,
-              text: "Accidents",
+              text: "Violations",
               color: "white",
             },
             grid: {
@@ -125,7 +125,7 @@ export default function CardLineChart({ accidents }) {
         chartInstanceRef.current.destroy();
       }
     };
-  }, [accidents]);
+  }, [violations]);
 
   return (
     <div className="relative flex flex-col min-w-0 break-words w-full mb-6 shadow-lg rounded bg-blueGray-700">
@@ -136,7 +136,7 @@ export default function CardLineChart({ accidents }) {
               Statistics
             </h6>
             <h2 className="text-blueGray-700 text-xl font-semibold">
-              Accident by Week
+              Violations by Week
             </h2>
           </div>
         </div>

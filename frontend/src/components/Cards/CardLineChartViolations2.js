@@ -2,10 +2,12 @@ import React, { useEffect, useRef, useState } from "react";
 import { Chart, registerables } from "chart.js";
 Chart.register(...registerables);
 
-function getMonthlyStats(accidents, year, fromDate, toDate) {
+// Hàm lấy số liệu theo tháng cho từng năm, có filter from/to
+function getMonthlyStats(violations, year, fromDate, toDate) {
   const months = Array(12).fill(0);
-  accidents.forEach(acc => {
-    const date = new Date(acc.accident_time);
+  violations.forEach(vio => {
+    if (!vio.created_at) return;
+    const date = new Date(vio.created_at);
     if (
       date.getFullYear() === year &&
       (!fromDate || date >= fromDate) &&
@@ -17,7 +19,12 @@ function getMonthlyStats(accidents, year, fromDate, toDate) {
   return months;
 }
 
-export default function CardBarChart({ accidents }) {
+// Mảng màu cho từng năm (tối đa 7 năm, lặp lại nếu nhiều hơn)
+const COLORS = [
+  "#4c51bf", "#ed64a6", "#38b2ac", "#ecc94b", "#f56565", "#4299e1", "#48bb78"
+];
+
+export default function CardLineChartViolations2({ violations }) {
   const chartRef = useRef(null);
   const chartInstanceRef = useRef(null);
 
@@ -32,59 +39,60 @@ export default function CardBarChart({ accidents }) {
       chartInstanceRef.current.destroy();
     }
 
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const lastYear = currentYear - 1;
+    // Parse date từ input
+    const fromDate = from ? new Date(from) : null;
+    const toDate = to ? new Date(to) : null;
+
+    // Lấy tất cả các năm có trong dữ liệu (sau khi lọc from/to) và sort tăng dần
+    const yearsSet = new Set();
+    violations.forEach(vio => {
+      if (!vio.created_at) return;
+      const date = new Date(vio.created_at);
+      if (
+        (!fromDate || date >= fromDate) &&
+        (!toDate || date <= toDate)
+      ) {
+        yearsSet.add(date.getFullYear());
+      }
+    });
+    const years = Array.from(yearsSet).sort();
 
     const months = [
       "January", "February", "March", "April", "May", "June",
       "July", "August", "September", "October", "November", "December"
     ];
 
-    // Parse date từ input
-    const fromDate = from ? new Date(from) : null;
-    const toDate = to ? new Date(to) : null;
-
-    const dataCurrent = getMonthlyStats(accidents, currentYear, fromDate, toDate);
-    const dataLast = getMonthlyStats(accidents, lastYear, fromDate, toDate);
+    // Tạo dataset cho từng năm
+    const datasets = years.map((year, idx) => ({
+      label: year,
+      backgroundColor: COLORS[idx % COLORS.length],
+      borderColor: COLORS[idx % COLORS.length],
+      data: getMonthlyStats(violations, year, fromDate, toDate),
+      fill: false,
+      tension: 0.3,
+    }));
 
     const config = {
-      type: "bar",
+      type: "line",
       data: {
         labels: months,
-        datasets: [
-          {
-            label: currentYear,
-            backgroundColor: "#ed64a6",
-            borderColor: "#ed64a6",
-            data: dataCurrent,
-            fill: false,
-            barThickness: 8,
-          },
-          {
-            label: lastYear,
-            fill: false,
-            backgroundColor: "#4c51bf",
-            borderColor: "#4c51bf",
-            data: dataLast,
-            barThickness: 8,
-          },
-        ],
+        datasets: datasets,
       },
       options: {
         maintainAspectRatio: false,
         responsive: true,
         plugins: {
           legend: {
+            display: true,
             labels: {
-              color: "rgba(0,0,0,.4)",
+              color: "rgba(255,255,255,.7)",
             },
             align: "end",
             position: "bottom",
           },
           title: {
             display: false,
-            text: "Accident by Month",
+            text: "Violations by Year",
           },
           tooltip: {
             mode: "index",
@@ -97,29 +105,36 @@ export default function CardBarChart({ accidents }) {
         },
         scales: {
           x: {
-            display: false,
+            ticks: {
+              color: "rgba(255,255,255,.7)",
+            },
             title: {
-              display: true,
+              display: false,
               text: "Month",
+              color: "white",
             },
             grid: {
+              display: false,
               borderDash: [2],
               color: "rgba(33, 37, 41, 0.3)",
-              zeroLineColor: "rgba(33, 37, 41, 0.3)",
+              zeroLineColor: "rgba(0, 0, 0, 0)",
               zeroLineBorderDash: [2],
             },
           },
           y: {
-            display: true,
+            ticks: {
+              color: "rgba(255,255,255,.7)",
+            },
             title: {
               display: false,
               text: "Value",
+              color: "white",
             },
             grid: {
-              borderDash: [2],
+              borderDash: [3],
               drawBorder: false,
-              color: "rgba(33, 37, 41, 0.2)",
-              zeroLineColor: "rgba(33, 37, 41, 0.15)",
+              color: "rgba(255, 255, 255, 0.15)",
+              zeroLineColor: "rgba(33, 37, 41, 0)",
               zeroLineBorderDash: [2],
             },
           },
@@ -135,10 +150,10 @@ export default function CardBarChart({ accidents }) {
         chartInstanceRef.current.destroy();
       }
     };
-  }, [accidents, from, to]);
+  }, [violations, from, to]);
 
   return (
-    <div className="relative flex flex-col min-w-0 break-words bg-white w-full mb-6 shadow-lg rounded">
+    <div className="relative flex flex-col min-w-0 break-words w-full mb-6 shadow-lg rounded bg-blueGray-700">
       <div className="rounded-t mb-0 px-4 py-3 bg-transparent">
         <div className="flex flex-wrap items-center justify-between">
           <div>
@@ -146,7 +161,7 @@ export default function CardBarChart({ accidents }) {
               Statistics
             </h6>
             <h2 className="text-blueGray-700 text-xl font-semibold">
-              Accident by Month
+              Violations by Year
             </h2>
           </div>
           <div className="flex gap-2 items-center">
@@ -168,7 +183,6 @@ export default function CardBarChart({ accidents }) {
         </div>
       </div>
       <div className="p-4 flex-auto">
-        {/* Chart */}
         <div className="relative h-350-px">
           <canvas ref={chartRef}></canvas>
         </div>

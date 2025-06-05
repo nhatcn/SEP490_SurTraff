@@ -7,6 +7,7 @@ import CardLineChart from "../../components/Cards/CardLineChart";
 import CardBarChart from "../../components/Cards/CardBarChart";
 import CardPageVisits from "../../components/Cards/CardPageVisits";
 import CardSocialTraffic from "../../components/Cards/CardSocialTraffic";
+import CardLineChart2 from "../../components/Cards/CardLineChart2";
 
 interface Camera {
   id: number;
@@ -56,7 +57,7 @@ const AccidentStatistics: React.FC = () => {
           {/* Dashboard 4 card như Notus React */}
           <div className="flex flex-wrap">
             <div className="w-full xl:w-8/12 mb-12 xl:mb-0 px-4">
-              <CardLineChart />
+              <CardLineChart accidents={accidents} />
             </div>
             <div className="w-full xl:w-4/12 px-4">
               <CardBarChart accidents={accidents} />
@@ -71,6 +72,9 @@ const AccidentStatistics: React.FC = () => {
             </div>
           </div>*/}
           {/* Bảng thống kê accident */}
+          <div className="w-full px-4">
+              <CardLineChart2 accidents={accidents} />
+          </div>
           <div className="w-full max-w-6xl mx-auto mt-8 bg-white rounded-lg shadow-lg p-6">
             <h2 className="text-2xl font-bold mb-6 text-blue-700">Accident Statistics Table</h2>
             {loading ? (

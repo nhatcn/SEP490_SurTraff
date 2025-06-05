@@ -2,10 +2,11 @@ import React, { useEffect, useRef, useState } from "react";
 import { Chart, registerables } from "chart.js";
 Chart.register(...registerables);
 
-function getMonthlyStats(accidents, year, fromDate, toDate) {
+function getMonthlyStats(violations, year, fromDate, toDate) {
   const months = Array(12).fill(0);
-  accidents.forEach(acc => {
-    const date = new Date(acc.accident_time);
+  violations.forEach(vio => {
+    if (!vio.created_at) return;
+    const date = new Date(vio.created_at);
     if (
       date.getFullYear() === year &&
       (!fromDate || date >= fromDate) &&
@@ -17,7 +18,7 @@ function getMonthlyStats(accidents, year, fromDate, toDate) {
   return months;
 }
 
-export default function CardBarChart({ accidents }) {
+export default function CardBarChartViolationsMonth({ violations }) {
   const chartRef = useRef(null);
   const chartInstanceRef = useRef(null);
 
@@ -45,8 +46,8 @@ export default function CardBarChart({ accidents }) {
     const fromDate = from ? new Date(from) : null;
     const toDate = to ? new Date(to) : null;
 
-    const dataCurrent = getMonthlyStats(accidents, currentYear, fromDate, toDate);
-    const dataLast = getMonthlyStats(accidents, lastYear, fromDate, toDate);
+    const dataCurrent = getMonthlyStats(violations, currentYear, fromDate, toDate);
+    const dataLast = getMonthlyStats(violations, lastYear, fromDate, toDate);
 
     const config = {
       type: "bar",
@@ -84,7 +85,7 @@ export default function CardBarChart({ accidents }) {
           },
           title: {
             display: false,
-            text: "Accident by Month",
+            text: "Violations by Month",
           },
           tooltip: {
             mode: "index",
@@ -97,7 +98,7 @@ export default function CardBarChart({ accidents }) {
         },
         scales: {
           x: {
-            display: false,
+            display: true,
             title: {
               display: true,
               text: "Month",
@@ -135,7 +136,7 @@ export default function CardBarChart({ accidents }) {
         chartInstanceRef.current.destroy();
       }
     };
-  }, [accidents, from, to]);
+  }, [violations, from, to]);
 
   return (
     <div className="relative flex flex-col min-w-0 break-words bg-white w-full mb-6 shadow-lg rounded">
@@ -146,7 +147,7 @@ export default function CardBarChart({ accidents }) {
               Statistics
             </h6>
             <h2 className="text-blueGray-700 text-xl font-semibold">
-              Accident by Month
+              Violations by Month
             </h2>
           </div>
           <div className="flex gap-2 items-center">
