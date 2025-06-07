@@ -1,35 +1,25 @@
+// pages/Auth/ForgotPasswordPage.tsx
 import React, { useState } from 'react';
 import AuthLayout from '../../components/Auth/AuthLayout';
 import AuthInput from '../../components/Auth/AuthInput';
 import AuthButton from '../../components/Auth/AuthButton';
+import { useForgotPassword } from '../../hooks/Auth/useAuth';
+import { ForgotPasswordFormData } from '../../types/Auth/auth';
 
 const ForgotPasswordPage: React.FC = () => {
-  const [email, setEmail] = useState('');
-  const [isSubmitted, setIsSubmitted] = useState(false);
-  const [error, setError] = useState('');
+  const [formData, setFormData] = useState<ForgotPasswordFormData>({
+    email: ''
+  });
+
+  const { isLoading, error, isSubmitted, sendResetEmail } = useForgotPassword();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    await sendResetEmail(formData);
+  };
 
-    try {
-      const response = await fetch('http://localhost:8080/api/users/forgotPassword', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      if (response.ok) {
-        setIsSubmitted(true);
-      } else {
-        const data = await response.json();
-        setError(data.detail || 'Something went wrong.');
-      }
-    } catch (err) {
-      setError('Unable to send request. Please try again later.');
-    }
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({ email: e.target.value });
   };
 
   const EmailIcon = () => (
@@ -63,12 +53,15 @@ const ForgotPasswordPage: React.FC = () => {
               type="email"
               label="Email"
               placeholder="Enter your email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={formData.email}
+              onChange={handleInputChange}
               icon={<EmailIcon />}
+              disabled={isLoading}
             />
 
-            <AuthButton type="submit">Send New Password</AuthButton>
+            <AuthButton type="submit" disabled={isLoading}>
+              {isLoading ? 'Sending...' : 'Send New Password'}
+            </AuthButton>
           </form>
         </>
       ) : (
@@ -87,7 +80,7 @@ const ForgotPasswordPage: React.FC = () => {
             />
           </svg>
           <p className="mb-4">
-            A new password has been sent to <strong>{email}</strong>
+            A new password has been sent to <strong>{formData.email}</strong>
           </p>
           <p className="text-sm">
             Please check your inbox.
