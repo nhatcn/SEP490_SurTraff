@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Zone, LightZoneMapping } from "../../Pages/Dashboard/Camera/AddCamera";
+import { Zone, LightZoneMapping } from '../../types/Camera/camera';
 
 interface LightZoneMappingConfigProps {
   zones: Zone[];

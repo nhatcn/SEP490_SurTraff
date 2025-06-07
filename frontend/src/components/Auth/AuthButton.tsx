@@ -1,26 +1,21 @@
 import React from 'react';
 
 interface AuthButtonProps {
-  type?: 'button' | 'submit' | 'reset';
-  onClick?: () => void;
-  fullWidth?: boolean;
   children: React.ReactNode;
+  type: 'button' | 'submit' | 'reset';
+  disabled?: boolean; // Thêm dòng này
 }
 
-const AuthButton: React.FC<AuthButtonProps> = ({
-  type = 'button',
-  onClick,
-  fullWidth = true,
-  children
-}) => {
+const AuthButton: React.FC<AuthButtonProps> = ({ children, type, disabled = false }) => {
   return (
-    <button 
+    <button
       type={type}
-      onClick={onClick}
-      className={`
-        ${fullWidth ? 'w-full' : ''} 
-        bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors
-      `}
+      disabled={disabled} // Thêm vào đây
+      className={`w-full py-2 px-4 rounded-lg font-semibold transition duration-200 ${
+        disabled
+          ? 'bg-gray-400 cursor-not-allowed'
+          : 'bg-blue-500 hover:bg-blue-600 text-white'
+      }`}
     >
       {children}
     </button>

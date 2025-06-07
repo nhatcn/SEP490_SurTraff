@@ -1,51 +1,34 @@
+// pages/Auth/RegisterPage.tsx
 import React, { useState } from 'react';
 import AuthLayout from '../../components/Auth/AuthLayout';
 import AuthInput from '../../components/Auth/AuthInput';
 import AuthButton from '../../components/Auth/AuthButton';
-import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useRegister } from '../../hooks/Auth/useAuth';
+import { RegisterFormData } from '../../types/Auth/auth';
 
 const RegisterPage: React.FC = () => {
-  const [username, setUsername] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState('');
-  const navigate = useNavigate();
+  const [formData, setFormData] = useState<RegisterFormData>({
+    username: '',
+    fullName: '',
+    password: '',
+    confirmPassword: ''
+  });
+
+  const { isLoading, error, register } = useRegister();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-
-    if (!username || !fullName || !password || !confirmPassword) {
-      setError('All fields are required!');
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setError('Passwords do not match!');
-      return;
-    }
-
-    try {
-      const response = await axios.post('http://localhost:8080/api/users/register', {
-        userName: username,   
-        name: fullName,       
-        password: password,   
-      });
-
-      navigate('/login');
-    } catch (err: any) {
-      const detail = err.response?.data?.error || err.response?.data?.detail;
-
-      if (typeof detail === 'string') {
-        setError(detail);
-      } else {
-        setError('Registration failed.');
-      }
-    }
+    await register(formData);
   };
 
+  const handleInputChange = (field: keyof RegisterFormData) => (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: e.target.value
+    }));
+  };
 
   const UserIcon = () => (
     <svg className="h-4 w-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
@@ -79,9 +62,10 @@ const RegisterPage: React.FC = () => {
           type="text"
           label="Username"
           placeholder="Choose a username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
+          value={formData.username}
+          onChange={handleInputChange('username')}
           icon={<UserIcon />}
+          disabled={isLoading}
         />
 
         <AuthInput
@@ -89,9 +73,10 @@ const RegisterPage: React.FC = () => {
           type="text"
           label="Full Name"
           placeholder="Enter your full name"
-          value={fullName}
-          onChange={(e) => setFullName(e.target.value)}
+          value={formData.fullName}
+          onChange={handleInputChange('fullName')}
           icon={<NameIcon />}
+          disabled={isLoading}
         />
 
         <AuthInput
@@ -99,9 +84,10 @@ const RegisterPage: React.FC = () => {
           type="password"
           label="Password"
           placeholder="Create a password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          value={formData.password}
+          onChange={handleInputChange('password')}
           icon={<LockIcon />}
+          disabled={isLoading}
         />
 
         <AuthInput
@@ -109,12 +95,15 @@ const RegisterPage: React.FC = () => {
           type="password"
           label="Confirm Password"
           placeholder="Confirm your password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
+          value={formData.confirmPassword}
+          onChange={handleInputChange('confirmPassword')}
           icon={<LockIcon />}
+          disabled={isLoading}
         />
 
-        <AuthButton type="submit">Create Account</AuthButton>
+        <AuthButton type="submit" disabled={isLoading}>
+          {isLoading ? 'Creating Account...' : 'Create Account'}
+        </AuthButton>
       </form>
 
       <div className="text-center mt-6">
