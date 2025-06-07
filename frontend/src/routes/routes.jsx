@@ -17,6 +17,8 @@ import ViolationDetail from '../Pages/Violations/ViolationDetail';
 import ViolationHistory from '../Pages/Violations/ViolationHistory';
 import EditCamera from '../Pages/Dashboard/Camera/EditCamera';
 import UserProfileDashboard from '../Pages/Dashboard/User/UserProfileDashboard';
+import AccidentDetails from '../Pages/Dashboard/Accident/AccidentDetails';
+
 
 
 const RoutesConfig = () => {
@@ -31,6 +33,7 @@ const RoutesConfig = () => {
       <Route path="/userdashboard" element={<UserDashboard />} />
       <Route path="/addcamera" element={<AddCameraDashboard />} />
       <Route path="/accidentdashboard" element={<AccidentDashboard />} />
+      <Route path="/accidents/:id" element={<AccidentDetails />} />
       <Route path="/cameras/edit/:id" element={<EditCamera />} />
       <Route path="/violations" element={<ViolationList />} />
       <Route path="/violations/:id" element={<ViolationDetail />} />
