@@ -17,7 +17,7 @@ function getLast7Days() {
 // Đếm số vụ mỗi ngày
 function countAccidentsByDay(accidents, days) {
   return days.map(day =>
-    accidents.filter(acc => acc.accident_time && acc.accident_time.slice(0, 10) === day).length
+    accidents.filter(acc => acc.accidentTime && acc.accidentTime.slice(0, 10) === day).length
   );
 }
 
@@ -142,8 +142,8 @@ export default function CardLineChart({ accidents }) {
         </div>
       </div>
       <div className="p-4 flex-auto">
-        <div className="relative h-350-px">
-          <canvas ref={chartRef}></canvas>
+        <div className="relative h-[200px]">
+          <canvas ref={chartRef} className="w-full h-full"></canvas>
         </div>
       </div>
     </div>

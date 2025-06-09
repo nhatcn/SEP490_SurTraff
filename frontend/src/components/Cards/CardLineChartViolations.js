@@ -17,7 +17,7 @@ function getLast7Days() {
 // Đếm số vi phạm mỗi ngày
 function countViolationsByDay(violations, days) {
   return days.map(day =>
-    violations.filter(vio => vio.created_at && vio.created_at.slice(0, 10) === day).length
+    violations.filter(vio => vio.createdAt && vio.createdAt.slice(0, 10) === day).length
   );
 }
 

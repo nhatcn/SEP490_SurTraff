@@ -6,9 +6,10 @@ Chart.register(...registerables);
 function getMonthlyStats(accidents, year, fromDate, toDate) {
   const months = Array(12).fill(0);
   accidents.forEach(acc => {
-    if (!acc.accident_time) return;
-    const date = new Date(acc.accident_time);
+    if (!acc.accidentTime) return;
+    const date = new Date(acc.accidentTime);
     if (
+      !isNaN(date) &&
       date.getFullYear() === year &&
       (!fromDate || date >= fromDate) &&
       (!toDate || date <= toDate)
@@ -46,9 +47,10 @@ export default function CardLineChart2({ accidents }) {
     // Lấy tất cả các năm có trong dữ liệu (sau khi lọc from/to) và sort tăng dần
     const yearsSet = new Set();
     accidents.forEach(acc => {
-      if (!acc.accident_time) return;
-      const date = new Date(acc.accident_time);
+      if (!acc.accidentTime) return;
+      const date = new Date(acc.accidentTime);
       if (
+        !isNaN(date) &&
         (!fromDate || date >= fromDate) &&
         (!toDate || date <= toDate)
       ) {
@@ -183,8 +185,8 @@ export default function CardLineChart2({ accidents }) {
         </div>
       </div>
       <div className="p-4 flex-auto">
-        <div className="relative h-350-px">
-          <canvas ref={chartRef}></canvas>
+        <div className="relative h-[200px]">
+          <canvas ref={chartRef} className="w-full h-full"></canvas>
         </div>
       </div>
     </div>

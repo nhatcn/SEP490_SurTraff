@@ -5,8 +5,9 @@ Chart.register(...registerables);
 function getMonthlyStats(accidents, year, fromDate, toDate) {
   const months = Array(12).fill(0);
   accidents.forEach(acc => {
-    const date = new Date(acc.accident_time);
+    const date = new Date(acc.accidentTime); // Sửa ở đây
     if (
+      !isNaN(date) &&
       date.getFullYear() === year &&
       (!fromDate || date >= fromDate) &&
       (!toDate || date <= toDate)
@@ -169,9 +170,11 @@ export default function CardBarChart({ accidents }) {
       </div>
       <div className="p-4 flex-auto">
         {/* Chart */}
-        <div className="relative h-350-px">
-          <canvas ref={chartRef}></canvas>
+        <div className="p-4 flex-auto">
+        <div className="relative h-[150px]">
+          <canvas ref={chartRef} className="w-full h-full"></canvas>
         </div>
+      </div>
       </div>
     </div>
   );

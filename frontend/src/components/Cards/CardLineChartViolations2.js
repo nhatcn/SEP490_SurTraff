@@ -2,13 +2,19 @@ import React, { useEffect, useRef, useState } from "react";
 import { Chart, registerables } from "chart.js";
 Chart.register(...registerables);
 
+// Chuyển ngày về ISO nếu cần
+function toISODateString(dateStr) {
+  return dateStr.includes('T') ? dateStr : dateStr.replace(' ', 'T');
+}
+
 // Hàm lấy số liệu theo tháng cho từng năm, có filter from/to
 function getMonthlyStats(violations, year, fromDate, toDate) {
   const months = Array(12).fill(0);
   violations.forEach(vio => {
-    if (!vio.created_at) return;
-    const date = new Date(vio.created_at);
+    if (!vio.createdAt) return;
+    const date = new Date(toISODateString(vio.createdAt));
     if (
+      !isNaN(date) &&
       date.getFullYear() === year &&
       (!fromDate || date >= fromDate) &&
       (!toDate || date <= toDate)
@@ -19,7 +25,6 @@ function getMonthlyStats(violations, year, fromDate, toDate) {
   return months;
 }
 
-// Mảng màu cho từng năm (tối đa 7 năm, lặp lại nếu nhiều hơn)
 const COLORS = [
   "#4c51bf", "#ed64a6", "#38b2ac", "#ecc94b", "#f56565", "#4299e1", "#48bb78"
 ];
@@ -28,7 +33,6 @@ export default function CardLineChartViolations2({ violations }) {
   const chartRef = useRef(null);
   const chartInstanceRef = useRef(null);
 
-  // State cho khoảng ngày
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
 
@@ -39,16 +43,15 @@ export default function CardLineChartViolations2({ violations }) {
       chartInstanceRef.current.destroy();
     }
 
-    // Parse date từ input
     const fromDate = from ? new Date(from) : null;
     const toDate = to ? new Date(to) : null;
 
-    // Lấy tất cả các năm có trong dữ liệu (sau khi lọc from/to) và sort tăng dần
     const yearsSet = new Set();
     violations.forEach(vio => {
-      if (!vio.created_at) return;
-      const date = new Date(vio.created_at);
+      if (!vio.createdAt) return;
+      const date = new Date(toISODateString(vio.createdAt));
       if (
+        !isNaN(date) &&
         (!fromDate || date >= fromDate) &&
         (!toDate || date <= toDate)
       ) {
@@ -62,7 +65,6 @@ export default function CardLineChartViolations2({ violations }) {
       "July", "August", "September", "October", "November", "December"
     ];
 
-    // Tạo dataset cho từng năm
     const datasets = years.map((year, idx) => ({
       label: year,
       backgroundColor: COLORS[idx % COLORS.length],
@@ -71,6 +73,10 @@ export default function CardLineChartViolations2({ violations }) {
       fill: false,
       tension: 0.3,
     }));
+
+    // Debug log
+    // console.log("Years:", years);
+    // console.log("Datasets:", datasets);
 
     const config = {
       type: "line",

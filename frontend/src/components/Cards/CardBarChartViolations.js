@@ -4,10 +4,13 @@ Chart.register(...registerables);
 
 function getMonthlyStats(violations, year, fromDate, toDate) {
   const months = Array(12).fill(0);
-  violations.forEach(vio => {
-    if (!vio.created_at) return;
-    const date = new Date(vio.created_at);
+  violations.forEach((vio) => {
+    // Sửa lại đúng tên trường
+    const createdAt = vio?.createdAt;
+    if (!createdAt) return;
+    const date = new Date(createdAt);
     if (
+      !isNaN(date) &&
       date.getFullYear() === year &&
       (!fromDate || date >= fromDate) &&
       (!toDate || date <= toDate)
@@ -22,13 +25,13 @@ export default function CardBarChartViolationsMonth({ violations }) {
   const chartRef = useRef(null);
   const chartInstanceRef = useRef(null);
 
-  // State cho khoảng ngày
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
 
   useEffect(() => {
     if (!chartRef.current) return;
 
+    // Clear chart nếu đã tồn tại
     if (chartInstanceRef.current) {
       chartInstanceRef.current.destroy();
     }
@@ -37,34 +40,34 @@ export default function CardBarChartViolationsMonth({ violations }) {
     const currentYear = now.getFullYear();
     const lastYear = currentYear - 1;
 
+    const fromDate = from ? new Date(from + "T00:00:00") : null;
+    const toDate = to ? new Date(to + "T23:59:59") : null;
+
+    const dataCurrent = getMonthlyStats(violations, currentYear, fromDate, toDate);
+    const dataLast = getMonthlyStats(violations, lastYear, fromDate, toDate);
+
     const months = [
       "January", "February", "March", "April", "May", "June",
       "July", "August", "September", "October", "November", "December"
     ];
 
-    // Parse date từ input
-    const fromDate = from ? new Date(from) : null;
-    const toDate = to ? new Date(to) : null;
+    const ctx = chartRef.current.getContext("2d");
+    if (!ctx) return;
 
-    const dataCurrent = getMonthlyStats(violations, currentYear, fromDate, toDate);
-    const dataLast = getMonthlyStats(violations, lastYear, fromDate, toDate);
-
-    const config = {
+    chartInstanceRef.current = new Chart(ctx, {
       type: "bar",
       data: {
         labels: months,
         datasets: [
           {
-            label: currentYear,
+            label: `${currentYear}`,
             backgroundColor: "#ed64a6",
             borderColor: "#ed64a6",
             data: dataCurrent,
-            fill: false,
             barThickness: 8,
           },
           {
-            label: lastYear,
-            fill: false,
+            label: `${lastYear}`,
             backgroundColor: "#4c51bf",
             borderColor: "#4c51bf",
             data: dataLast,
@@ -73,32 +76,22 @@ export default function CardBarChartViolationsMonth({ violations }) {
         ],
       },
       options: {
-        maintainAspectRatio: false,
         responsive: true,
+        maintainAspectRatio: false,
         plugins: {
           legend: {
-            labels: {
-              color: "rgba(0,0,0,.4)",
-            },
-            align: "end",
             position: "bottom",
-          },
-          title: {
-            display: false,
-            text: "Violations by Month",
+            labels: {
+              color: "rgba(0,0,0,.5)",
+            },
           },
           tooltip: {
             mode: "index",
             intersect: false,
           },
         },
-        hover: {
-          mode: "nearest",
-          intersect: true,
-        },
         scales: {
           x: {
-            display: true,
             title: {
               display: true,
               text: "Month",
@@ -106,30 +99,18 @@ export default function CardBarChartViolationsMonth({ violations }) {
             grid: {
               borderDash: [2],
               color: "rgba(33, 37, 41, 0.3)",
-              zeroLineColor: "rgba(33, 37, 41, 0.3)",
-              zeroLineBorderDash: [2],
             },
           },
           y: {
-            display: true,
-            title: {
-              display: false,
-              text: "Value",
-            },
+            beginAtZero: true,
             grid: {
               borderDash: [2],
-              drawBorder: false,
               color: "rgba(33, 37, 41, 0.2)",
-              zeroLineColor: "rgba(33, 37, 41, 0.15)",
-              zeroLineBorderDash: [2],
             },
           },
         },
       },
-    };
-
-    const ctx = chartRef.current.getContext("2d");
-    chartInstanceRef.current = new Chart(ctx, config);
+    });
 
     return () => {
       if (chartInstanceRef.current) {
@@ -155,21 +136,20 @@ export default function CardBarChartViolationsMonth({ violations }) {
             <input
               type="date"
               value={from}
-              onChange={e => setFrom(e.target.value)}
+              onChange={(e) => setFrom(e.target.value)}
               className="border rounded px-2 py-1 text-xs"
             />
             <label className="text-xs">To</label>
             <input
               type="date"
               value={to}
-              onChange={e => setTo(e.target.value)}
+              onChange={(e) => setTo(e.target.value)}
               className="border rounded px-2 py-1 text-xs"
             />
           </div>
         </div>
       </div>
       <div className="p-4 flex-auto">
-        {/* Chart */}
         <div className="relative h-350-px">
           <canvas ref={chartRef}></canvas>
         </div>

@@ -5,10 +5,10 @@ Chart.register(...registerables);
 function getTopVehicleViolations(violations, topN = 5) {
   const stats = {};
   violations.forEach(vio => {
-    if (vio.vehicle_id == null) return;
-    stats[vio.vehicle_id] = (stats[vio.vehicle_id] || 0) + 1;
+    // Sửa lại đúng tên trường
+    if (vio.vehicleId == null) return;
+    stats[vio.vehicleId] = (stats[vio.vehicleId] || 0) + 1;
   });
-  // Chuyển thành mảng, sort giảm dần theo count, lấy topN
   return Object.entries(stats)
     .sort((a, b) => b[1] - a[1])
     .slice(0, topN);
