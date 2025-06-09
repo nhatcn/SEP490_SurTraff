@@ -17,6 +17,7 @@ interface CameraCardProps {
 
 export default function CameraCard({ camera, isSelected, onClick }: CameraCardProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const [imageError, setImageError] = useState(false);
   
   return (
     <div 
@@ -30,12 +31,20 @@ export default function CameraCard({ camera, isSelected, onClick }: CameraCardPr
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div className="relative bg-gray-100 h-40 flex items-center justify-center overflow-hidden">
-        <img 
-          src={camera.thumbnail} 
-          alt={camera.name} 
-          className={`w-full h-full object-cover transition-transform duration-500 ${isHovered ? "scale-105" : ""}`}
-        />
+      <div className="relative bg-gray-200 h-40 flex items-center justify-center overflow-hidden">
+        {imageError || !camera.thumbnail ? (
+          <div className="w-full h-full bg-gray-50 flex flex-col items-center justify-center text-gray-400">
+            <Camera size={32} className="mb-2" />
+            <span className="text-xs text-center px-2">No Image Available</span>
+          </div>
+        ) : (
+          <img 
+            src={camera.thumbnail}
+            alt={camera.name} 
+            className={`w-full h-full object-cover transition-transform duration-500 ${isHovered ? "scale-105" : ""}`}
+            onError={() => setImageError(true)}
+          />
+        )}
       </div>
 
       <div className="p-4 flex-grow flex flex-col">
@@ -58,7 +67,7 @@ export default function CameraCard({ camera, isSelected, onClick }: CameraCardPr
 
         <div className="flex items-center text-xs mt-auto pt-2 border-t border-dashed border-gray-200">
           <span className={`font-semibold ${camera.status === "violation" ? "text-red-600" : "text-green-600"}`}>
-            Trạng thái: {camera.status === "violation" ? "Vi phạm phát hiện" : "Bình thường"}
+            Status: {camera.status === "violation" ? "Violation Detected" : "Normal"}
           </span>
           <Camera size={14} className={`ml-auto text-gray-400 transition-transform ${isHovered ? "rotate-12" : ""}`} />
         </div>

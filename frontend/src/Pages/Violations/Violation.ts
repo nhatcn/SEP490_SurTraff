@@ -11,3 +11,5 @@ export interface Violation {
   violationTime: string;
   createdAt: string;
 }
+
+// /types/violation

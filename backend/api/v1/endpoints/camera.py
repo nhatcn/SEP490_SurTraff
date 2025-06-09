@@ -6,7 +6,11 @@ from fastapi.encoders import jsonable_encoder
 from services.camera_service import (
     stream_normal_video_service,
     stream_violation_video_service,
-    stream_count_video_service,stream_accident_video_service,stream_plate_with_ocr_video_service
+    stream_violation_video_service1,
+    stream_count_video_service,
+    stream_accident_video_service,
+    stream_plate_with_ocr_video_service,
+    stream_violation_wrongway_video_service
 )
 from services.traffic_density_service import (analyze_traffic_video)
 from services.pothole_detection_service import (detect_potholes_in_video)
@@ -99,6 +103,11 @@ def stream_video(camera_id: int, db: Session = Depends(get_db)):
     elif camera_id == 7:
         return StreamingResponse(
             detect_potholes_in_video(camera.stream_url, camera.id, db),
+            media_type="multipart/x-mixed-replace; boundary=frame"
+        )
+    elif camera_id >= 25:
+        return StreamingResponse(
+            stream_violation_video_service1(camera.stream_url, camera.id),
             media_type="multipart/x-mixed-replace; boundary=frame"
         )
     else:

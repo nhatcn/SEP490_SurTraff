@@ -99,7 +99,7 @@ export default function MapDashboard() {
 
   return (
     <div className="flex h-screen">
-      <Sidebar />
+      <Sidebar defaultActiveItem="map"/>
       <div className="flex flex-col flex-grow overflow-hidden">
         <Header title="Camera Location Map" />
         <div className="flex p-4 gap-6 flex-grow overflow-hidden">

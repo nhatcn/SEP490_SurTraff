@@ -1,8 +1,7 @@
-import { useState, useRef, useEffect } from "react";
-import { Zone } from "../../Pages/Dashboard/AddCamera";
+import { Zone } from '../../types/Camera/camera';
+import { useZoneCanvas } from "../../hooks/Camera/useZoneCanvas";
 
 interface ZoneCanvasProps {
-  activeZoneType: string | null;
   zones: Zone[];
   setZones: React.Dispatch<React.SetStateAction<Zone[]>>;
   thumbnailUrl: string;
@@ -12,7 +11,6 @@ interface ZoneCanvasProps {
 }
 
 export default function ZoneCanvas({ 
-  activeZoneType,
   zones,
   setZones,
   thumbnailUrl,
@@ -20,218 +18,112 @@ export default function ZoneCanvas({
   setNextZoneId,
   onDeleteZone
 }: ZoneCanvasProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const imgRef = useRef<HTMLImageElement | null>(null);
-  const [currentPoints, setCurrentPoints] = useState<number[][]>([]);
-  const [canvasSize, setCanvasSize] = useState({ width: 600, height: 400 });
-  const containerRef = useRef<HTMLDivElement>(null);
-  
-  useEffect(() => {
-    const img = new Image();
-    img.src = thumbnailUrl;
-    img.onload = () => {
-      imgRef.current = img;
-      redrawCanvas();
-    };
-  }, [thumbnailUrl]);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
+  const {
+    // Refs
+    canvasRef,
+    containerRef,
     
-    const containerWidth = containerRef.current.clientWidth;
-    setCanvasSize({
-      width: containerWidth,
-      height: containerWidth * 0.66
-    });
+    // State
+    currentPoints,
+    displaySize,
+    imageSize,
+    activeZoneType,
+    zoneTypes,
     
-    const handleResize = () => {
-      if (!containerRef.current) return;
-      const newWidth = containerRef.current.clientWidth;
-      setCanvasSize({
-        width: newWidth,
-        height: newWidth * 0.66
-      });
-    };
+    // Handlers
+    handleCanvasClick,
+    handleFinishZone,
+    handleClearPoints,
+    handleUndoPoint,
+    handleZoneTypeChange,
+    handleClearSelection,
     
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  useEffect(() => {
-    if (canvasRef.current) {
-      canvasRef.current.width = canvasSize.width;
-      canvasRef.current.height = canvasSize.height;
-      redrawCanvas();
-    }
-  }, [canvasSize]);
-
-  useEffect(() => {
-    redrawCanvas();
-  }, [zones, currentPoints]);
-
-  const redrawCanvas = () => {
-    if (!canvasRef.current) return;
+    // Utilities
+    getInstructionText,
+    getZoneRequirements,
+    isFinishButtonDisabled,
+    getFinishButtonText,
     
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx || !canvas.width || !canvas.height) return;
-    
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    if (imgRef.current) {
-      ctx.drawImage(imgRef.current, 0, 0, canvas.width, canvas.height);
-    }
-    
-    // Draw existing zones
-    zones.forEach(zone => {
-      ctx.beginPath();
-      
-      if (zone.coordinates.length > 0) {
-        ctx.moveTo(zone.coordinates[0][0], zone.coordinates[0][1]);
-        
-        for (let i = 1; i < zone.coordinates.length; i++) {
-          ctx.lineTo(zone.coordinates[i][0], zone.coordinates[i][1]);
-        }
-        
-        if (zone.type !== 'line') {
-          ctx.closePath();
-        }
-      }
-      
-      ctx.strokeStyle = zone.color;
-      ctx.lineWidth = 3;
-      ctx.stroke();
-      
-      if (zone.type !== 'line') {
-        ctx.fillStyle = `${zone.color}33`;
-        ctx.fill();
-      }
-
-      // Draw zone name for lane zones
-      if (zone.type === 'lane' && zone.coordinates.length > 0) {
-        const centerX = zone.coordinates.reduce((sum, coord) => sum + coord[0], 0) / zone.coordinates.length;
-        const centerY = zone.coordinates.reduce((sum, coord) => sum + coord[1], 0) / zone.coordinates.length;
-        
-        ctx.fillStyle = "#000";
-        ctx.font = "14px Arial";
-        ctx.textAlign = "center";
-        ctx.fillText(zone.name, centerX, centerY);
-      }
-    });
-    
-    // Draw current points and connecting lines
-    if (currentPoints.length > 0) {
-      // Draw points
-      currentPoints.forEach((point, index) => {
-        ctx.beginPath();
-        ctx.arc(point[0], point[1], 4, 0, Math.PI * 2);
-        ctx.fillStyle = getZoneColor(activeZoneType);
-        ctx.fill();
-        
-        ctx.fillStyle = "#000";
-        ctx.font = "12px Arial";
-        ctx.textAlign = "left";
-        ctx.fillText(`${index + 1}`, point[0] + 6, point[1] - 6);
-      });
-      
-      // Connect points with lines
-      ctx.beginPath();
-      ctx.moveTo(currentPoints[0][0], currentPoints[0][1]);
-      
-      for (let i = 1; i < currentPoints.length; i++) {
-        ctx.lineTo(currentPoints[i][0], currentPoints[i][1]);
-      }
-      
-      if (activeZoneType !== 'line' && currentPoints.length > 2) {
-        ctx.lineTo(currentPoints[0][0], currentPoints[0][1]);
-      }
-      
-      ctx.strokeStyle = getZoneColor(activeZoneType);
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      
-      if (activeZoneType !== 'line' && currentPoints.length > 2) {
-        ctx.fillStyle = `${getZoneColor(activeZoneType)}33`;
-        ctx.fill();
-      }
-    }
-  };
-
-  const getZoneColor = (zoneType: string | null): string => {
-    switch(zoneType) {
-      case 'lane': return "#3B82F6";
-      case 'line': return "#EF4444";
-      case 'light': return "#F59E0B";
-      default: return "#888";
-    }
-  };
-
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!activeZoneType) return;
-    
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    if (activeZoneType === 'line') {
-      if (currentPoints.length < 2) {
-        setCurrentPoints([...currentPoints, [x, y]]);
-      } else {
-        setCurrentPoints([currentPoints[0], [x, y]]);
-      }
-    } else {
-      setCurrentPoints([...currentPoints, [x, y]]);
-    }
-  };
-
-  const handleFinishZone = () => {
-    if (!activeZoneType) return;
-    
-    let isValid = false;
-    
-    if (activeZoneType === 'line') {
-      isValid = currentPoints.length === 2;
-    } else {
-      isValid = currentPoints.length >= 4;
-    }
-    
-    if (isValid) {
-      const newZone: Zone = {
-        id: nextZoneId.toString(),
-        type: activeZoneType as "lane" | "line" | "light",
-        coordinates: currentPoints,
-        name: `${activeZoneType.charAt(0).toUpperCase() + activeZoneType.slice(1)} Zone ${nextZoneId}`,
-        color: getZoneColor(activeZoneType)
-      };
-      
-      setZones(prev => [...prev, newZone]);
-      setNextZoneId(prev => prev + 1);
-      setCurrentPoints([]);
-    } else if (activeZoneType !== 'line' && currentPoints.length < 4) {
-      alert(`${activeZoneType.charAt(0).toUpperCase() + activeZoneType.slice(1)} zones must have at least 4 points.`);
-    }
-  };
-
-  const handleClearPoints = () => {
-    setCurrentPoints([]);
-  };
-
-  const handleUndoPoint = () => {
-    if (currentPoints.length > 0) {
-      setCurrentPoints(currentPoints.slice(0, -1));
-    }
-  };
+    // Constants
+    STANDARD_WIDTH,
+    STANDARD_HEIGHT
+  } = useZoneCanvas({
+    zones,
+    setZones,
+    thumbnailUrl,
+    nextZoneId,
+    setNextZoneId
+  });
 
   return (
     <div>
-      <div ref={containerRef} className="relative border rounded">
+      {/* Zone Type Selection */}
+      <div className="mb-6">
+        <h3 className="text-lg font-semibold mb-3">Select Zone Type</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {zoneTypes.map(type => (
+            <button
+              key={type.value}
+              onClick={() => handleZoneTypeChange(type.value)}
+              className={`p-3 rounded-lg border-2 font-medium transition-all duration-200 ${
+                activeZoneType === type.value
+                  ? 'border-2 text-white shadow-lg'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400'
+              }`}
+              style={{
+                backgroundColor: activeZoneType === type.value ? type.color : undefined,
+                borderColor: activeZoneType === type.value ? type.color : undefined
+              }}
+            >
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-xl">{type.icon}</span>
+                <span className="text-sm">{type.label}</span>
+              </div>
+            </button>
+          ))}
+        </div>
+        
+        {/* Clear Selection Button */}
+        <button
+          onClick={handleClearSelection}
+          className="mt-3 px-4 py-2 rounded-lg border border-gray-300 bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+        >
+          Clear Selection
+        </button>
+        
+        {/* Zone Instructions */}
+        {activeZoneType && (
+          <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">{zoneTypes.find(t => t.value === activeZoneType)?.icon}</span>
+              <div>
+                <strong className="text-blue-800">
+                  {zoneTypes.find(t => t.value === activeZoneType)?.label}:
+                </strong>
+                <span className="text-blue-700 ml-2">
+                  {activeZoneType === 'line' && 'Click exactly 2 points to create a line.'}
+                  {activeZoneType === 'speed' && 'Click exactly 4 points to create a speed measurement zone.'}
+                  {(activeZoneType === 'lane' || activeZoneType === 'light') && 'Click at least 4 points to create a polygon zone.'}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Thông tin kích thước để debug */}
+      <div className="mb-2 text-sm text-gray-600">
+        Display: {displaySize.width}x{displaySize.height} | 
+        Standard: {STANDARD_WIDTH}x{STANDARD_HEIGHT} |
+        Image: {imageSize.width}x{imageSize.height}
+      </div>
+      
+      <div ref={containerRef} className="relative border rounded flex justify-center">
         <canvas
           ref={canvasRef}
-          width={canvasSize.width}
-          height={canvasSize.height}
-          className="cursor-crosshair"
+          width={displaySize.width}
+          height={displaySize.height}
+          className="cursor-crosshair border"
           onClick={handleCanvasClick}
         />
         {!activeZoneType && (
@@ -241,8 +133,7 @@ export default function ZoneCanvas({
         )}
         {activeZoneType && (
           <div className="absolute bottom-2 left-2 bg-white bg-opacity-75 px-2 py-1 text-sm rounded">
-            Click to add points. {activeZoneType !== 'line' ? 'Minimum 4 points required for polygon zones.' 
-              : 'Exactly 2 points required for line zones.'}
+            Click to add points. {getInstructionText()}
           </div>
         )}
         
@@ -258,15 +149,14 @@ export default function ZoneCanvas({
               onClick={handleClearPoints}
               className="px-2 py-1 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 text-sm"
             >
-              Clear All
+            Clear All
             </button>
             <button 
               onClick={handleFinishZone}
               className="px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
-              disabled={(activeZoneType === 'line' && currentPoints.length !== 2) || 
-                (activeZoneType !== 'line' && currentPoints.length < 4)}
+              disabled={isFinishButtonDisabled()}
             >
-              Finish Zone
+              {getFinishButtonText()}
             </button>
           </div>
         )}
@@ -285,7 +175,10 @@ export default function ZoneCanvas({
                     className="w-4 h-4 mr-2 rounded-full" 
                     style={{ backgroundColor: zone.color }}
                   ></div>
-                  <span>{zone.name} ({zone.coordinates.length} points)</span>
+                  <span>
+                    {zone.name} ({zone.coordinates.length} points)
+                    {zone.type === 'speed' && <span className="ml-1 text-xs bg-green-100 text-green-800 px-1 rounded">SPEED</span>}
+                  </span>
                 </div>
                 <button
                   onClick={() => onDeleteZone(zone.id)}
