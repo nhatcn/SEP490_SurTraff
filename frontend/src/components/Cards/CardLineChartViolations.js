@@ -142,8 +142,8 @@ export default function CardLineChartViolations({ violations }) {
         </div>
       </div>
       <div className="p-4 flex-auto">
-        <div className="relative h-350-px">
-          <canvas ref={chartRef}></canvas>
+        <div className="relative h-[200px]">
+          <canvas ref={chartRef} className="w-full h-full"></canvas>
         </div>
       </div>
     </div>

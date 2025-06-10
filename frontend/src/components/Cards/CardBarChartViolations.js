@@ -150,9 +150,12 @@ export default function CardBarChartViolationsMonth({ violations }) {
         </div>
       </div>
       <div className="p-4 flex-auto">
-        <div className="relative h-350-px">
-          <canvas ref={chartRef}></canvas>
+        {/* Chart */}
+        <div className="p-4 flex-auto">
+        <div className="relative h-[150px]">
+          <canvas ref={chartRef} className="w-full h-full"></canvas>
         </div>
+      </div>
       </div>
     </div>
   );

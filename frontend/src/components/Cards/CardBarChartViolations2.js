@@ -2,17 +2,15 @@ import React, { useEffect, useRef } from "react";
 import { Chart, registerables } from "chart.js";
 Chart.register(...registerables);
 
-function getTopVehicleViolations(violations, topN = 5) {
+function getTopVehicleViolations(violations) {
   const stats = {};
   violations.forEach(vio => {
-    // Sửa lại đúng tên trường
     if (vio.vehicleId == null) return;
     stats[vio.vehicleId] = (stats[vio.vehicleId] || 0) + 1;
   });
-  return Object.entries(stats)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, topN);
+  return Object.entries(stats).sort((a, b) => b[1] - a[1]);
 }
+
 
 export default function CardBarChartViolations2({ violations }) {
   const chartRef = useRef(null);
@@ -23,7 +21,7 @@ export default function CardBarChartViolations2({ violations }) {
     if (chartInstanceRef.current) chartInstanceRef.current.destroy();
 
     const stats = getTopVehicleViolations(violations, 5); // Top 5
-    const labels = stats.map(([vehicle_id]) => `Vehicle ${vehicle_id}`);
+    const labels = stats.map(([vehicleId]) => `Vehicle ${vehicleId}`);
     const data = stats.map(([, count]) => count);
 
     const config = {
@@ -93,9 +91,12 @@ export default function CardBarChartViolations2({ violations }) {
         </div>
       </div>
       <div className="p-4 flex-auto">
-        <div className="relative h-350-px">
-          <canvas ref={chartRef}></canvas>
+        {/* Chart */}
+        <div className="p-4 flex-auto">
+        <div className="relative h-[150px]">
+          <canvas ref={chartRef} className="w-full h-full"></canvas>
         </div>
+      </div>
       </div>
     </div>
   );
