@@ -1,11 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Zone } from "../../types/Camera/camera";
 
-// CHUẨN HÓA KÍCH THƯỚC - Kích thước chuẩn để lưu vào DB
-const STANDARD_WIDTH = 640;
-const STANDARD_HEIGHT = 480;
-const STANDARD_ASPECT_RATIO = STANDARD_WIDTH / STANDARD_HEIGHT; // 4:3
-
 interface UseZoneCanvasProps {
   zones: Zone[];
   setZones: React.Dispatch<React.SetStateAction<Zone[]>>;
@@ -30,12 +25,11 @@ export const useZoneCanvas = ({
   const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
   const [activeZoneType, setActiveZoneType] = useState<string | null>(null);
 
-  // Danh sách các loại zone
+  // Danh sách các loại zone (removed speed zone)
   const zoneTypes = [
     { value: 'lane', label: 'Lane Zone', color: '#3B82F6', icon: '🛣️' },
     { value: 'line', label: 'Line Zone', color: '#EF4444', icon: '📏' },
-    { value: 'light', label: 'Light Zone', color: '#F59E0B', icon: '🚦' },
-    { value: 'speed', label: 'Speed Zone', color: '#10B981', icon: '🚗' }
+    { value: 'light', label: 'Light Zone', color: '#F59E0B', icon: '🚦' }
   ];
 
   // Load image
@@ -54,19 +48,21 @@ export const useZoneCanvas = ({
     if (!containerRef.current) return;
     
     const updateDisplaySize = () => {
-      if (!containerRef.current) return;
+      if (!containerRef.current || !imageSize.width || !imageSize.height) return;
+      
       const containerWidth = containerRef.current.clientWidth - 20; // padding
       const maxWidth = Math.min(containerWidth, 800); // giới hạn tối đa
       
-      // Tính kích thước hiển thị dựa trên tỷ lệ chuẩn
+      // Tính kích thước hiển thị dựa trên tỷ lệ thực của image
+      const imageAspectRatio = imageSize.width / imageSize.height;
       let displayWidth, displayHeight;
       
-      if (maxWidth / STANDARD_ASPECT_RATIO <= 600) { // chiều cao không vượt quá 600px
+      if (maxWidth / imageAspectRatio <= 600) { // chiều cao không vượt quá 600px
         displayWidth = maxWidth;
-        displayHeight = maxWidth / STANDARD_ASPECT_RATIO;
+        displayHeight = maxWidth / imageAspectRatio;
       } else {
         displayHeight = 600;
-        displayWidth = 600 * STANDARD_ASPECT_RATIO;
+        displayWidth = 600 * imageAspectRatio;
       }
       
       setDisplaySize({
@@ -79,7 +75,7 @@ export const useZoneCanvas = ({
     
     window.addEventListener('resize', updateDisplaySize);
     return () => window.removeEventListener('resize', updateDisplaySize);
-  }, []);
+  }, [imageSize]);
 
   // Update canvas size when display size changes
   useEffect(() => {
@@ -95,24 +91,18 @@ export const useZoneCanvas = ({
     redrawCanvas();
   }, [zones, currentPoints]);
 
-  // Coordinate conversion functions
-  const convertFromStandardToDisplay = (standardCoords: number[][]): number[][] => {
-    const scaleX = displaySize.width / STANDARD_WIDTH;
-    const scaleY = displaySize.height / STANDARD_HEIGHT;
-    
-    return standardCoords.map(([x, y]) => [
-      Math.round(x * scaleX),
-      Math.round(y * scaleY)
+  // Coordinate conversion functions - CHUYỂN ĐỔI SANG PHẦN TRĂM
+  const convertFromPercentageToDisplay = (percentageCoords: number[][]): number[][] => {
+    return percentageCoords.map(([x, y]) => [
+      Math.round((x * displaySize.width) / 100),
+      Math.round((y * displaySize.height) / 100)
     ]);
   };
 
-  const convertFromDisplayToStandard = (displayCoords: number[][]): number[][] => {
-    const scaleX = STANDARD_WIDTH / displaySize.width;
-    const scaleY = STANDARD_HEIGHT / displaySize.height;
-    
+  const convertFromDisplayToPercentage = (displayCoords: number[][]): number[][] => {
     return displayCoords.map(([x, y]) => [
-      Math.round(x * scaleX),
-      Math.round(y * scaleY)
+      Math.round((x / displaySize.width) * 100 * 100) / 100, // Làm tròn 2 chữ số thập phân
+      Math.round((y / displaySize.height) * 100 * 100) / 100
     ]);
   };
 
@@ -121,7 +111,6 @@ export const useZoneCanvas = ({
       case 'lane': return "#3B82F6";
       case 'line': return "#EF4444";
       case 'light': return "#F59E0B";
-      case 'speed': return "#10B981";
       default: return "#888";
     }
   };
@@ -129,7 +118,6 @@ export const useZoneCanvas = ({
   const getZoneRequirements = (zoneType: string | null): { min: number; max?: number } => {
     switch(zoneType) {
       case 'line': return { min: 2, max: 2 };
-      case 'speed': return { min: 4, max: 4 };
       case 'lane':
       case 'light':
       default: return { min: 4 };
@@ -150,9 +138,9 @@ export const useZoneCanvas = ({
       ctx.drawImage(imgRef.current, 0, 0, canvas.width, canvas.height);
     }
     
-    // Vẽ zones đã lưu (chuyển đổi từ tọa độ chuẩn sang hiển thị)
+    // Vẽ zones đã lưu (chuyển đổi từ phần trăm sang hiển thị)
     zones.forEach(zone => {
-      const displayCoords = convertFromStandardToDisplay(zone.coordinates);
+      const displayCoords = convertFromPercentageToDisplay(zone.coordinates);
       
       ctx.beginPath();
       
@@ -177,8 +165,8 @@ export const useZoneCanvas = ({
         ctx.fill();
       }
 
-      // Vẽ tên zone cho lane zones và speed zones
-      if ((zone.type === 'lane' || zone.type === 'speed') && displayCoords.length > 0) {
+      // Vẽ tên zone cho lane zones
+      if (zone.type === 'lane' && displayCoords.length > 0) {
         const centerX = displayCoords.reduce((sum, coord) => sum + coord[0], 0) / displayCoords.length;
         const centerY = displayCoords.reduce((sum, coord) => sum + coord[1], 0) / displayCoords.length;
         
@@ -186,18 +174,6 @@ export const useZoneCanvas = ({
         ctx.font = "14px Arial";
         ctx.textAlign = "center";
         ctx.fillText(zone.name, centerX, centerY);
-      }
-
-      // Thêm icon hoặc ký hiệu đặc biệt cho speed zone
-      if (zone.type === 'speed' && displayCoords.length > 0) {
-        const centerX = displayCoords.reduce((sum, coord) => sum + coord[0], 0) / displayCoords.length;
-        const centerY = displayCoords.reduce((sum, coord) => sum + coord[1], 0) / displayCoords.length;
-        
-        // Vẽ biểu tượng tốc độ (speedometer icon)
-        ctx.fillStyle = zone.color;
-        ctx.font = "16px Arial";
-        ctx.textAlign = "center";
-        ctx.fillText("🚗", centerX, centerY - 20);
       }
     });
     
@@ -257,14 +233,6 @@ export const useZoneCanvas = ({
       } else {
         setCurrentPoints([currentPoints[0], [x, y]]);
       }
-    } else if (activeZoneType === 'speed') {
-      if (currentPoints.length < 4) {
-        setCurrentPoints([...currentPoints, [x, y]]);
-      } else {
-        // Replace the oldest point if already have 4 points
-        const newPoints = [...currentPoints.slice(1), [x, y]];
-        setCurrentPoints(newPoints);
-      }
     } else {
       setCurrentPoints([...currentPoints, [x, y]]);
     }
@@ -285,13 +253,13 @@ export const useZoneCanvas = ({
     }
     
     if (isValid) {
-      // Chuyển đổi tọa độ từ hiển thị sang chuẩn trước khi lưu
-      const standardCoords = convertFromDisplayToStandard(currentPoints);
+      // Chuyển đổi tọa độ từ hiển thị sang phần trăm trước khi lưu
+      const percentageCoords = convertFromDisplayToPercentage(currentPoints);
       
       const newZone: Zone = {
         id: nextZoneId.toString(),
-        type: activeZoneType as "lane" | "line" | "light" | "speed",
-        coordinates: standardCoords, // Lưu tọa độ chuẩn
+        type: activeZoneType as "lane" | "line" | "light",
+        coordinates: percentageCoords, // Lưu tọa độ theo phần trăm
         name: `${activeZoneType.charAt(0).toUpperCase() + activeZoneType.slice(1)} Zone ${nextZoneId}`,
         color: getZoneColor(activeZoneType)
       };
@@ -334,8 +302,6 @@ export const useZoneCanvas = ({
     
     if (activeZoneType === 'line') {
       return 'Exactly 2 points required for line zones.';
-    } else if (activeZoneType === 'speed') {
-      return 'Exactly 4 points required for speed measurement zone.';
     } else {
       return 'Minimum 4 points required for polygon zones.';
     }
@@ -386,8 +352,8 @@ export const useZoneCanvas = ({
     isFinishButtonDisabled,
     getFinishButtonText,
     
-    // Constants
-    STANDARD_WIDTH,
-    STANDARD_HEIGHT
+    // Coordinate conversion utilities
+    convertFromPercentageToDisplay,
+    convertFromDisplayToPercentage
   };
 };
