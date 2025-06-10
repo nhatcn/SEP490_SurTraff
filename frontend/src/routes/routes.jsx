@@ -1,6 +1,5 @@
 import React from 'react';
 import { Route, Routes } from 'react-router-dom';
-
 import CameraDashboard from '../Pages/Dashboard/Camera/CameraDashboard';
 import MapDashboard from '../Pages/Map/MapDashboard';
 import TrafficMonitoringAuth from '../Pages/Auth/LoginPage';

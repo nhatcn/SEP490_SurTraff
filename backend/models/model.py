@@ -9,7 +9,6 @@ class Role(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     role_name = Column(String(50), unique=True)
     description = Column(Text)
-
     users = relationship("User", back_populates="role")
 
 class User(Base):
@@ -33,6 +32,7 @@ class Camera(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     name = Column(String(100))
+    max_speed = Column(Integer)
     location = Column(Text)
     latitude = Column(Float)
     longitude = Column(Float)
