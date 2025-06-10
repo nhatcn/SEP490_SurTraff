@@ -543,6 +543,35 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
         
         return np.array(converted_coords, dtype=np.int32)
 
+    def point_below_line(point, line_start, line_end):
+        """
+        Kiểm tra điểm có ở phía dưới đường thẳng không (từ dưới màn hình lên trên)
+        Trả về True nếu điểm ở phía dưới đường
+        """
+        x, y = point
+        x1, y1 = line_start
+        x2, y2 = line_end
+        
+        # Tính tích có hướng để xác định vị trí điểm so với đường thẳng
+        cross_product = (x2 - x1) * (y - y1) - (y2 - y1) * (x - x1)
+        
+        # Nếu cross_product > 0, điểm ở bên trái đường (phía dưới trong hệ tọa độ màn hình)
+        # Nếu cross_product < 0, điểm ở bên phải đường (phía trên trong hệ tọa độ màn hình) 
+        return cross_product > 0
+
+    def detect_line_crossing(prev_point, curr_point, line_start, line_end):
+        """
+        Kiểm tra xe có vượt qua line từ dưới lên trên không
+        """
+        if prev_point is None or curr_point is None:
+            return False
+            
+        # Kiểm tra xe di chuyển từ phía dưới line lên phía trên line
+        was_below = point_below_line(prev_point, line_start, line_end)
+        is_above = not point_below_line(curr_point, line_start, line_end)
+        
+        return was_below and is_above
+
     # Parse zones và chuyển đổi tọa độ sẽ được thực hiện sau khi biết kích thước frame
     lane_zones_standard = {}
     light_zones_standard = {}
@@ -563,7 +592,11 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
                 "coordinates": standard_points
             }
         elif z["zoneType"] == "line":
-            zone_lines_standard.append(standard_points)  # vạch dừng
+            zone_lines_standard.append({
+                "id": z["id"],
+                "name": z["name"],
+                "coordinates": standard_points
+            })
 
     # Build movement and light mappings
     lane_transitions = {(m["fromLaneZoneId"], m["toLaneZoneId"]) for m in lane_movements}
@@ -583,7 +616,9 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
 
     red_light_history = []
     track_zone_history = {}  # track_id: current_zone_id
+    track_position_history = {}  # track_id: previous_position
     vehicle_violations = {}
+    vehicle_violation_types = {}  # track_id: violation_type
 
     try:
         while True:
@@ -619,9 +654,13 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
                         "polygon": frame_coords
                     }
 
-                for line_coords in zone_lines_standard:
-                    frame_coords = convert_coordinates_to_frame_size(line_coords, w, h)
-                    zone_lines.append(frame_coords)
+                for line_data in zone_lines_standard:
+                    frame_coords = convert_coordinates_to_frame_size(line_data["coordinates"], w, h)
+                    zone_lines.append({
+                        "id": line_data["id"],
+                        "name": line_data["name"],
+                        "coordinates": frame_coords
+                    })
 
                 frame_size_initialized = True
                 print(f"Initialized {len(lane_zones)} lane zones, {len(light_zones)} light zones, {len(zone_lines)} lines")
@@ -640,15 +679,32 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
 
             for line in zone_lines:
-                cv2.polylines(frame_annotated, [line], isClosed=False, color=(0, 255, 255), thickness=3)
+                cv2.polylines(frame_annotated, [line["coordinates"]], isClosed=False, color=(0, 255, 255), thickness=3)
 
-            # Step 2: Detect đèn giao thông
-            light_results = model_light(frame)[0]
-            red_detected = any(
-                model_light.names[int(box.cls[0])].lower() == 'red' and float(box.conf[0]) > 0.5
-                for box in light_results.boxes
-            )
-            red_light_history.append(red_detected)
+            # Step 2: Detect đèn giao thông chỉ trong light zones
+            red_detected_in_light_zone = False
+            
+            # Crop frame chỉ trong light zones để detect đèn
+            for light_zone in light_zones.values():
+                # Tạo mask cho light zone
+                mask = np.zeros((h, w), dtype=np.uint8)
+                cv2.fillPoly(mask, [light_zone["polygon"]], 255)
+                
+                # Crop frame theo light zone
+                light_frame = cv2.bitwise_and(frame, frame, mask=mask)
+                
+                # Detect đèn trong vùng này
+                light_results = model_light(light_frame)[0]
+                zone_red_detected = any(
+                    model_light.names[int(box.cls[0])].lower() == 'red' and float(box.conf[0]) > 0.5
+                    for box in light_results.boxes
+                )
+                
+                if zone_red_detected:
+                    red_detected_in_light_zone = True
+                    break
+            
+            red_light_history.append(red_detected_in_light_zone)
             if len(red_light_history) > 3:
                 red_light_history.pop(0)
             is_red = red_light_history.count(True) > 1
@@ -678,6 +734,10 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
                 cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
                 track_id = int(results.boxes.id[i])
 
+                # Lưu vị trí trước đó
+                prev_position = track_position_history.get(track_id)
+                track_position_history[track_id] = (cx, cy)
+
                 # Xác định zone hiện tại của vehicle
                 current_zone_id = None
                 for z_id, z in lane_zones.items():
@@ -689,19 +749,42 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
                 prev_zone_id = track_zone_history.get(track_id)
                 track_zone_history[track_id] = current_zone_id
 
-                # Kiểm tra vi phạm
-                violated = False
-                if (is_red and prev_zone_id and current_zone_id and 
-                    (prev_zone_id, current_zone_id) in lane_transitions):
-                    controlled_light_id = light_control_map.get(prev_zone_id)
-                    if controlled_light_id:
-                        violated = True
-                        vehicle_violations[track_id] = True
-                        print(f"VIOLATION: Vehicle {track_id} moved from zone {prev_zone_id} to {current_zone_id} during red light")
+                # Kiểm tra vi phạm vượt đèn đỏ (vượt qua line từ dưới lên khi đèn đỏ)
+                if is_red and prev_position and len(zone_lines) > 0:
+                    for line_data in zone_lines:
+                        line_coords = line_data["coordinates"]
+                        if len(line_coords) >= 2:
+                            line_start = tuple(line_coords[0])
+                            line_end = tuple(line_coords[1])
+                            
+                            # Kiểm tra xe có vượt qua line từ dưới lên không
+                            if detect_line_crossing(prev_position, (cx, cy), line_start, line_end):
+                                # Kiểm tra xe có đi đúng lane movement không
+                                if (prev_zone_id and current_zone_id and 
+                                    (prev_zone_id, current_zone_id) in lane_transitions):
+                                    # Xe đi đúng lane nhưng vượt đèn đỏ
+                                    vehicle_violations[track_id] = True
+                                    vehicle_violation_types[track_id] = "RED_LIGHT"
+                                    print(f"RED LIGHT VIOLATION: Vehicle {track_id} crossed line from zone {prev_zone_id} to {current_zone_id} during red light")
+
+                # Kiểm tra vi phạm đi sai làn (wrong way) khi đèn xanh
+                if (not is_red and prev_zone_id and current_zone_id and 
+                    prev_zone_id != current_zone_id and 
+                    (prev_zone_id, current_zone_id) not in lane_transitions):
+                    # Xe đi sai lane khi đèn xanh
+                    vehicle_violations[track_id] = True
+                    vehicle_violation_types[track_id] = "WRONG_WAY"
+                    print(f"WRONG WAY VIOLATION: Vehicle {track_id} moved from zone {prev_zone_id} to {current_zone_id} (not allowed movement)")
 
                 # Vẽ bounding box và label
+                violation_type = vehicle_violation_types.get(track_id, "")
                 color = (0, 0, 255) if vehicle_violations.get(track_id) else (0, 255, 0)
-                violation_text = "VIOLATION" if vehicle_violations.get(track_id) else "OK"
+                
+                if vehicle_violations.get(track_id):
+                    violation_text = violation_type
+                else:
+                    violation_text = "OK"
+                    
                 label = f"ID:{track_id} {class_name} {violation_text}"
                 
                 cv2.rectangle(frame_annotated, (x1, y1), (x2, y2), color, 2)

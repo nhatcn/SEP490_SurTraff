@@ -4,19 +4,19 @@ import { Route, Routes } from 'react-router-dom';
 
 
 
-import CameraDashboard from '../Pages/Dashboard/Camera/CameraDashboard';
-import MapDashboard from '../Pages/Map/MapDashboard';
-import TrafficMonitoringAuth from '../Pages/Auth/LoginPage';
-import RegisterPage from '../Pages/Auth/RegisterPage';
-import ForgotPasswordPage from '../Pages/Auth/ForgotPasswordPage';
-import UserDashboard from '../Pages/Dashboard/User/UserDashboard';
-import AddCameraDashboard from '../Pages/Dashboard/Camera/AddCamera';
-import AccidentDashboard from '../Pages/Dashboard/Accident/AccidentDashboard';
-import ViolationList from '../Pages/Violations/ViolationList';
-import ViolationDetail from '../Pages/Violations/ViolationDetail';
-import ViolationHistory from '../Pages/Violations/ViolationHistory';
-import EditCamera from '../Pages/Dashboard/Camera/EditCamera';
-import UserProfileDashboard from '../Pages/Dashboard/User/UserProfileDashboard';
+import CameraDashboard from '../pages/Dashboard/Camera/CameraDashboard';
+import MapDashboard from '../pages/Map/MapDashboard';
+import TrafficMonitoringAuth from '../pages/Auth/LoginPage';
+import RegisterPage from '../pages/Auth/RegisterPage';
+import ForgotPasswordPage from '../pages/Auth/ForgotPasswordPage';
+import UserDashboard from '../pages/Dashboard/User/UserDashboard';
+import AddCameraDashboard from '../pages/Dashboard/Camera/AddCamera';
+import AccidentDashboard from '../pages/Dashboard/Accident/AccidentDashboard';
+import ViolationList from '../pages/Violations/ViolationList';
+import ViolationDetail from '../pages/Violations/ViolationDetail';
+import ViolationHistory from '../pages/Violations/ViolationHistory';
+import EditCamera from '../pages/Dashboard/Camera/EditCamera';
+import UserProfileDashboard from '../pages/Dashboard/User/UserProfileDashboard';
 
 
 const RoutesConfig = () => {

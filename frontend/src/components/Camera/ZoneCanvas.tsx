@@ -44,9 +44,9 @@ export default function ZoneCanvas({
     isFinishButtonDisabled,
     getFinishButtonText,
     
-    // Constants
-    STANDARD_WIDTH,
-    STANDARD_HEIGHT
+    // Coordinate conversion utilities
+    convertFromPercentageToDisplay,
+    convertFromDisplayToPercentage
   } = useZoneCanvas({
     zones,
     setZones,
@@ -60,7 +60,7 @@ export default function ZoneCanvas({
       {/* Zone Type Selection */}
       <div className="mb-6">
         <h3 className="text-lg font-semibold mb-3">Select Zone Type</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {zoneTypes.map(type => (
             <button
               key={type.value}
@@ -102,7 +102,6 @@ export default function ZoneCanvas({
                 </strong>
                 <span className="text-blue-700 ml-2">
                   {activeZoneType === 'line' && 'Click exactly 2 points to create a line.'}
-                  {activeZoneType === 'speed' && 'Click exactly 4 points to create a speed measurement zone.'}
                   {(activeZoneType === 'lane' || activeZoneType === 'light') && 'Click at least 4 points to create a polygon zone.'}
                 </span>
               </div>
@@ -111,11 +110,15 @@ export default function ZoneCanvas({
         )}
       </div>
 
-      {/* Thông tin kích thước để debug */}
-      <div className="mb-2 text-sm text-gray-600">
-        Display: {displaySize.width}x{displaySize.height} | 
-        Standard: {STANDARD_WIDTH}x{STANDARD_HEIGHT} |
-        Image: {imageSize.width}x{imageSize.height}
+      {/* Thông tin kích thước để debug - ĐÃ CẬP NHẬT */}
+      <div className="mb-2 text-sm text-gray-600 bg-gray-100 p-2 rounded">
+        <div><strong>Display Size:</strong> {displaySize.width}×{displaySize.height}px</div>
+        <div><strong>Original Image:</strong> {imageSize.width}×{imageSize.height}px</div>
+        <div><strong>Aspect Ratio:</strong> {imageSize.width && imageSize.height ? (imageSize.width / imageSize.height).toFixed(2) : 'Loading...'}</div>
+        <div><strong>Scale:</strong> {displaySize.width && imageSize.width ? `${((displaySize.width / imageSize.width) * 100).toFixed(1)}%` : 'Loading...'}</div>
+        {zones.length > 0 && (
+          <div><strong>Storage Format:</strong> Percentage coordinates (0-100%)</div>
+        )}
       </div>
       
       <div ref={containerRef} className="relative border rounded flex justify-center">
@@ -169,20 +172,30 @@ export default function ZoneCanvas({
         ) : (
           <div className="space-y-2">
             {zones.map(zone => (
-              <div key={zone.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                <div className="flex items-center">
+              <div key={zone.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
+                <div className="flex items-center flex-grow">
                   <div 
-                    className="w-4 h-4 mr-2 rounded-full" 
+                    className="w-4 h-4 mr-3 rounded-full border" 
                     style={{ backgroundColor: zone.color }}
                   ></div>
-                  <span>
-                    {zone.name} ({zone.coordinates.length} points)
-                    {zone.type === 'speed' && <span className="ml-1 text-xs bg-green-100 text-green-800 px-1 rounded">SPEED</span>}
-                  </span>
+                  <div className="flex-grow">
+                    <div className="font-medium">{zone.name}</div>
+                    <div className="text-sm text-gray-600">
+                      {zone.coordinates.length} points • 
+                      Type: {zone.type} • 
+                      Stored as percentage coordinates
+                    </div>
+                    {/* Debug: Show first coordinate as example */}
+                    {zone.coordinates.length > 0 && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        Example: ({zone.coordinates[0][0].toFixed(1)}%, {zone.coordinates[0][1].toFixed(1)}%)
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <button
                   onClick={() => onDeleteZone(zone.id)}
-                  className="text-red-600 hover:text-red-800"
+                  className="px-3 py-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
                 >
                   Remove
                 </button>
@@ -191,6 +204,16 @@ export default function ZoneCanvas({
           </div>
         )}
       </div>
+
+      {/* Thông tin bổ sung về format lưu trữ */}
+      {zones.length > 0 && (
+        <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+          <div className="text-sm text-green-800">
+            <strong>✅ Coordinate Storage:</strong> All zones are now stored using percentage coordinates (0-100%). 
+            This ensures compatibility with any image resolution from your backend.
+          </div>
+        </div>
+      )}
     </div>
   );
 }

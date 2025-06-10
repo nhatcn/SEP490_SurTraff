@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Header from "../../../components/Layout/Header";
 import Sidebar from "../../../components/Layout/Sidebar";
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from "react-leaflet";
@@ -105,10 +105,23 @@ export default function AddCamera() {
     handleSuggestionClick
   } = useLocationSearch({ mapRef, onLocationSelect: cameraForm.handleLocationSelect });
 
+  // Cleanup object URLs when component unmounts
+  useEffect(() => {
+    return () => {
+      cameraForm.cleanup();
+    };
+  }, []);
+
   const handleGetCurrentLocation = async () => {
     const result = await getCurrentLocationManually();
     if (result) {
       cameraForm.handleLocationSelect(result.lat, result.lng, result.address);
+    }
+  };
+
+  const handleExtractThumbnail = () => {
+    if (cameraForm.streamUrl.trim()) {
+      cameraForm.extractThumbnail(cameraForm.streamUrl);
     }
   };
 
@@ -156,14 +169,58 @@ export default function AddCamera() {
 
               <div>
                 <label className="block mb-2 font-medium">Stream URL *</label>
-                <input
-                  type="text"
-                  value={cameraForm.streamUrl}
-                  onChange={e => cameraForm.setStreamUrl(e.target.value)}
-                  className="w-full p-2 border rounded focus:ring focus:ring-blue-300"
-                  placeholder="rtsp:// or http:// stream URL"
-                  required
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={cameraForm.streamUrl}
+                    onChange={e => cameraForm.setStreamUrl(e.target.value)}
+                    className="flex-1 p-2 border rounded focus:ring focus:ring-blue-300"
+                    placeholder="rtsp:// or http:// stream URL"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={handleExtractThumbnail}
+                    disabled={!cameraForm.streamUrl.trim() || cameraForm.isExtractingThumbnail}
+                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 whitespace-nowrap"
+                  >
+                    {cameraForm.isExtractingThumbnail ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Extracting...
+                      </>
+                    ) : (
+                      <>
+                        📷 Extract Thumbnail
+                      </>
+                    )}
+                  </button>
+                </div>
+                
+                {/* Thumbnail extraction status */}
+                {cameraForm.thumbnailError && (
+                  <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded">
+                    <div className="text-red-700 text-sm">
+                      <strong>Error:</strong> {cameraForm.thumbnailError}
+                    </div>
+                  </div>
+                )}
+                
+                {cameraForm.thumbnailUrl && (
+                  <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded">
+                    <div className="text-green-700 text-sm flex items-center gap-2">
+                      <span>✅ Thumbnail extracted successfully!</span>
+                      <img 
+                        src={cameraForm.thumbnailUrl} 
+                        alt="Camera thumbnail preview" 
+                        className="h-12 w-16 object-cover rounded border"
+                      />
+                    </div>
+                    <div className="text-green-600 text-xs mt-1">
+                      You can now configure zones below.
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -272,34 +329,77 @@ export default function AddCamera() {
               </div>
             </div>
 
+            {/* Speed Limit Configuration */}
             <div className="mb-6">
-              <h3 className="text-xl font-semibold mb-4">Camera Thumbnail & Zones</h3>
-
-              <ZoneCanvas
-                zones={cameraForm.zones}
-                setZones={cameraForm.setZones}
-                thumbnailUrl={cameraForm.thumbnailUrl}
-                nextZoneId={nextZoneId}
-                setNextZoneId={setNextZoneId}
-                onDeleteZone={cameraForm.handleDeleteZone}
-              />
+              <label className="block mb-2 font-medium">Speed Limit: {cameraForm.speedLimit} km/h</label>
+              <div className="max-w-md">
+                <input
+                  type="range"
+                  min="40"
+                  max="120"
+                  step="5"
+                  value={cameraForm.speedLimit}
+                  onChange={e => cameraForm.setSpeedLimit(Number(e.target.value))}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                />
+                <div className="flex justify-between text-sm text-gray-500 mt-1">
+                  <span>40 km/h</span>
+                  <span>120 km/h</span>
+                </div>
+                <div className="mt-1 text-sm text-gray-500">
+                  Set the speed limit for this camera location (used for speed violation detection)
+                </div>
+              </div>
             </div>
 
-            <div className="mb-6">
-              <LaneDirectionConfig
-                zones={cameraForm.zones}
-                laneDirections={cameraForm.laneDirections}
-                setLaneDirections={cameraForm.setLaneDirections}
-              />
-            </div>
+            {/* Zone Configuration - Only show if thumbnail is available */}
+            {cameraForm.thumbnailUrl ? (
+              <div className="mb-6">
+                <h3 className="text-xl font-semibold mb-4">Camera Thumbnail & Zones</h3>
 
-            <div className="mb-6">
-              <LightZoneMappingConfig
-                zones={cameraForm.zones}
-                lightZoneMappings={cameraForm.lightZoneMappings}
-                setLightZoneMappings={cameraForm.setLightZoneMappings}
-              />
-            </div>
+                <ZoneCanvas
+                  zones={cameraForm.zones}
+                  setZones={cameraForm.setZones}
+                  thumbnailUrl={cameraForm.thumbnailUrl}
+                  nextZoneId={nextZoneId}
+                  setNextZoneId={setNextZoneId}
+                  onDeleteZone={cameraForm.handleDeleteZone}
+                />
+              </div>
+            ) : (
+              <div className="mb-6">
+                <h3 className="text-xl font-semibold mb-4">Camera Thumbnail & Zones</h3>
+                <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                  <div className="text-gray-500 mb-2">
+                    📷 Please extract a thumbnail from the stream URL first
+                  </div>
+                  <div className="text-sm text-gray-400">
+                    Enter a valid stream URL above and click "Extract Thumbnail" to configure zones
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Lane Direction and Light Zone Mappings - Only show if zones exist */}
+            {cameraForm.zones.length > 0 && (
+              <>
+                <div className="mb-6">
+                  <LaneDirectionConfig
+                    zones={cameraForm.zones}
+                    laneDirections={cameraForm.laneDirections}
+                    setLaneDirections={cameraForm.setLaneDirections}
+                  />
+                </div>
+
+                <div className="mb-6">
+                  <LightZoneMappingConfig
+                    zones={cameraForm.zones}
+                    lightZoneMappings={cameraForm.lightZoneMappings}
+                    setLightZoneMappings={cameraForm.setLightZoneMappings}
+                  />
+                </div>
+              </>
+            )}
 
             <div className="mt-8 flex justify-end space-x-4">
               <button
