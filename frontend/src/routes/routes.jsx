@@ -2,21 +2,18 @@
 import React from 'react';
 import { Route, Routes } from 'react-router-dom';
 
-
-
-import CameraDashboard from '../Pages/Dashboard/Camera/CameraDashboard';
 import MapDashboard from '../Pages/Map/MapDashboard';
-import TrafficMonitoringAuth from '../Pages/Auth/LoginPage';
 import RegisterPage from '../Pages/Auth/RegisterPage';
 import ForgotPasswordPage from '../Pages/Auth/ForgotPasswordPage';
 import UserDashboard from '../Pages/Dashboard/User/UserDashboard';
-import AddCameraDashboard from '../Pages/Dashboard/Camera/AddCamera';
 import AccidentDashboard from '../Pages/Dashboard/Accident/AccidentDashboard';
-import ViolationList from '../Pages/Violations/ViolationList';
-import ViolationDetail from '../Pages/Violations/ViolationDetail';
-import ViolationHistory from '../Pages/Violations/ViolationHistory';
 import EditCamera from '../Pages/Dashboard/Camera/EditCamera';
+import ViolationList from '../Pages/Violations/ViolationList';
+import ViolationHistory from '../Pages/Violations/ViolationHistory';
 import UserProfileDashboard from '../Pages/Dashboard/User/UserProfileDashboard';
+import AddCamera from '../Pages/Dashboard/Camera/AddCamera';
+import CameraDashboard from '../Pages/Dashboard/Camera/CameraDashboard';
+import ViolationDetail from '../Pages/Violations/ViolationDetail';
 
 
 const RoutesConfig = () => {
@@ -25,11 +22,11 @@ const RoutesConfig = () => {
       <Route path="/dashboard" element={<CameraDashboard />} />
       <Route path="/cameras" element={<CameraDashboard />} />
       <Route path="/map" element={<MapDashboard />} />
-      <Route path="/login" element={<TrafficMonitoringAuth />} />
+      <Route path="/login" element={<lo />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/forgotpassword" element={<ForgotPasswordPage />} />
       <Route path="/userdashboard" element={<UserDashboard />} />
-      <Route path="/addcamera" element={<AddCameraDashboard />} />
+      <Route path="/addcamera" element={<AddCamera />} />
       <Route path="/accidentdashboard" element={<AccidentDashboard />} />
       <Route path="/cameras/edit/:id" element={<EditCamera />} />
       <Route path="/violations" element={<ViolationList />} />
