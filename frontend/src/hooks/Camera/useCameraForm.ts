@@ -11,9 +11,16 @@ export const useCameraForm = () => {
   const [location, setLocation] = useState({ lat: 0, lng: 0, selected: false });
   const [zones, setZones] = useState<Zone[]>([]);
   const [activeZoneType, setActiveZoneType] = useState<string | null>(null);
-  const [thumbnailUrl, setThumbnailUrl] = useState("https://cdn.discordapp.com/attachments/1242410259205591071/1377269674659811389/image.png?ex=68438e96&is=68423d16&hm=ffc97abae41913c441886bc5d32c35636f9cba23e2980d04730e55b9b087e98d&");
+  const [thumbnailUrl, setThumbnailUrl] = useState("");
   const [laneDirections, setLaneDirections] = useState<LaneDirection[]>([]);
   const [lightZoneMappings, setLightZoneMappings] = useState<LightZoneMapping[]>([]);
+  
+  // New speed configuration state
+  const [speedLimit, setSpeedLimit] = useState<number>(50);
+  
+  // Loading states
+  const [isExtractingThumbnail, setIsExtractingThumbnail] = useState(false);
+  const [thumbnailError, setThumbnailError] = useState<string | null>(null);
 
   const handleLocationSelect = (lat: number, lng: number, address: string) => {
     setLocation({
@@ -38,9 +45,67 @@ export const useCameraForm = () => {
     ));
   };
 
+  const extractThumbnail = async (streamUrl: string) => {
+    if (!streamUrl.trim()) {
+      setThumbnailError("Stream URL is required");
+      return;
+    }
+
+    setIsExtractingThumbnail(true);
+    setThumbnailError(null);
+
+    try {
+      const response = await fetch("http://localhost:8000/api/thumbnail/extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stream_url: streamUrl })
+      });
+
+      if (!response.ok) {
+        let errorMessage = `Failed to extract thumbnail: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch {
+          // If response is not JSON, use default error message
+        }
+        throw new Error(errorMessage);
+      }
+
+      // Convert the image response to a blob and create object URL
+      const blob = await response.blob();
+      const imageUrl = URL.createObjectURL(blob);
+      
+      setThumbnailUrl(imageUrl);
+      setThumbnailError(null);
+    } catch (error: unknown) {
+      console.error("Thumbnail extraction error:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      setThumbnailError(errorMessage);
+      setThumbnailUrl(""); // Clear thumbnail on error
+    } finally {
+      setIsExtractingThumbnail(false);
+    }
+  };
+
+  const handleStreamUrlChange = (url: string) => {
+    setStreamUrl(url);
+    // Clear thumbnail when URL changes and revoke previous object URL to prevent memory leaks
+    if (thumbnailUrl) {
+      URL.revokeObjectURL(thumbnailUrl);
+    }
+    setThumbnailUrl("");
+    setThumbnailError(null);
+  };
+
   const handleSubmit = async () => {
     if (!name || !streamUrl || !location.selected || !locationAddress || zones.length === 0) {
       alert("Please fill in all required fields.");
+      return;
+    }
+
+    if (!thumbnailUrl) {
+      alert("Please extract a thumbnail from the stream URL first.");
       return;
     }
 
@@ -52,6 +117,7 @@ export const useCameraForm = () => {
         longitude: location.lng,
         location: locationAddress,
         thumbnail: thumbnailUrl,
+        speedLimit: speedLimit,
         
         zones: zones.map(z => ({
           id: parseInt(z.id),
@@ -83,10 +149,23 @@ export const useCameraForm = () => {
       }
 
       alert("Camera setup successfully!");
+      
+      // Clean up object URL before navigating
+      if (thumbnailUrl) {
+        URL.revokeObjectURL(thumbnailUrl);
+      }
+      
       navigate("/dashboard");
     } catch (error: unknown) {
       console.error("Setup error:", error);
       alert(`Error: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
+  // Cleanup function to revoke object URLs
+  const cleanup = () => {
+    if (thumbnailUrl) {
+      URL.revokeObjectURL(thumbnailUrl);
     }
   };
 
@@ -95,7 +174,7 @@ export const useCameraForm = () => {
     name,
     setName,
     streamUrl,
-    setStreamUrl,
+    setStreamUrl: handleStreamUrlChange,
     locationAddress,
     setLocationAddress,
     location,
@@ -109,11 +188,19 @@ export const useCameraForm = () => {
     setLaneDirections,
     lightZoneMappings,
     setLightZoneMappings,
+    speedLimit,
+    setSpeedLimit,
+    
+    // Thumbnail extraction state
+    isExtractingThumbnail,
+    thumbnailError,
     
     // Handlers
     handleLocationSelect,
     handleDeleteZone,
     handleSubmit,
+    extractThumbnail,
+    cleanup,
     navigate
   };
 };
