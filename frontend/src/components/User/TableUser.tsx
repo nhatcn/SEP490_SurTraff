@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
-import { ChevronRight, ChevronLeft, Filter, Trash2, AlertCircle, X } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
+import GenericTable, { TableColumn, TableAction, FilterConfig } from '../../components/Table/GenericTable';
 import ConfirmDialog from '../UI/PopUp/ConfirmDialog';
+import DeleteButton from '../Button/DeleteButton';
+import EditButton from '../Button/EditButton';
 
-// Define interfaces
+// Giữ nguyên interfaces từ code cũ
 interface User {
   userId: number;
   avatar: string;
@@ -11,7 +14,7 @@ interface User {
   email: string;
   status: boolean;
   role: string;
-  roleId: number; // Add roleId to track the actual role ID
+  roleId: number;
 }
 
 interface Role {
@@ -26,6 +29,7 @@ interface FilterState {
 }
 
 export default function TableUser() {
+  // Giữ nguyên tất cả states từ code cũ
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
@@ -37,7 +41,11 @@ export default function TableUser() {
     status: '',
     search: ''
   });
-  const [showFilters, setShowFilters] = useState(false);
+  
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  
   const [confirmDialog, setConfirmDialog] = useState({
     isOpen: false,
     title: '',
@@ -47,11 +55,9 @@ export default function TableUser() {
     confirmButtonColor: 'bg-red-500 hover:bg-red-600'
   });
 
-  // Get API base URL and token
+
   const API_BASE_URL = 'http://localhost:8081/api';
   const token = localStorage.getItem("token");
-
-  // Create auth header with proper template literal syntax
   const authHeader = {
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -59,12 +65,9 @@ export default function TableUser() {
     },
   };
 
-  // Filter users based on current filter state
   const applyFilters = (userList: User[]) => {
     let filtered = userList;
 
-    // Search filter
-    // Search filter
     if (filters.search) {
       const searchTerm = filters.search.toLowerCase();
       filtered = filtered.filter(user => {
@@ -78,12 +81,10 @@ export default function TableUser() {
       });
     }
 
-    // Role filter
     if (filters.role) {
       filtered = filtered.filter(user => user.role === filters.role);
     }
 
-    // Status filter
     if (filters.status) {
       if (filters.status === 'active') {
         filtered = filtered.filter(user => user.status === true);
@@ -95,12 +96,23 @@ export default function TableUser() {
     return filtered;
   };
 
-  // Update filtered users when users or filters change
+  const getPaginatedData = (data: User[]) => {
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return data.slice(startIndex, endIndex);
+  };
+
+  const totalPages = Math.ceil(filteredUsers.length / pageSize);
+
   useEffect(() => {
-    setFilteredUsers(applyFilters(users));
+    const filtered = applyFilters(users);
+    setFilteredUsers(filtered);
+ 
+    setCurrentPage(1);
   }, [users, filters]);
 
-  const handleFilterChange = (type: keyof FilterState, value: string) => {
+
+  const handleFilterChange = (type: string, value: string) => {
     setFilters(prev => ({
       ...prev,
       [type]: value
@@ -115,11 +127,19 @@ export default function TableUser() {
     });
   };
 
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize);
+    setCurrentPage(1); 
+  };
+
   const toggleUserActive = async (userId: number, currentStatus: boolean, index: number) => {
     try {
       const updatedUsers = [...users];
       const newStatus = !currentStatus;
-      // Find the actual user index in the original users array
       const actualIndex = users.findIndex(user => user.userId === userId);
       if (actualIndex !== -1) {
         updatedUsers[actualIndex].status = newStatus;
@@ -146,7 +166,6 @@ export default function TableUser() {
       }
     } catch (err) {
       console.error('Error updating user status:', err);
-      // Revert status on error
       const revertedUsers = [...users];
       const actualIndex = users.findIndex(user => user.userId === userId);
       if (actualIndex !== -1) {
@@ -192,7 +211,6 @@ export default function TableUser() {
       setConfirmDialog(prev => ({ ...prev, isOpen: false }));
     } catch (err) {
       console.error('Error deleting user:', err);
-      // Show error toast or notification here
     }
   };
 
@@ -212,14 +230,12 @@ export default function TableUser() {
 
   const confirmRoleChange = async (userId: number, newRole: string) => {
     try {
-      // Find the role ID by name
       const roleObj = roleObjects.find(role => role.name === newRole);
 
       if (!roleObj) {
         throw new Error(`Role ${newRole} not found`);
       }
 
-      // Update the user's role using the endpoint and properly formatted data
       const response = await fetch(
         `${API_BASE_URL}/users/${userId}`,
         {
@@ -239,7 +255,6 @@ export default function TableUser() {
         throw new Error('Failed to update user role');
       }
 
-      // Update the user in the state
       const updatedUsers = users.map(user =>
         user.userId === userId
           ? { ...user, role: newRole, roleId: roleObj.id }
@@ -250,11 +265,10 @@ export default function TableUser() {
       setConfirmDialog(prev => ({ ...prev, isOpen: false }));
     } catch (err) {
       console.error('Error updating user role:', err);
-      // Show error toast or notification here
     }
   };
 
-  // Fetch roles from API
+  // Giữ nguyên các useEffect fetch data
   useEffect(() => {
     const fetchRoles = async () => {
       try {
@@ -267,16 +281,13 @@ export default function TableUser() {
         }
 
         const rolesData = await response.json();
-        console.log('Roles data:', rolesData); // Debug log
+        console.log('Roles data:', rolesData);
 
-        // Store the complete role objects
         setRoleObjects(rolesData);
-        // Extract role names for the dropdown
         const roleNames = rolesData.map((role: Role) => role.name);
         setRoles(roleNames);
       } catch (err) {
         console.error('Error fetching roles:', err);
-        // Set default roles as fallback
         setRoles(["User", "Admin", "Moderator", "Editor", "Viewer"]);
       }
     };
@@ -284,7 +295,6 @@ export default function TableUser() {
     fetchRoles();
   }, []);
 
-  // Fetch users
   useEffect(() => {
     const fetchUsers = async () => {
       try {
@@ -297,13 +307,11 @@ export default function TableUser() {
         }
 
         const data = await response.json();
-        console.log('Users data:', data); // Debug log
+        console.log('Users data:', data);
 
-        // Process users and map role names correctly
         const usersWithRoles = data.map((user: any) => {
-          // If user has roleId, find the corresponding role name
-          let roleName = "User"; // Default role
-          let roleId = user.roleId || 1; // Default roleId
+          let roleName = "User";
+          let roleId = user.roleId || 1;
 
           if (user.roleId && roleObjects.length > 0) {
             const roleObj = roleObjects.find(role => role.id === user.roleId);
@@ -311,11 +319,9 @@ export default function TableUser() {
               roleName = roleObj.name;
             }
           } else if (user.role && typeof user.role === 'object' && user.role.name) {
-            // If role is an object with name property
             roleName = user.role.name;
             roleId = user.role.id;
           } else if (user.role && typeof user.role === 'string') {
-            // If role is already a string
             roleName = user.role;
           }
 
@@ -340,240 +346,164 @@ export default function TableUser() {
       }
     };
 
-    // Only fetch users after roles are loaded
     if (roleObjects.length > 0) {
       fetchUsers();
     }
-  }, [roleObjects]); // Depend on roleObjects to ensure proper role mapping
+  }, [roleObjects]);
 
-  return (
-    <div className="p-2 bg-white rounded-lg shadow-sm">
-      {/* Filter Section */}
-      <div className="flex flex-wrap mb-6 gap-2">
-        <div
-          className="border rounded-lg p-2 bg-gray-50 hover:bg-gray-100 cursor-pointer transition-colors"
-          onClick={() => setShowFilters(!showFilters)}
+  // Định nghĩa columns cho GenericTable
+  const columns: TableColumn<User>[] = [
+    {
+      key: 'avatar',
+      title: 'AVATAR',
+      render: (value, record) => (
+        <img
+          src={value || `https://ui-avatars.com/api/?name=${record.userName || "U"}&background=random`}
+          alt={record.userName}
+          className="h-9 w-9 rounded-full object-cover"
+        />
+      )
+    },
+    {
+      key: 'userName',
+      title: 'Username',
+      render: (value) => (
+        <span className="text-sm font-medium text-gray-900">{value || "(unknown)"}</span>
+      )
+    },
+    {
+      key: 'name',
+      title: 'Name',
+      render: (value) => (
+        <span className="text-sm text-gray-900">{value}</span>
+      )
+    },
+    {
+      key: 'email',
+      title: 'Email',
+      render: (value) => (
+        <span className="text-sm text-gray-900">{value}</span>
+      )
+    },
+    {
+      key: 'role',
+      title: 'Role',
+      render: (value, record) => (
+        <select
+          className="block w-full py-1.5 pl-3 pr-8 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          value={value}
+          onChange={(e) => handleRoleChange(record.userId, e.target.value)}
         >
-          <Filter size={20} className="text-gray-600" />
-        </div>
-
-        {/* Search Filter */}
-        <div className="border rounded-lg bg-gray-50 hover:bg-gray-100 flex-grow max-w-xs">
-          <div className="flex items-center px-4 py-2">
-            <input
-              type="text"
-              placeholder="Search users..."
-              value={filters.search}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
-              className="bg-transparent outline-none text-gray-700 placeholder-gray-500 w-full"
-            />
-          </div>
-        </div>
-
-        {/* Role Filter */}
-        <div className="border rounded-lg bg-gray-50 hover:bg-gray-100 flex-grow max-w-xs">
-          <select
-            value={filters.role}
-            onChange={(e) => handleFilterChange('role', e.target.value)}
-            className="w-full px-4 py-2 bg-transparent outline-none text-gray-700"
-          >
-            <option value="">All Roles</option>
-            {roles.map((role) => (
-              <option key={role} value={role}>{role}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Status Filter */}
-        <div className="border rounded-lg bg-gray-50 hover:bg-gray-100 flex-grow max-w-xs">
-          <select
-            value={filters.status}
-            onChange={(e) => handleFilterChange('status', e.target.value)}
-            className="w-full px-4 py-2 bg-transparent outline-none text-gray-700"
-          >
-            <option value="">All Status</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
-        </div>
-
-        {/* Reset Filters Button */}
-        {(filters.role || filters.status || filters.search) && (
+          {roles.map((role) => (
+            <option key={role} value={role}>{role}</option>
+          ))}
+        </select>
+      )
+    },
+    {
+      key: 'status',
+      title: 'Status',
+      render: (value, record, index) => (
+        <div className="flex items-center">
           <button
-            className="flex items-center text-red-500 hover:text-red-600 px-3 py-2 transition-colors"
-            onClick={resetFilters}
+            type="button"
+            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${value ? 'bg-green-500' : 'bg-gray-300'}`}
+            role="switch"
+            onClick={() => toggleUserActive(record.userId, value, index)}
           >
-            <X size={16} className="mr-1" />
-            Reset Filters
+            <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${value ? 'translate-x-5' : 'translate-x-0'}`}></span>
           </button>
-        )}
-      </div>
-
-      {/* Active Filters Display */}
-      {(filters.role || filters.status || filters.search) && (
-        <div className="mb-4 flex flex-wrap gap-2">
-          {filters.search && (
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800">
-              Search: {filters.search}
-              <button
-                onClick={() => handleFilterChange('search', '')}
-                className="ml-2 hover:text-blue-600"
-              >
-                <X size={14} />
-              </button>
-            </span>
-          )}
-          {filters.role && (
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-green-100 text-green-800">
-              Role: {filters.role}
-              <button
-                onClick={() => handleFilterChange('role', '')}
-                className="ml-2 hover:text-green-600"
-              >
-                <X size={14} />
-              </button>
-            </span>
-          )}
-          {filters.status && (
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-purple-100 text-purple-800">
-              Status: {filters.status}
-              <button
-                onClick={() => handleFilterChange('status', '')}
-                className="ml-2 hover:text-purple-600"
-              >
-                <X size={14} />
-              </button>
-            </span>
-          )}
+          <span className="ml-2 text-sm">
+            {value === true ? 'Active' : 'Inactive'}
+          </span>
         </div>
-      )}
+      )
+    }
+  ];
 
-      {/* Table */}
-      <div className="border rounded-lg overflow-hidden shadow-sm">
-        {loading ? (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mx-auto"></div>
-            <p className="mt-3 text-gray-600">Loading users...</p>
-          </div>
-        ) : error ? (
-          <div className="text-center py-12 text-red-500">
-            <AlertCircle className="mx-auto mb-2" size={32} />
-            <p className="font-medium">{error}</p>
-            <button
-              className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-              onClick={() => window.location.reload()}
-            >
-              Retry
-            </button>
-          </div>
-        ) : filteredUsers.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <p>No users found{(filters.role || filters.status || filters.search) ? ' matching your filters' : ''}</p>
-          </div>
-        ) : (
-          <table className="min-w-full">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="text-xs font-semibold text-gray-600 uppercase px-6 py-3 text-left tracking-wider">AVATAR</th>
-                <th className="text-xs font-semibold text-gray-600 uppercase px-6 py-3 text-left tracking-wider">Username</th>
-                <th className="text-xs font-semibold text-gray-600 uppercase px-6 py-3 text-left tracking-wider">Name</th>
-                <th className="text-xs font-semibold text-gray-600 uppercase px-6 py-3 text-left tracking-wider">Email</th>
-                <th className="text-xs font-semibold text-gray-600 uppercase px-6 py-3 text-left tracking-wider">Role</th>
-                <th className="text-xs font-semibold text-gray-600 uppercase px-6 py-3 text-left tracking-wider">Status</th>
-                <th className="text-xs font-semibold text-gray-600 uppercase px-6 py-3 text-left tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {filteredUsers.map((user, index) => (
-                <tr key={user.userId} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <img
-                      src={user.avatar || `https://ui-avatars.com/api/?name=${user.userName || "U"}&background=random`}
-                      alt={user.userName}
-                      className="h-9 w-9 rounded-full object-cover"
-                    />
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <span className="text-sm font-medium text-gray-900">{user.userName || "(unknown)"}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.email}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <select
-                      className="block w-full py-1.5 pl-3 pr-8 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      value={user.role}
-                      onChange={(e) => handleRoleChange(user.userId, e.target.value)}
-                    >
-                      {roles.map((role) => (
-                        <option key={role} value={role}>{role}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <button
-                        type="button"
-                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${user.status ? 'bg-green-500' : 'bg-gray-300'}`}
-                        role="switch"
-                        onClick={() => toggleUserActive(user.userId, user.status, index)}
-                      >
-                        <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${user.status ? 'translate-x-5' : 'translate-x-0'}`}></span>
-                      </button>
-                      <span className="ml-2 text-sm">
-                        {user.status === true ? 'Active' : 'Inactive'}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <button
-                      className="p-1 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-full transition-colors"
-                      onClick={() => handleDeleteUser(user.userId)}
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {/* Pagination */}
-      <div className="flex items-center justify-between mt-6">
-        <div className="text-sm text-gray-700">
-          Showing <span className="font-medium">{filteredUsers.length}</span> of <span className="font-medium">{users.length}</span> users
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <button className="flex items-center px-4 py-2 text-sm rounded border hover:bg-gray-50 transition-colors">
-            <ChevronLeft size={16} className="mr-1" />
-            Previous
-          </button>
-
-          <button className="flex items-center px-4 py-2 text-sm rounded border bg-blue-500 text-white hover:bg-blue-600 transition-colors">
-            1
-          </button>
-
-          <button className="flex items-center px-4 py-2 text-sm rounded border hover:bg-gray-50 transition-colors">
-            Next
-            <ChevronRight size={16} className="ml-1" />
-          </button>
-        </div>
-      </div>
-
-      {/* Confirmation Dialog */}
-      <ConfirmDialog
-        isOpen={confirmDialog.isOpen}
-        title={confirmDialog.title}
-        message={confirmDialog.message}
-        onConfirm={confirmDialog.onConfirm}
-        onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
-        confirmButtonText={confirmDialog.confirmButtonText}
-        confirmButtonColor={confirmDialog.confirmButtonColor}
+const actions: TableAction<User>[] = [
+  {
+    key: 'delete',
+    label: 'Delete Product',
+    icon: (
+      <EditButton
+        onClick={() => {}}
+        size="md"
+        variant="icon"
+        className="text-red-500 hover:text-red-700 hover:bg-red-100"
       />
-    </div>
-  );
+    ),
+    onClick: (record) => handleDeleteUser(record.userId)
+  }
+];
+
+  // Định nghĩa filters cho GenericTable
+  const filterConfigs: FilterConfig[] = [
+    {
+      key: 'search',
+      label: 'Search',
+      type: 'text',
+      placeholder: 'Search users...'
+    },
+    {
+      key: 'role',
+      label: 'Role',
+      type: 'select',
+      options: roles.map(role => ({ value: role, label: role }))
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      type: 'select',
+      options: [
+        { value: 'active', label: 'Active' },
+        { value: 'inactive', label: 'Inactive' }
+      ]
+    }
+  ];
+
+ return (
+  <>
+    <GenericTable<User>
+      data={users}
+      filteredData={getPaginatedData(filteredUsers)}
+      columns={columns}
+      rowKey="userId"
+      actions={actions}
+      filters={filterConfigs}
+      filterValues={filters}
+      onFilterChange={handleFilterChange}
+      onResetFilters={resetFilters}
+      loading={loading}
+      error={error}
+      onRetry={() => window.location.reload()}
+      emptyMessage="No users found"
+      pagination={{
+        enabled: true,
+        currentPage,
+        totalPages,
+        pageSize,
+        totalItems: filteredUsers.length,
+        onPageChange: handlePageChange,
+        onPageSizeChange: handlePageSizeChange
+      }}
+    />
+
+    {/* Giữ nguyên ConfirmDialog */}
+    <ConfirmDialog
+      isOpen={confirmDialog.isOpen}
+      title={confirmDialog.title}
+      message={confirmDialog.message}
+      onConfirm={confirmDialog.onConfirm}
+      onCancel={() =>
+        setConfirmDialog((prev) => ({
+          ...prev,
+          isOpen: false,
+        }))
+      }
+      confirmButtonText={confirmDialog.confirmButtonText}
+      confirmButtonColor={confirmDialog.confirmButtonColor}
+    />
+  </>
+);
 }

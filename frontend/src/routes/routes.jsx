@@ -2,8 +2,6 @@
 import React from 'react';
 import { Route, Routes } from 'react-router-dom';
 
-
-
 import CameraDashboard from '../Pages/Dashboard/Camera/CameraDashboard';
 import MapDashboard from '../Pages/Map/MapDashboard';
 import TrafficMonitoringAuth from '../Pages/Auth/LoginPage';
@@ -17,7 +15,6 @@ import ViolationDetail from '../Pages/Violations/ViolationDetail';
 import ViolationHistory from '../Pages/Violations/ViolationHistory';
 import EditCamera from '../Pages/Dashboard/Camera/EditCamera';
 import UserProfileDashboard from '../Pages/Dashboard/User/UserProfileDashboard';
-
 
 const RoutesConfig = () => {
   return (
