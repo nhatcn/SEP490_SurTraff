@@ -5,6 +5,7 @@ import Header from "../../../components/Layout/Header";
 import CameraCard from "../../../components/Camera/CameraCard";
 import CameraDetail from "../../../components/Camera/CameraDetail";
 import { Link } from "react-router-dom";
+import AddButton from "../../../components/Button/AddButton";
 
 interface CameraType {
   id: string | number;
@@ -46,7 +47,7 @@ export default function CameraDashboard() {
         return res.json();
       })
       .then((data) => {
-        const sortedData = data.sort((a: CameraType, b: CameraType) => 
+        const sortedData = data.sort((a: CameraType, b: CameraType) =>
           typeof a.id === 'number' && typeof b.id === 'number' ? a.id - b.id : String(a.id).localeCompare(String(b.id))
         );
 
@@ -57,7 +58,7 @@ export default function CameraDashboard() {
         if (!selectedCamera && sortedData.length > 0) {
           setSelectedCamera(sortedData[0]);
         }
-        
+
         setLoading(false);
       })
       .catch((err) => {
@@ -108,20 +109,22 @@ export default function CameraDashboard() {
 
   return (
     <div className="flex h-screen">
-      <Sidebar defaultActiveItem="cameras"/>
+      <Sidebar defaultActiveItem="cameras" />
       <div className="flex flex-col flex-grow overflow-hidden">
         <Header title="Camera Surveillance Dashboard" />
-        
+
         {/* Filter Section - Updated to match User style */}
         <div className="p-4 bg-white border-b border-gray-200">
           {/* Filter Section */}
           <div className="flex flex-wrap mb-6 gap-2">
             {/* Add Camera Button */}
-            <Link
-              to="/addcamera"
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 inline-flex items-center"
-            >
-              Add Camera
+            <Link to="/addcamera" className="inline-flex">
+              <AddButton
+                size="md"
+                variant="full"
+                className="bg-blue-600 text-white hover:bg-blue-700"
+                text="Add Camera"
+              />
             </Link>
             <div className="border rounded-lg p-2 bg-gray-50 hover:bg-gray-100 cursor-pointer transition-colors">
               <Filter size={20} className="text-gray-600" />
@@ -247,11 +250,11 @@ export default function CameraDashboard() {
                       />
                     </div>
                   ))}
-                  
+
                   {filteredCameras.length === 0 && (
                     <div className="col-span-3 py-12 text-center text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-                      {cameras.length === 0 
-                        ? "No cameras available." 
+                      {cameras.length === 0
+                        ? "No cameras available."
                         : "No cameras match your current filters."
                       }
                       {(filters.status || filters.location || filters.name) && (

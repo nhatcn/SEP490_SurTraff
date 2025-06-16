@@ -13,6 +13,7 @@ import { useCameraForm } from "../../../hooks/Camera/useCameraForm";
 import { useCurrentLocation } from "../../../hooks/Camera/useCurrentLocation";
 import { useLocationSearch } from "../../../hooks/Camera/useLocationSearch";
 import { useZoneId } from "../../../hooks/Camera/useZoneId";
+import SubmitButton from "../../../components/Button/SubmitButton";
 
 const markerIconUrl = "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png";
 const markerShadowUrl = "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png";
@@ -125,8 +126,8 @@ export default function AddCamera() {
     }
   };
 
-  // Show loading state while fetching zone ID
-  if (isLoadingZoneId) {
+  // Show loading state while fetching zone ID or violation types
+  if (isLoadingZoneId || cameraForm.isLoadingViolationTypes) {
     return (
       <div className="flex h-screen">
         <Sidebar defaultActiveItem="cameras"/>
@@ -329,10 +330,10 @@ export default function AddCamera() {
               </div>
             </div>
 
-            {/* Speed Limit Configuration */}
-            <div className="mb-6">
-              <label className="block mb-2 font-medium">Speed Limit: {cameraForm.speedLimit} km/h</label>
-              <div className="max-w-md">
+            {/* Speed Limit Configuration and Violation Type */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div>
+                <label className="block mb-2 font-medium">Speed Limit: {cameraForm.speedLimit} km/h</label>
                 <input
                   type="range"
                   min="40"
@@ -347,8 +348,33 @@ export default function AddCamera() {
                   <span>120 km/h</span>
                 </div>
                 <div className="mt-1 text-sm text-gray-500">
-                  Set the speed limit for this camera location (used for speed violation detection)
+                  Set the speed limit for this camera location
                 </div>
+              </div>
+
+              <div>
+                <label className="block mb-2 font-medium">Violation Type *</label>
+                <select
+                  value={cameraForm.violationTypeId || ""}
+                  onChange={e => cameraForm.setViolationTypeId(Number(e.target.value))}
+                  className="w-full p-2 border rounded focus:ring focus:ring-blue-300"
+                  required
+                >
+                  <option value="">Select violation type...</option>
+                  {cameraForm.violationTypes.map(type => (
+                    <option key={type.id} value={type.id}>
+                      {type.typeName}
+                    </option>
+                  ))}
+                </select>
+                <div className="mt-1 text-sm text-gray-500">
+                  Select the primary type of violation this camera will detect
+                </div>
+                {cameraForm.violationTypes.length === 0 && !cameraForm.isLoadingViolationTypes && (
+                  <div className="mt-1 text-sm text-red-500">
+                    Failed to load violation types. Please refresh the page.
+                  </div>
+                )}
               </div>
             </div>
 
@@ -414,6 +440,7 @@ export default function AddCamera() {
               >
                 Add Camera
               </button>
+   
             </div>
           </div>
         </div>

@@ -1,10 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Zone, LaneDirection, LightZoneMapping } from '../../types/Camera/camera';
 
+// Type for violation type from API
+interface ViolationType {
+  id: number;
+  typeName: string;
+}
+
 export const useCameraForm = () => {
   const navigate = useNavigate();
-
   const [name, setName] = useState("");
   const [streamUrl, setStreamUrl] = useState("");
   const [locationAddress, setLocationAddress] = useState("");
@@ -15,12 +20,45 @@ export const useCameraForm = () => {
   const [laneDirections, setLaneDirections] = useState<LaneDirection[]>([]);
   const [lightZoneMappings, setLightZoneMappings] = useState<LightZoneMapping[]>([]);
   
-  // New speed configuration state
+  // Speed configuration state
   const [speedLimit, setSpeedLimit] = useState<number>(50);
+  
+  // Violation type state - now stores ID instead of string
+  const [violationTypeId, setViolationTypeId] = useState<number | null>(null);
+  const [violationTypes, setViolationTypes] = useState<ViolationType[]>([]);
+  const [isLoadingViolationTypes, setIsLoadingViolationTypes] = useState(false);
   
   // Loading states
   const [isExtractingThumbnail, setIsExtractingThumbnail] = useState(false);
   const [thumbnailError, setThumbnailError] = useState<string | null>(null);
+
+  // Fetch violation types from API
+  useEffect(() => {
+    const fetchViolationTypes = async () => {
+      setIsLoadingViolationTypes(true);
+      try {
+        const response = await fetch("http://localhost:8081/api/violation-type");
+        if (!response.ok) {
+          throw new Error(`Failed to fetch violation types: ${response.status}`);
+        }
+        const data: ViolationType[] = await response.json();
+        setViolationTypes(data);
+        
+        // Set default violation type to the first one if available
+        if (data.length > 0 && violationTypeId === null) {
+          setViolationTypeId(data[0].id);
+        }
+      } catch (error) {
+        console.error("Error fetching violation types:", error);
+        // Fallback to empty array if API fails
+        setViolationTypes([]);
+      } finally {
+        setIsLoadingViolationTypes(false);
+      }
+    };
+
+    fetchViolationTypes();
+  }, []); // Empty dependency array - chỉ gọi 1 lần khi component mount
 
   const handleLocationSelect = (lat: number, lng: number, address: string) => {
     setLocation({
@@ -109,6 +147,11 @@ export const useCameraForm = () => {
       return;
     }
 
+    if (violationTypeId === null) {
+      alert("Please select a violation type.");
+      return;
+    }
+
     try {
       const setupData = {
         cameraName: name,
@@ -117,7 +160,8 @@ export const useCameraForm = () => {
         longitude: location.lng,
         location: locationAddress,
         thumbnail: thumbnailUrl,
-        speedLimit: speedLimit,
+        maxSpeed: speedLimit,
+        violationTypeId: violationTypeId, // Send ID instead of string
         
         zones: zones.map(z => ({
           id: parseInt(z.id),
@@ -190,6 +234,10 @@ export const useCameraForm = () => {
     setLightZoneMappings,
     speedLimit,
     setSpeedLimit,
+    violationTypeId,
+    setViolationTypeId,
+    violationTypes,
+    isLoadingViolationTypes,
     
     // Thumbnail extraction state
     isExtractingThumbnail,

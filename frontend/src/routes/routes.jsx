@@ -7,13 +7,23 @@ import RegisterPage from '../Pages/Auth/RegisterPage';
 import ForgotPasswordPage from '../Pages/Auth/ForgotPasswordPage';
 import UserDashboard from '../Pages/Dashboard/User/UserDashboard';
 import AccidentDashboard from '../Pages/Dashboard/Accident/AccidentDashboard';
-import EditCamera from '../Pages/Dashboard/Camera/EditCamera';
+
+import AccidentStatistics from '../Pages/Dashboard/AccidentStatistics';
+
 import ViolationList from '../Pages/Violations/ViolationList';
 import ViolationHistory from '../Pages/Violations/ViolationHistory';
+
+import ViolationStatistics from '../Pages/Dashboard/ViolationStatistics';
+import EditCamera from '../Pages/Dashboard/Camera/EditCamera';
 import UserProfileDashboard from '../Pages/Dashboard/User/UserProfileDashboard';
-import AddCamera from '../Pages/Dashboard/Camera/AddCamera';
+import VehicleDashboard from '../Pages/Dashboard/Vehicle/VehicleDashboard';
+
 import CameraDashboard from '../Pages/Dashboard/Camera/CameraDashboard';
+import AddCamera from '../Pages/Dashboard/Camera/AddCamera';
 import ViolationDetail from '../Pages/Violations/ViolationDetail';
+import VehicleDetail from '../Pages/Dashboard/Vehicle/VehicleDetails';
+
+
 
 
 const RoutesConfig = () => {
@@ -33,6 +43,11 @@ const RoutesConfig = () => {
       <Route path="/violations/:id" element={<ViolationDetail />} />
       <Route path="/violations/history/:plate" element={<ViolationHistory />} />
       <Route path="/profile" element={<UserProfileDashboard />} />
+      <Route path="/accidentstatistics" element={<AccidentStatistics />} />
+      <Route path="/violationstatistics" element={<ViolationStatistics />} />
+      <Route path="/vehicledetails" element={<VehicleDetail/>} />
+      <Route path="/vehicles" element={<VehicleDashboard />} />
+      <Route path="/vehicles/:id" element={<VehicleDetail />} />
     </Routes>
   );
 };
