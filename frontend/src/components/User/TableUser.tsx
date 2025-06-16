@@ -426,7 +426,7 @@ const actions: TableAction<User>[] = [
     key: 'delete',
     label: 'Delete Product',
     icon: (
-      <EditButton
+      <DeleteButton
         onClick={() => {}}
         size="md"
         variant="icon"
