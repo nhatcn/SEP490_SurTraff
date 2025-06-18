@@ -22,6 +22,8 @@ import CameraDashboard from '../Pages/Dashboard/Camera/CameraDashboard';
 import AddCamera from '../Pages/Dashboard/Camera/AddCamera';
 import ViolationDetail from '../Pages/Violations/ViolationDetail';
 import VehicleDetail from '../Pages/Dashboard/Vehicle/VehicleDetails';
+import CustomerHome from '../Pages/Home/HomePage';
+import CustomerProfile from '../Pages/Dashboard/User/CustomerProfile';
 
 
 
@@ -48,6 +50,8 @@ const RoutesConfig = () => {
       <Route path="/vehicledetails" element={<VehicleDetail/>} />
       <Route path="/vehicles" element={<VehicleDashboard />} />
       <Route path="/vehicles/:id" element={<VehicleDetail />} />
+      <Route path="/home" element={<CustomerHome />} />
+      <Route path="/myprofile" element={<CustomerProfile />} />
     </Routes>
   );
 };
