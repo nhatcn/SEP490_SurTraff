@@ -1,16 +1,32 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Chart, registerables } from "chart.js";
+import {
+  Chart,
+  registerables,
+  ChartConfiguration,
+  Chart as ChartJS,
+} from "chart.js";
+
 Chart.register(...registerables);
 
-function getMonthlyStats(violations, year, fromDate, toDate) {
+interface Accident {
+  accidentTime: string;
+}
+
+interface CardBarChartProps {
+  accidents: Accident[];
+}
+
+function getMonthlyStats(
+  accidents: Accident[],
+  year: number,
+  fromDate: Date | null,
+  toDate: Date | null
+): number[] {
   const months = Array(12).fill(0);
-  violations.forEach((vio) => {
-    // Sửa lại đúng tên trường
-    const createdAt = vio?.createdAt;
-    if (!createdAt) return;
-    const date = new Date(createdAt);
+  accidents.forEach((acc) => {
+    const date = new Date(acc.accidentTime);
     if (
-      !isNaN(date) &&
+      !isNaN(date.getTime()) &&
       date.getFullYear() === year &&
       (!fromDate || date >= fromDate) &&
       (!toDate || date <= toDate)
@@ -21,17 +37,16 @@ function getMonthlyStats(violations, year, fromDate, toDate) {
   return months;
 }
 
-export default function CardBarChartViolationsMonth({ violations }) {
-  const chartRef = useRef(null);
-  const chartInstanceRef = useRef(null);
+export default function CardBarChart({ accidents }: CardBarChartProps) {
+  const chartRef = useRef<HTMLCanvasElement | null>(null);
+  const chartInstanceRef = useRef<ChartJS<"bar", number[], string> | null>(null);
 
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const [from, setFrom] = useState<string>("");
+  const [to, setTo] = useState<string>("");
 
   useEffect(() => {
     if (!chartRef.current) return;
 
-    // Clear chart nếu đã tồn tại
     if (chartInstanceRef.current) {
       chartInstanceRef.current.destroy();
     }
@@ -43,8 +58,8 @@ export default function CardBarChartViolationsMonth({ violations }) {
     const fromDate = from ? new Date(from + "T00:00:00") : null;
     const toDate = to ? new Date(to + "T23:59:59") : null;
 
-    const dataCurrent = getMonthlyStats(violations, currentYear, fromDate, toDate);
-    const dataLast = getMonthlyStats(violations, lastYear, fromDate, toDate);
+    const dataCurrent = getMonthlyStats(accidents, currentYear, fromDate, toDate);
+    const dataLast = getMonthlyStats(accidents, lastYear, fromDate, toDate);
 
     const months = [
       "January", "February", "March", "April", "May", "June",
@@ -54,7 +69,7 @@ export default function CardBarChartViolationsMonth({ violations }) {
     const ctx = chartRef.current.getContext("2d");
     if (!ctx) return;
 
-    chartInstanceRef.current = new Chart(ctx, {
+    const config: ChartConfiguration<"bar", number[], string> = {
       type: "bar",
       data: {
         labels: months,
@@ -82,7 +97,10 @@ export default function CardBarChartViolationsMonth({ violations }) {
           legend: {
             position: "bottom",
             labels: {
-              color: "rgba(0,0,0,.5)",
+              color: "rgba(0,0,0,0.5)", // dễ đọc hơn trên nền trắng
+              font: {
+                size: 12,
+              },
             },
           },
           tooltip: {
@@ -97,27 +115,25 @@ export default function CardBarChartViolationsMonth({ violations }) {
               text: "Month",
             },
             grid: {
-              borderDash: [2],
               color: "rgba(33, 37, 41, 0.3)",
             },
           },
           y: {
             beginAtZero: true,
             grid: {
-              borderDash: [2],
               color: "rgba(33, 37, 41, 0.2)",
             },
           },
         },
       },
-    });
+    };
+
+    chartInstanceRef.current = new Chart(ctx, config);
 
     return () => {
-      if (chartInstanceRef.current) {
-        chartInstanceRef.current.destroy();
-      }
+      chartInstanceRef.current?.destroy();
     };
-  }, [violations, from, to]);
+  }, [accidents, from, to]);
 
   return (
     <div className="relative flex flex-col min-w-0 break-words bg-white w-full mb-6 shadow-lg rounded">
@@ -128,7 +144,7 @@ export default function CardBarChartViolationsMonth({ violations }) {
               Statistics
             </h6>
             <h2 className="text-blueGray-700 text-xl font-semibold">
-              Violations by Month
+              Accidents by Month
             </h2>
           </div>
           <div className="flex gap-2 items-center">
@@ -150,12 +166,9 @@ export default function CardBarChartViolationsMonth({ violations }) {
         </div>
       </div>
       <div className="p-4 flex-auto">
-        {/* Chart */}
-        <div className="p-4 flex-auto">
-        <div className="relative h-[150px]">
+        <div className="relative h-[200px]">
           <canvas ref={chartRef} className="w-full h-full"></canvas>
         </div>
-      </div>
       </div>
     </div>
   );

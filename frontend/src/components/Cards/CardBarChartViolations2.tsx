@@ -1,30 +1,53 @@
 import React, { useEffect, useRef } from "react";
-import { Chart, registerables } from "chart.js";
+import {
+  Chart,
+  registerables,
+  Chart as ChartJS,
+  ChartConfiguration,
+} from "chart.js";
+
 Chart.register(...registerables);
 
-function getTopVehicleViolations(violations) {
-  const stats = {};
-  violations.forEach(vio => {
-    if (vio.vehicleId == null) return;
-    stats[vio.vehicleId] = (stats[vio.vehicleId] || 0) + 1;
-  });
-  return Object.entries(stats).sort((a, b) => b[1] - a[1]);
+interface Violation {
+  vehicleId: string | number | null;
+  createdAt: string;
 }
 
+interface Props {
+  violations: Violation[];
+}
 
-export default function CardBarChartViolations2({ violations }) {
-  const chartRef = useRef(null);
-  const chartInstanceRef = useRef(null);
+function getTopVehicleViolations(violations: Violation[], limit: number) {
+  const stats: Record<string, number> = {};
+  violations.forEach((vio) => {
+    if (vio.vehicleId == null) return;
+    const id = String(vio.vehicleId);
+    stats[id] = (stats[id] || 0) + 1;
+  });
+  return Object.entries(stats)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit);
+}
+
+export default function CardBarChartViolations2({ violations }: Props) {
+  const chartRef = useRef<HTMLCanvasElement | null>(null);
+  const chartInstanceRef = useRef<ChartJS<"bar", number[], string> | null>(null);
 
   useEffect(() => {
     if (!chartRef.current) return;
-    if (chartInstanceRef.current) chartInstanceRef.current.destroy();
+
+    if (chartInstanceRef.current) {
+      chartInstanceRef.current.destroy();
+    }
 
     const stats = getTopVehicleViolations(violations, 5); // Top 5
     const labels = stats.map(([vehicleId]) => `Vehicle ${vehicleId}`);
     const data = stats.map(([, count]) => count);
 
-    const config = {
+    const ctx = chartRef.current.getContext("2d");
+    if (!ctx) return;
+
+    const config: ChartConfiguration<"bar", number[], string> = {
       type: "bar",
       data: {
         labels,
@@ -34,7 +57,6 @@ export default function CardBarChartViolations2({ violations }) {
             backgroundColor: "#ed64a6",
             borderColor: "#ed64a6",
             data,
-            fill: false,
             barThickness: 24,
           },
         ],
@@ -48,31 +70,49 @@ export default function CardBarChartViolations2({ violations }) {
             display: true,
             text: "Top 5 Vehicles by Violation Count",
           },
-          tooltip: { mode: "index", intersect: false },
+          tooltip: {
+            mode: "index",
+            intersect: false,
+          },
         },
-        hover: { mode: "nearest", intersect: true },
+        hover: {
+          mode: "nearest",
+          intersect: true,
+        },
         scales: {
           x: {
             display: true,
-            title: { display: true, text: "Vehicle ID" },
-            grid: { borderDash: [2], color: "rgba(33, 37, 41, 0.3)" },
+            title: {
+              display: true,
+              text: "Vehicle ID",
+            },
+            grid: {
+              color: "rgba(33, 37, 41, 0.3)",
+            },
           },
           y: {
             display: true,
-            title: { display: true, text: "Violation Count" },
-            grid: { borderDash: [2], drawBorder: false, color: "rgba(33, 37, 41, 0.2)" },
             beginAtZero: true,
-            ticks: { precision: 0 },
+            title: {
+              display: true,
+              text: "Violation Count",
+            },
+            ticks: {
+              precision: 0,
+            },
+            grid: {
+              display: false,
+              color: "rgba(33, 37, 41, 0.2)",
+            },
           },
         },
       },
     };
 
-    const ctx = chartRef.current.getContext("2d");
     chartInstanceRef.current = new Chart(ctx, config);
 
     return () => {
-      if (chartInstanceRef.current) chartInstanceRef.current.destroy();
+      chartInstanceRef.current?.destroy();
     };
   }, [violations]);
 
@@ -91,12 +131,9 @@ export default function CardBarChartViolations2({ violations }) {
         </div>
       </div>
       <div className="p-4 flex-auto">
-        {/* Chart */}
-        <div className="p-4 flex-auto">
-        <div className="relative h-[150px]">
+        <div className="relative h-[200px]">
           <canvas ref={chartRef} className="w-full h-full"></canvas>
         </div>
-      </div>
       </div>
     </div>
   );

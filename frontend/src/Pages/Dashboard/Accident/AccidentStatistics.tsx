@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from "react";
-import Sidebar from "../../components/Layout/Sidebar";
-import Header from "../../components/Layout/Header";
+import Sidebar from "../../../components/Layout/Sidebar";
+import Header from "../../../components/Layout/Header";
 
 // Import các Card đã copy từ Notus React
-import CardLineChart from "../../components/Cards/CardLineChart";
-import CardBarChart from "../../components/Cards/CardBarChart";
-import CardPageVisits from "../../components/Cards/CardPageVisits";
-import CardSocialTraffic from "../../components/Cards/CardSocialTraffic";
-import CardLineChart2 from "../../components/Cards/CardLineChart2";
+import CardLineChart from "../../../components/Cards/CardLineChart";
+import CardBarChart from "../../../components/Cards/CardBarChart";
+import CardPageVisits from "../../../components/Cards/CardPageVisits";
+import CardSocialTraffic from "../../../components/Cards/CardSocialTraffic";
+import CardLineChart2 from "../../../components/Cards/CardLineChart2";
 
 interface Camera {
   id: number;
