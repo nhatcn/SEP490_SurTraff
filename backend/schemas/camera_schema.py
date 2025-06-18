@@ -8,6 +8,7 @@ class CameraBase(BaseModel):
     latitude: float
     longitude: float
     stream_url: str
+    max_speed:Optional[int]
     status: Optional[str] = "true"
 
 class CameraCreate(CameraBase):
