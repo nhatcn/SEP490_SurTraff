@@ -28,6 +28,7 @@ import CustomerProfile from '../Pages/Dashboard/User/CustomerProfile';
 
 
 
+
 const RoutesConfig = () => {
   return (
     <Routes>
@@ -50,8 +51,10 @@ const RoutesConfig = () => {
       <Route path="/vehicledetails" element={<VehicleDetail/>} />
       <Route path="/vehicles" element={<VehicleDashboard />} />
       <Route path="/vehicles/:id" element={<VehicleDetail />} />
+
       <Route path="/home" element={<CustomerHome />} />
       <Route path="/myprofile" element={<CustomerProfile />} />
+
     </Routes>
   );
 };

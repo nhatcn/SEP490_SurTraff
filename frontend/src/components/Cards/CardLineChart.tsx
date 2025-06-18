@@ -1,10 +1,24 @@
 import React, { useEffect, useRef } from "react";
-import { Chart, registerables } from "chart.js";
+import {
+  Chart,
+  registerables,
+  ChartConfiguration,
+  Chart as ChartJS,
+} from "chart.js";
+
 Chart.register(...registerables);
 
+interface Accident {
+  accidentTime: string;
+}
+
+interface Props {
+  accidents: Accident[];
+}
+
 // Hàm lấy 7 ngày gần nhất (yyyy-mm-dd)
-function getLast7Days() {
-  const days = [];
+function getLast7Days(): string[] {
+  const days: string[] = [];
   const today = new Date();
   for (let i = 6; i >= 0; i--) {
     const d = new Date(today);
@@ -14,16 +28,19 @@ function getLast7Days() {
   return days;
 }
 
-// Đếm số vi phạm mỗi ngày
-function countViolationsByDay(violations, days) {
-  return days.map(day =>
-    violations.filter(vio => vio.createdAt && vio.createdAt.slice(0, 10) === day).length
+// Đếm số tai nạn mỗi ngày
+function countAccidentsByDay(accidents: Accident[], days: string[]): number[] {
+  return days.map(
+    (day) =>
+      accidents.filter(
+        (acc) => acc.accidentTime && acc.accidentTime.slice(0, 10) === day
+      ).length
   );
 }
 
-export default function CardLineChartViolations({ violations }) {
-  const chartRef = useRef(null);
-  const chartInstanceRef = useRef(null);
+export default function CardLineChart({ accidents }: Props) {
+  const chartRef = useRef<HTMLCanvasElement | null>(null);
+  const chartInstanceRef = useRef<ChartJS<"line"> | null>(null);
 
   useEffect(() => {
     if (!chartRef.current) return;
@@ -33,20 +50,25 @@ export default function CardLineChartViolations({ violations }) {
     }
 
     const days = getLast7Days();
-    const counts = countViolationsByDay(violations, days);
+    const counts = countAccidentsByDay(accidents, days);
 
-    const config = {
+    const labels = days.map((d) => {
+      const date = new Date(d);
+      return `${date.getDate()}/${date.getMonth() + 1}`;
+    });
+
+    const ctx = chartRef.current.getContext("2d");
+    if (!ctx) return;
+
+    const config: ChartConfiguration<"line"> = {
       type: "line",
       data: {
-        labels: days.map(d => {
-          const date = new Date(d);
-          return `${date.getDate()}/${date.getMonth() + 1}`;
-        }),
+        labels,
         datasets: [
           {
-            label: "Violations",
-            backgroundColor: "#4c51bf",
-            borderColor: "#4c51bf",
+            label: "Accidents",
+            backgroundColor: "#e53e3e", // đỏ cho phân biệt
+            borderColor: "#e53e3e",
             data: counts,
             fill: false,
             tension: 0.3,
@@ -59,15 +81,6 @@ export default function CardLineChartViolations({ violations }) {
         plugins: {
           legend: {
             display: false,
-            labels: {
-              color: "rgba(255,255,255,.7)",
-            },
-            align: "end",
-            position: "bottom",
-          },
-          title: {
-            display: false,
-            text: "Violations by Week",
           },
           tooltip: {
             mode: "index",
@@ -80,52 +93,39 @@ export default function CardLineChartViolations({ violations }) {
         },
         scales: {
           x: {
-            ticks: {
-              color: "rgba(255,255,255,.7)",
-            },
+            ticks: {},
             title: {
-              display: false,
+              display: true,
               text: "Date",
-              color: "white",
             },
             grid: {
               display: false,
-              borderDash: [2],
-              color: "rgba(33, 37, 41, 0.3)",
-              zeroLineColor: "rgba(0, 0, 0, 0)",
-              zeroLineBorderDash: [2],
             },
           },
           y: {
             ticks: {
-              color: "rgba(255,255,255,.7)",
+              precision: 0,
             },
             title: {
-              display: false,
-              text: "Violations",
-              color: "white",
+              display: true,
+              text: "Accident Count",
             },
             grid: {
-              borderDash: [3],
-              drawBorder: false,
-              color: "rgba(255, 255, 255, 0.15)",
-              zeroLineColor: "rgba(33, 37, 41, 0)",
-              zeroLineBorderDash: [2],
+              display: false,
+              color: "rgba(33, 37, 41, 0.3)",
             },
+            beginAtZero: true,
           },
         },
       },
     };
 
-    const ctx = chartRef.current.getContext("2d");
     chartInstanceRef.current = new Chart(ctx, config);
 
     return () => {
-      if (chartInstanceRef.current) {
-        chartInstanceRef.current.destroy();
-      }
+      chartInstanceRef.current?.destroy();
     };
-  }, [violations]);
+  }, [accidents]);
 
   return (
     <div className="relative flex flex-col min-w-0 break-words w-full mb-6 shadow-lg rounded bg-blueGray-700">
@@ -136,14 +136,14 @@ export default function CardLineChartViolations({ violations }) {
               Statistics
             </h6>
             <h2 className="text-blueGray-700 text-xl font-semibold">
-              Violations by Week
+              Accidents by Week
             </h2>
           </div>
         </div>
       </div>
       <div className="p-4 flex-auto">
         <div className="relative h-[200px]">
-          <canvas ref={chartRef} className="w-full h-full"></canvas>
+          <canvas ref={chartRef} className="w-full h-full" />
         </div>
       </div>
     </div>

@@ -1,13 +1,34 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Chart, registerables } from "chart.js";
+import {
+  Chart,
+  registerables,
+  ChartConfiguration,
+  Chart as ChartJS,
+} from "chart.js";
+
 Chart.register(...registerables);
 
-function getMonthlyStats(accidents, year, fromDate, toDate) {
+interface Violation {
+  createdAt: string;
+}
+
+interface Props {
+  violations: Violation[];
+}
+
+function getMonthlyStats(
+  violations: Violation[],
+  year: number,
+  fromDate: Date | null,
+  toDate: Date | null
+): number[] {
   const months = Array(12).fill(0);
-  accidents.forEach(acc => {
-    const date = new Date(acc.accidentTime); // Sửa ở đây
+  violations.forEach((vio: Violation) => {
+    const createdAt = vio?.createdAt;
+    if (!createdAt) return;
+    const date = new Date(createdAt);
     if (
-      !isNaN(date) &&
+      !isNaN(date.getTime()) &&
       date.getFullYear() === year &&
       (!fromDate || date >= fromDate) &&
       (!toDate || date <= toDate)
@@ -18,13 +39,12 @@ function getMonthlyStats(accidents, year, fromDate, toDate) {
   return months;
 }
 
-export default function CardBarChart({ accidents }) {
-  const chartRef = useRef(null);
-  const chartInstanceRef = useRef(null);
+export default function CardBarChartViolationsMonth({ violations }: Props) {
+  const chartRef = useRef<HTMLCanvasElement | null>(null);
+  const chartInstanceRef = useRef<ChartJS<"bar", number[], string> | null>(null);
 
-  // State cho khoảng ngày
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const [from, setFrom] = useState<string>("");
+  const [to, setTo] = useState<string>("");
 
   useEffect(() => {
     if (!chartRef.current) return;
@@ -37,34 +57,34 @@ export default function CardBarChart({ accidents }) {
     const currentYear = now.getFullYear();
     const lastYear = currentYear - 1;
 
+    const fromDate = from ? new Date(from + "T00:00:00") : null;
+    const toDate = to ? new Date(to + "T23:59:59") : null;
+
+    const dataCurrent = getMonthlyStats(violations, currentYear, fromDate, toDate);
+    const dataLast = getMonthlyStats(violations, lastYear, fromDate, toDate);
+
     const months = [
       "January", "February", "March", "April", "May", "June",
       "July", "August", "September", "October", "November", "December"
     ];
 
-    // Parse date từ input
-    const fromDate = from ? new Date(from) : null;
-    const toDate = to ? new Date(to) : null;
+    const ctx = chartRef.current.getContext("2d");
+    if (!ctx) return;
 
-    const dataCurrent = getMonthlyStats(accidents, currentYear, fromDate, toDate);
-    const dataLast = getMonthlyStats(accidents, lastYear, fromDate, toDate);
-
-    const config = {
+    const config: ChartConfiguration<"bar", number[], string> = {
       type: "bar",
       data: {
         labels: months,
         datasets: [
           {
-            label: currentYear,
+            label: `${currentYear}`,
             backgroundColor: "#ed64a6",
             borderColor: "#ed64a6",
             data: dataCurrent,
-            fill: false,
             barThickness: 8,
           },
           {
-            label: lastYear,
-            fill: false,
+            label: `${lastYear}`,
             backgroundColor: "#4c51bf",
             borderColor: "#4c51bf",
             data: dataLast,
@@ -73,70 +93,46 @@ export default function CardBarChart({ accidents }) {
         ],
       },
       options: {
-        maintainAspectRatio: false,
         responsive: true,
+        maintainAspectRatio: false,
         plugins: {
           legend: {
-            labels: {
-              color: "rgba(0,0,0,.4)",
-            },
-            align: "end",
             position: "bottom",
-          },
-          title: {
-            display: false,
-            text: "Accident by Month",
+            labels: {
+              color: "rgba(0,0,0,.5)",
+            },
           },
           tooltip: {
             mode: "index",
             intersect: false,
           },
         },
-        hover: {
-          mode: "nearest",
-          intersect: true,
-        },
         scales: {
           x: {
-            display: false,
             title: {
               display: true,
               text: "Month",
             },
             grid: {
-              borderDash: [2],
               color: "rgba(33, 37, 41, 0.3)",
-              zeroLineColor: "rgba(33, 37, 41, 0.3)",
-              zeroLineBorderDash: [2],
             },
           },
           y: {
-            display: true,
-            title: {
-              display: false,
-              text: "Value",
-            },
+            beginAtZero: true,
             grid: {
-              borderDash: [2],
-              drawBorder: false,
               color: "rgba(33, 37, 41, 0.2)",
-              zeroLineColor: "rgba(33, 37, 41, 0.15)",
-              zeroLineBorderDash: [2],
             },
           },
         },
       },
     };
 
-    const ctx = chartRef.current.getContext("2d");
     chartInstanceRef.current = new Chart(ctx, config);
 
     return () => {
-      if (chartInstanceRef.current) {
-        chartInstanceRef.current.destroy();
-      }
+      chartInstanceRef.current?.destroy();
     };
-  }, [accidents, from, to]);
+  }, [violations, from, to]);
 
   return (
     <div className="relative flex flex-col min-w-0 break-words bg-white w-full mb-6 shadow-lg rounded">
@@ -147,7 +143,7 @@ export default function CardBarChart({ accidents }) {
               Statistics
             </h6>
             <h2 className="text-blueGray-700 text-xl font-semibold">
-              Accident by Month
+              Violations by Month
             </h2>
           </div>
           <div className="flex gap-2 items-center">
@@ -155,26 +151,23 @@ export default function CardBarChart({ accidents }) {
             <input
               type="date"
               value={from}
-              onChange={e => setFrom(e.target.value)}
+              onChange={(e) => setFrom(e.target.value)}
               className="border rounded px-2 py-1 text-xs"
             />
             <label className="text-xs">To</label>
             <input
               type="date"
               value={to}
-              onChange={e => setTo(e.target.value)}
+              onChange={(e) => setTo(e.target.value)}
               className="border rounded px-2 py-1 text-xs"
             />
           </div>
         </div>
       </div>
       <div className="p-4 flex-auto">
-        {/* Chart */}
-        <div className="p-4 flex-auto">
-        <div className="relative h-[150px]">
+        <div className="relative h-[200px]">
           <canvas ref={chartRef} className="w-full h-full"></canvas>
         </div>
-      </div>
       </div>
     </div>
   );
