@@ -5,6 +5,7 @@ import CardLineChartViolations from "../../components/Cards/CardLineChartViolati
 import CardBarChartViolations from "../../components/Cards/CardBarChartViolations";
 import CardLineChartViolations2 from "../../components/Cards/CardLineChartViolations2";
 import CardBarChartViolations2 from "../../components/Cards/CardBarChartViolations2";
+import CardLineChartViolations3 from "../../components/Cards/CardLineChartViolations3";
 
 interface Violation {
   id: number;
@@ -12,9 +13,24 @@ interface Violation {
   vehicleId: number | null;
 }
 
+interface ViolationDetails {
+  id: number;
+  violationId: number;
+  violationTypeId: number | null;
+  imageUrl: string | null;
+  videoUrl: string | null;
+  location: string | null;
+  violationTime: string | null;
+  speed: number | null;
+  additionalNotes: string | null;
+  createdAt: string | null;
+}
+
 const ViolationStatistics: React.FC = () => {
   const [violations, setViolations] = useState<Violation[]>([]);
+  const [violationDetails, setViolationDetails] = useState<ViolationDetails[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingDetails, setLoadingDetails] = useState(true);
 
   useEffect(() => {
     const fetchViolations = async () => {
@@ -28,40 +44,65 @@ const ViolationStatistics: React.FC = () => {
         setLoading(false);
       }
     };
-
     fetchViolations();
   }, []);
 
-  // Thêm class h-96 (hoặc h-[450px]) cho các chart
-  const chartContainerClass = "relative h-96"; // hoặc "relative h-[450px]"
+  useEffect(() => {
+    const fetchViolationDetails = async () => {
+      try {
+        const response = await fetch("http://localhost:8081/api/violationdetail/all");
+        const data = await response.json();
+        setViolationDetails(data);
+      } catch (error) {
+        console.error("Error fetching violation details:", error);
+      } finally {
+        setLoadingDetails(false);
+      }
+    };
+    fetchViolationDetails();
+  }, []);
+
+  const chartContainerClass = "relative h-96 mb-6";
 
   return (
     <div className="flex h-screen">
       <Sidebar />
-      <div className="flex flex-col flex-grow overflow-hidden">
+      <div className="flex flex-col flex-1">
         <Header title="Violation Statistics Dashboard" />
-        <div className="p-4">
-          <div className="flex flex-wrap">
-            <div className="w-full xl:w-7/12 mb-12 xl:mb-0 px-4">
-              <div className={chartContainerClass}>
-                <CardLineChartViolations violations={violations} />
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-6 min-h-full">
+            {/* First Row */}
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 mb-8">
+              <div className="xl:col-span-7">
+                <div className={chartContainerClass}>
+                  <CardLineChartViolations violations={violations} />
+                </div>
+              </div>
+              <div className="xl:col-span-5">
+                <div className={chartContainerClass}>
+                  <CardBarChartViolations violations={violations} />
+                </div>
               </div>
             </div>
-            <div className="w-full xl:w-5/12 px-4">
-              <div className={chartContainerClass}>
-                <CardBarChartViolations violations={violations} />
+
+            {/* Second Row */}
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 mb-8">
+              <div className="xl:col-span-8">
+                <div className={chartContainerClass}>
+                  <CardLineChartViolations2 violations={violations} />
+                </div>
+              </div>
+              <div className="xl:col-span-4">
+                <div className={chartContainerClass}>
+                  <CardBarChartViolations2 violations={violations} />
+                </div>
               </div>
             </div>
-          </div>
-          <div className="flex flex-wrap">
-            <div className="w-full xl:w-8/12 mb-12 xl:mb-0 px-4">
+
+            {/* Third Row - Full Width */}
+            <div className="w-full">
               <div className={chartContainerClass}>
-                <CardLineChartViolations2 violations={violations} />
-              </div>
-            </div>
-            <div className="w-full xl:w-4/12 px-4">
-              <div className={chartContainerClass}>
-                <CardBarChartViolations2 violations={violations} />
+                <CardLineChartViolations3 violationDetails={violationDetails} />
               </div>
             </div>
           </div>
