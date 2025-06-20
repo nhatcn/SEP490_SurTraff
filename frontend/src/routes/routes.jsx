@@ -7,9 +7,11 @@ import RegisterPage from '../Pages/Auth/RegisterPage';
 import ForgotPasswordPage from '../Pages/Auth/ForgotPasswordPage';
 import UserDashboard from '../Pages/Dashboard/User/UserDashboard';
 import AccidentDashboard from '../Pages/Dashboard/Accident/AccidentDashboard';
+import AccidentStatistics from '../Pages/Dashboard/Accident/AccidentStatistics';
 
 import ViolationList from '../Pages/Violations/ViolationList';
 import ViolationHistory from '../Pages/Violations/ViolationHistory';
+import ViolationStatistics from '../Pages/Violations/ViolationStatistics';
 
 import EditCamera from '../Pages/Dashboard/Camera/EditCamera';
 import UserProfileDashboard from '../Pages/Dashboard/User/UserProfileDashboard';
@@ -21,9 +23,10 @@ import ViolationDetail from '../Pages/Violations/ViolationDetail';
 import VehicleDetail from '../Pages/Dashboard/Vehicle/VehicleDetails';
 import CustomerHome from '../Pages/Home/HomePage';
 import CustomerProfile from '../Pages/Dashboard/User/CustomerProfile';
-import AccidentStatistics from '../Pages/Dashboard/Accident/AccidentStatistics';
-import ViolationStatistics from '../Pages/Violations/ViolationStatistics';
+
 import AccidentDetails from '../Pages/Dashboard/Accident/AccidentDetails';
+
+import VehicleTracking from '../Pages/Dashboard/Vehicle/VehicleTracking';
 
 
 
@@ -56,6 +59,8 @@ const RoutesConfig = () => {
 
       <Route path="/home" element={<CustomerHome />} />
       <Route path="/myprofile" element={<CustomerProfile />} />
+
+      <Route path="/vehicletracking" element={<VehicleTracking />} />
 
     </Routes>
   );
