@@ -2,11 +2,8 @@ import React, { useEffect, useState } from "react";
 import Sidebar from "../../../components/Layout/Sidebar";
 import Header from "../../../components/Layout/Header";
 
-// Import các Card đã copy từ Notus React
 import CardLineChart from "../../../components/Cards/CardLineChart";
 import CardBarChart from "../../../components/Cards/CardBarChart";
-import CardPageVisits from "../../../components/Cards/CardPageVisits";
-import CardSocialTraffic from "../../../components/Cards/CardSocialTraffic";
 import CardLineChart2 from "../../../components/Cards/CardLineChart2";
 
 interface Camera {
@@ -48,32 +45,35 @@ const AccidentStatistics: React.FC = () => {
       });
   }, []);
 
+  const chartContainerClass = "relative h-96 mb-6";
+
   return (
     <div className="flex h-screen">
       <Sidebar />
-      <div className="flex flex-col flex-grow overflow-hidden">
+      <div className="flex flex-col flex-1">
         <Header title="Accident Statistics Dashboard" />
-        <div className="p-4">
-          {/* Dashboard 4 card như Notus React */}
-          <div className="flex flex-wrap">
-            <div className="w-full xl:w-8/12 mb-12 xl:mb-0 px-4">
-              <CardLineChart accidents={accidents} />
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-6 min-h-full">
+            {/* First Row */}
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 mb-8">
+              <div className="xl:col-span-8">
+                <div className={chartContainerClass}>
+                  <CardLineChart accidents={accidents} />
+                </div>
+              </div>
+              <div className="xl:col-span-4">
+                <div className={chartContainerClass}>
+                  <CardBarChart accidents={accidents} />
+                </div>
+              </div>
             </div>
-            <div className="w-full xl:w-4/12 px-4">
-              <CardBarChart accidents={accidents} />
+
+            {/* Second Row - Full Width */}
+            <div className="w-full">
+              <div className={chartContainerClass}>
+                <CardLineChart2 accidents={accidents} />
+              </div>
             </div>
-          </div>
-          {/*<div className="flex flex-wrap mt-4">
-            <div className="w-full xl:w-8/12 mb-12 xl:mb-0 px-4">
-              <CardPageVisits />
-            </div>
-            <div className="w-full xl:w-4/12 px-4">
-              <CardSocialTraffic />
-            </div>
-          </div>*/}
-          {/* Bảng thống kê accident */}
-          <div className="w-full px-4">
-              <CardLineChart2 accidents={accidents} />
           </div>
         </div>
       </div>
