@@ -132,7 +132,7 @@ export default function CardBarChartViolations2({ violations }: Props) {
       </div>
       <div className="p-4 flex-auto">
         <div className="relative h-[200px]">
-          <canvas ref={chartRef} className="w-full h-full"></canvas>
+          <canvas ref={chartRef} className="w-full h-full" height={200}></canvas>
         </div>
       </div>
     </div>

@@ -166,7 +166,7 @@ export default function CardBarChart({ accidents }: CardBarChartProps) {
         </div>
       </div>
       <div className="p-4 flex-auto">
-        <div className="relative h-[200px]">
+        <div className="relative h-[175px]">
           <canvas ref={chartRef} className="w-full h-full"></canvas>
         </div>
       </div>
