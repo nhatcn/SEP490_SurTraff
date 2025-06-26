@@ -1,21 +1,73 @@
-import { Search, Bell, User, ChevronDown, Car, Calendar, Clock, MapPin, Menu, X, Shield, Eye, AlertTriangle, LogOut } from "lucide-react";
+import { Search, Bell, User, ChevronDown, Menu, X, AlertTriangle, Clock, Shield, LogOut } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
+import axios from "axios";
 import Logo from "../../components/Logo/Logo";
 
-// Interface for Header props
 interface HeaderProps {
   showMobileMenu: boolean;
   setShowMobileMenu: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
-// Header component
+interface Notification {
+  id: number;
+  user_id: number | null;
+  vehicle_id: number | null;
+  accident_id: number | null;
+  violation_id: number | null;
+  message: string;
+  notification_type: string;
+  created_at: string;  // ISO string date from backend
+  is_read: boolean;
+}
+
+function timeAgo(dateString: string) {
+  const now = new Date();
+  const past = new Date(dateString);
+  const diffMs = now.getTime() - past.getTime();
+
+  const seconds = Math.floor(diffMs / 1000);
+  if (seconds < 60) return `${seconds} seconds ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} minutes ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hours ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} days ago`;
+}
+
 const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdowns when clicking outside
+  const userId = 7; // Mặc định userId = 7
+
+  useEffect(() => {
+    async function fetchNotifications() {
+      try {
+        const res = await axios.get<Notification[]>(`http://localhost:8081/api/notifications/${userId}`);
+        setNotifications(res.data);
+      } catch (error) {
+        console.error("Failed to fetch notifications", error);
+      }
+    }
+
+    fetchNotifications();
+  }, [userId]);
+
+  async function markAsRead(notificationId: number) {
+    try {
+      await axios.put(`http://localhost:8081/api/notifications/read/${notificationId}`);
+      // Xóa notification vừa đọc khỏi danh sách để biến mất ngay
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+    } catch (error) {
+      console.error("Failed to mark notification as read", error);
+    }
+  }
+
+  // Đóng dropdown khi click ngoài
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
@@ -30,12 +82,16 @@ const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Lọc chỉ thông báo chưa đọc
+  const unreadNotifications = notifications.filter(n => !n.is_read);
+
   return (
     <header className="bg-white border-b border-gray-200 py-4 px-6 flex items-center justify-between shadow-sm relative z-50">
       <div className="flex items-center">
         <button
           onClick={() => setShowMobileMenu(!showMobileMenu)}
           className="md:hidden mr-4 text-gray-600 hover:text-gray-800 transition-colors duration-200"
+          aria-label="Toggle mobile menu"
         >
           <div className="relative w-6 h-6">
             <X 
@@ -56,7 +112,7 @@ const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
             />
           </div>
         </button>
-        <Logo/>
+        <Logo />
       </div>
       
       <div className="flex items-center space-x-4">
@@ -72,11 +128,14 @@ const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
           <button 
             className="relative p-2 rounded-full hover:bg-gray-100 transition-all duration-200 transform hover:scale-105"
             onClick={() => setShowNotifications(!showNotifications)}
+            aria-label="Toggle notifications"
           >
             <Bell size={20} className="text-gray-600" />
-            <span className="absolute -top-1 -right-1 bg-red-500 w-3 h-3 rounded-full animate-pulse">
-              <span className="absolute inset-0 bg-red-500 rounded-full animate-ping opacity-75"></span>
-            </span>
+            {unreadNotifications.length > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-semibold w-5 h-5 flex items-center justify-center rounded-full animate-pulse">
+                {unreadNotifications.length}
+              </span>
+            )}
           </button>
           
           <div className={`absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50 transition-all duration-300 ease-out transform ${
@@ -92,33 +151,26 @@ const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
             </div>
             
             <div className="max-h-64 overflow-y-auto">
-              <div className="px-4 py-3 hover:bg-red-50 border-l-4 border-red-500 transition-colors duration-200 cursor-pointer">
-                <div className="flex items-start">
-                  <AlertTriangle size={16} className="text-red-500 mt-0.5 mr-3 flex-shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-800">New violation detected for your vehicle</p>
-                    <p className="text-xs text-gray-500 mt-1">2 minutes ago</p>
+              {unreadNotifications.length === 0 && (
+                <p className="px-4 py-3 text-gray-500 text-center">No notifications</p>
+              )}
+              {unreadNotifications.map(n => (
+                <div 
+                  key={n.id} 
+                  className="px-4 py-3 cursor-pointer transition-colors duration-200 bg-blue-50 border-l-4 border-blue-600"
+                  onClick={() => markAsRead(n.id)}
+                >
+                  <div className="flex items-start space-x-3">
+                    {n.notification_type === 'violation' && <AlertTriangle size={16} className="text-red-500 mt-0.5 flex-shrink-0" />}
+                    {n.notification_type === 'maintenance' && <Clock size={16} className="text-blue-500 mt-0.5 flex-shrink-0" />}
+                    {n.notification_type === 'security' && <Shield size={16} className="text-green-500 mt-0.5 flex-shrink-0" />}
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">{n.message}</p>
+                      <p className="text-xs text-gray-500 mt-1">{timeAgo(n.created_at)}</p>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="px-4 py-3 hover:bg-blue-50 transition-colors duration-200 cursor-pointer">
-                <div className="flex items-start">
-                  <Clock size={16} className="text-blue-500 mt-0.5 mr-3 flex-shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-800">System maintenance scheduled</p>
-                    <p className="text-xs text-gray-500 mt-1">1 hour ago</p>
-                  </div>
-                </div>
-              </div>
-              <div className="px-4 py-3 hover:bg-green-50 transition-colors duration-200 cursor-pointer">
-                <div className="flex items-start">
-                  <Shield size={16} className="text-green-500 mt-0.5 mr-3 flex-shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-800">Security update completed</p>
-                    <p className="text-xs text-gray-500 mt-1">3 hours ago</p>
-                  </div>
-                </div>
-              </div>
+              ))}
             </div>
             
             <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 text-center">
@@ -134,6 +186,7 @@ const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
           <button 
             className="flex items-center space-x-2 rounded-lg hover:bg-gray-100 py-2 px-3 transition-all duration-200 transform hover:scale-105"
             onClick={() => setShowUserMenu(!showUserMenu)}
+            aria-label="Toggle user menu"
           >
             <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm shadow-lg">
               CU
@@ -188,105 +241,25 @@ const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
   );
 };
 
-// MobileDropdownMenu component
 const MobileDropdownMenu = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
-  const menuItems = [
-    { id: "home", name: "Home", icon: <Eye size={20} />, path: "/home", active: true },
-    { id: "search", name: "Search Violations", icon: <Search size={20} />, path: "/search" },
-    { id: "help", name: "Help", icon: <Shield size={20} />, path: "/help" },
-    { id: "contact", name: "Contact", icon: <User size={20} />, path: "/contact" },
-    { id: "logout", name: "Log Out", icon: <LogOut size={20} />, path: "/logout" },
-  ];
-
-  if (!showMobileMenu) {
-    return null;
-  }
-
   return (
-    <>
-      {/* Overlay */}
-      <div 
-        className="md:hidden fixed inset-0 bg-black bg-opacity-25 z-40"
-        onClick={() => setShowMobileMenu(false)}
-      />
-      
-      {/* Dropdown menu */}
-      <div className="md:hidden absolute top-0 left-0 right-0 bg-white border-b border-gray-200 shadow-xl z-50 mt-16 animate-slideDown">
-        <nav className="py-2">
-          <ul className="space-y-1">
-            {menuItems.map((item, index) => (
-              <li 
-                key={item.id}
-                className="animate-slideInLeft"
-                style={{ 
-                  animationDelay: `${index * 50}ms`,
-                  animationFillMode: 'both'
-                }}
-              >
-                <button
-                  onClick={() => {
-                    setShowMobileMenu(false);
-                    // Add navigation logic here if needed
-                  }}
-                  className={`w-full flex items-center py-3 px-6 transition-all duration-200 relative group
-                    ${item.active 
-                      ? "bg-blue-600 text-white shadow-lg" 
-                      : "text-gray-700 hover:bg-blue-50 hover:text-blue-700"
-                    }`}
-                >
-                  <span className={`transition-colors duration-200 ${
-                    item.active ? 'text-white' : 'text-gray-400 group-hover:text-blue-600'
-                  }`}>
-                    {item.icon}
-                  </span>
-                  <span className="ml-3 text-sm font-medium">{item.name}</span>
-                  {item.active && (
-                    <div className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-blue-300 h-2 w-2 rounded-full animate-pulse"></div>
-                  )}
-                  
-                  {/* Hover effect */}
-                  <div className={`absolute left-0 top-0 bottom-0 w-1 bg-blue-600 transition-all duration-200 ${
-                    item.active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                  }`}></div>
-                </button>
-              </li>
-            ))}
-          </ul>
+    <div
+      className={`fixed inset-0 bg-black bg-opacity-30 z-40 transform transition-transform duration-300 ${
+        showMobileMenu ? "translate-x-0" : "-translate-x-full"
+      }`}
+    >
+      <div className="bg-white w-64 h-full p-4">
+        <button onClick={() => setShowMobileMenu(false)} className="mb-4 px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+          Close Menu
+        </button>
+        <nav className="flex flex-col space-y-2">
+          <a href="#" className="text-gray-700 hover:text-blue-600">Home</a>
+          <a href="#" className="text-gray-700 hover:text-blue-600">Search Violations</a>
+          <a href="#" className="text-gray-700 hover:text-blue-600">Help</a>
+          <a href="#" className="text-gray-700 hover:text-blue-600">Contact</a>
         </nav>
       </div>
-      
-      <style>{`
-        @keyframes slideDown {
-          from {
-            transform: translateY(-100%);
-            opacity: 0;
-          }
-          to {
-            transform: translateY(0);
-            opacity: 1;
-          }
-        }
-        
-        @keyframes slideInLeft {
-          from {
-            transform: translateX(-20px);
-            opacity: 0;
-          }
-          to {
-            transform: translateX(0);
-            opacity: 1;
-          }
-        }
-        
-        .animate-slideDown {
-          animation: slideDown 0.3s ease-out;
-        }
-        
-        .animate-slideInLeft {
-          animation: slideInLeft 0.3s ease-out;
-        }
-      `}</style>
-    </>
+    </div>
   );
 };
 

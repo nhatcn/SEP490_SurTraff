@@ -1,53 +1,57 @@
 import { Search, Car, Calendar, Clock, MapPin, Shield, Eye } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Header, MobileDropdownMenu } from "../../components/Layout/Menu";
-import Logo from "../../components/Logo/Logo";
 import Footer from "../../components/Layout/Footer";
-
 
 interface Violation {
   id: number;
-  plateNumber: string;
-  violationType: string;
-  location: string;
-  time: string;
-  fine: string;
-  status: string;
-  image: string;
+  camera_id: number;
+  vehicle_id: number;
+  user_id: number;
+  licensePlate: string;
+  violation_type_id: number;
+  type_name: string;
+  // Nếu có thêm trường location, time, fine thì thêm ở đây
+  location?: string;
+  time?: string;
+  fine?: string;
+  status?: string;
+  image?: string;
 }
 
-const mockViolations: Violation[] = [
+// Dữ liệu "data" của bạn, giả sử import hoặc fetch
+const data: Violation[] = [
   {
-    id: 1,
-    plateNumber: "30A-12345",
-    violationType: "Red Light Violation",
-    location: "Le Loi - Nguyen Hue Intersection",
-    time: "2024-06-15 14:30:25",
-    fine: "$45",
-    status: "Pending",
-    image: "/api/placeholder/300/200"
+    id: 5,
+    camera_id: 2,
+    vehicle_id: 2,
+    user_id: 7,
+    licensePlate: "51B-67890",
+    violation_type_id: 2,
+    type_name: "overspeed"
   },
   {
-    id: 2,
-    plateNumber: "30A-12345",
-    violationType: "Speeding",
-    location: "Vo Van Kiet Street",
-    time: "2024-06-10 09:15:42",
-    fine: "$35",
-    status: "Processed",
-    image: "/api/placeholder/300/200"
+    id: 6,
+    camera_id: 2,
+    vehicle_id: 3,
+    user_id: 7,
+    licensePlate: "51C-11111",
+    violation_type_id: 3,
+    type_name: "illegal park"
   },
   {
-    id: 3,
-    plateNumber: "51B-67890",
-    violationType: "Illegal Parking",
-    location: "Nguyen Hue Walking Street",
-    time: "2024-06-08 16:45:18",
-    fine: "$25",
-    status: "Pending",
-    image: "/api/placeholder/300/200"
-  }
+    id: 7,
+    camera_id: 3,
+    vehicle_id: 4,
+    user_id: 5,
+    licensePlate: "51D-22222",
+    violation_type_id: 1,
+    type_name: "red light"
+  },
+  // ...các dữ liệu khác
 ];
+
+const USER_ID = 7; // user cố định
 
 export default function CustomerHome() {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -55,6 +59,13 @@ export default function CustomerHome() {
   const [searchResults, setSearchResults] = useState<Violation[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [userViolations, setUserViolations] = useState<Violation[]>([]);
+
+  // Lọc vi phạm của user_id = 7 khi component mount
+  useEffect(() => {
+    const filtered = data.filter((v) => v.user_id === USER_ID);
+    setUserViolations(filtered);
+  }, []);
 
   const handleSearch = () => {
     if (!searchQuery.trim()) return;
@@ -63,16 +74,17 @@ export default function CustomerHome() {
     setHasSearched(true);
 
     setTimeout(() => {
-      const results = mockViolations.filter(violation =>
-        violation.plateNumber.toLowerCase().includes(searchQuery.toLowerCase())
+      // Tìm trong mảng userViolations thôi
+      const results = userViolations.filter((violation) =>
+        violation.licensePlate.toLowerCase().includes(searchQuery.toLowerCase())
       );
       setSearchResults(results);
       setIsSearching(false);
-    }, 1000);
+    }, 500);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       handleSearch();
     }
   };
@@ -83,12 +95,9 @@ export default function CustomerHome() {
       <MobileDropdownMenu showMobileMenu={showMobileMenu} setShowMobileMenu={setShowMobileMenu} />
 
       <main>
+        {/* Search input như cũ */}
         <div className="relative bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 overflow-hidden">
-          <div className="absolute inset-0">
-            <div className="absolute inset-0 bg-blue-800 mix-blend-multiply" />
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-transparent opacity-90" />
-          </div>
-
+          {/* ... phần header gradient giống cũ, bạn giữ nguyên */}
           <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
             <div className="text-center">
               <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">
@@ -104,7 +113,7 @@ export default function CustomerHome() {
                   <div className="flex-1 relative">
                     <input
                       type="text"
-                      placeholder="Enter license plate (e.g., 30A-12345)"
+                      placeholder="Enter license plate (e.g., 51B-67890)"
                       className="w-full px-6 py-4 text-lg border-0 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
@@ -133,18 +142,12 @@ export default function CustomerHome() {
               </div>
             </div>
           </div>
-
-          <div className="absolute top-0 right-0 -mt-4 opacity-20">
-            <Eye className="h-32 w-32 text-blue-300" />
-          </div>
-          <div className="absolute bottom-0 left-0 -mb-4 opacity-20">
-            <Shield className="h-24 w-24 text-blue-300" />
-          </div>
+          {/* Bạn giữ các phần icon như Shield, Eye nếu muốn */}
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          {hasSearched && (
-            <div className="mb-12">
+          {hasSearched ? (
+            <>
               <h2 className="text-2xl font-bold text-gray-900 mb-6">
                 Search Results for "{searchQuery}"
               </h2>
@@ -160,58 +163,67 @@ export default function CustomerHome() {
                   </p>
                 </div>
               ) : (
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                  {searchResults.map((violation) => (
-                    <div key={violation.id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
-                      <img
-                        src={violation.image}
-                        alt="Violation evidence"
-                        className="w-full h-48 object-cover bg-gray-200"
-                      />
-                      <div className="p-6">
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-lg font-bold text-blue-600">
-                            {violation.plateNumber}
-                          </span>
-                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${violation.status === 'Processed'
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-red-100 text-red-800'
-                            }`}>
-                            {violation.status}
-                          </span>
-                        </div>
-
-                        <h3 className="font-semibold text-gray-900 mb-2">
-                          {violation.violationType}
-                        </h3>
-
-                        <div className="space-y-2 text-sm text-gray-600">
-                          <div className="flex items-center">
-                            <MapPin className="h-4 w-4 mr-2" />
-                            {violation.location}
-                          </div>
-                          <div className="flex items-center">
-                            <Clock className="h-4 w-4 mr-2" />
-                            {violation.time}
-                          </div>
-                          <div className="flex items-center">
-                            <Calendar className="h-4 w-4 mr-2" />
-                            Fine: <span className="font-semibold text-red-600 ml-1">{violation.fine}</span>
-                          </div>
-                        </div>
-
-                        <button className="w-full mt-4 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
-                          View Details
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                  <div className="px-6 py-4 border-b border-gray-200">
+                    <h2 className="text-xl font-bold text-gray-900">
+                      Violations for {searchQuery}
+                    </h2>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            License Plate
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Violation Type
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Location
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Time
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Fine
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Status
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {searchResults.map((violation) => (
+                          <tr key={violation.id} className="hover:bg-gray-50 transition-colors">
+                            <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
+                              {violation.licensePlate}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">{violation.type_name}</td>
+                            <td className="px-6 py-4 whitespace-nowrap">{violation.location || "-"}</td>
+                            <td className="px-6 py-4 whitespace-nowrap">{violation.time || "-"}</td>
+                            <td className="px-6 py-4 whitespace-nowrap">{violation.fine || "-"}</td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span
+                                className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                  violation.status === "Processed"
+                                    ? "bg-green-100 text-green-800"
+                                    : "bg-red-100 text-red-800"
+                                }`}
+                              >
+                                {violation.status || "Pending"}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
-            </div>
-          )}
-
-          {!hasSearched && (
+            </>
+          ) : (
+            // Hiển thị tất cả vi phạm của user_id = 7 nếu chưa search
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-200">
                 <h2 className="text-xl font-bold text-gray-900">Recent Violations</h2>
@@ -227,7 +239,13 @@ export default function CustomerHome() {
                         Violation Type
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Location
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Time
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Fine
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Status
@@ -235,23 +253,24 @@ export default function CustomerHome() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {mockViolations.map((violation) => (
+                    {userViolations.map((violation) => (
                       <tr key={violation.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">{violation.plateNumber}</div>
+                        <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
+                          {violation.licensePlate}
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap">{violation.type_name}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">{violation.location || "-"}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">{violation.time || "-"}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">{violation.fine || "-"}</td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{violation.violationType}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-500">{violation.time}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${violation.status === 'Processed'
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-red-100 text-red-800'
-                            }`}>
-                            {violation.status}
+                          <span
+                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              violation.status === "Processed"
+                                ? "bg-green-100 text-green-800"
+                                : "bg-red-100 text-red-800"
+                            }`}
+                          >
+                            {violation.status || "Pending"}
                           </span>
                         </td>
                       </tr>
