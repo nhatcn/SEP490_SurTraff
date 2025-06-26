@@ -27,6 +27,7 @@ import CustomerProfile from '../Pages/Dashboard/User/CustomerProfile';
 import AccidentDetails from '../Pages/Dashboard/Accident/AccidentDetails';
 
 import VehicleTracking from '../Pages/Dashboard/Vehicle/VehicleTracking';
+import UserTrafficMap from '../Pages/UserMap/UserTrafficMap';
 
 
 
@@ -59,6 +60,7 @@ const RoutesConfig = () => {
 
       <Route path="/home" element={<CustomerHome />} />
       <Route path="/myprofile" element={<CustomerProfile />} />
+      <Route path="/usermap" element={<UserTrafficMap />} />
 
       <Route path="/vehicletracking" element={<VehicleTracking />} />
 
