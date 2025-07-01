@@ -134,7 +134,7 @@ export default function TableVehicleTracking() {
       {/* Chart + Filter */}
       <div className="min-h-[600px] bg-white rounded shadow p-4">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold">Vehicle Count by Camera</h2>
+          <h2 className="text-xl font-semibold"></h2>
           <div className="flex gap-2 items-center">
             <label className="text-xs text-gray-600">From</label>
             <input
