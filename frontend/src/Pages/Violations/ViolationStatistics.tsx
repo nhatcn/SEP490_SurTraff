@@ -6,6 +6,9 @@ import CardBarChartViolations from "../../components/Cards/CardBarChartViolation
 import CardLineChartViolations2 from "../../components/Cards/CardLineChartViolations2";
 import CardBarChartViolations2 from "../../components/Cards/CardBarChartViolations2";
 import CardLineChartViolations3 from "../../components/Cards/CardLineChartViolations3";
+import CardDonutChart from "../../components/Cards/CardDonutChartViolations";
+import CardDonutChartMonth from "../../components/Cards/CardDonutChartViolations2";
+import CardDonutChartYear from "../../components/Cards/CardDonutChartViolations3";
 
 interface Violation {
   id: number;
@@ -71,6 +74,23 @@ const ViolationStatistics: React.FC = () => {
         <Header title="Violation Statistics Dashboard" />
         <div className="flex-1 overflow-y-auto">
           <div className="p-6 min-h-full">
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 mb-8">
+              <div className="xl:col-span-4">
+                <div className={chartContainerClass}>
+                  <CardDonutChart violationDetails={violationDetails} />
+                </div>
+              </div>
+              <div className="xl:col-span-4">
+                <div className={chartContainerClass}>
+                  <CardDonutChartMonth violationDetails={violationDetails} />
+                </div>
+              </div>
+              <div className="xl:col-span-4">
+                <div className={chartContainerClass}>
+                  <CardDonutChartYear violationDetails={violationDetails} />
+                </div>
+              </div>
+            </div>    
             {/* First Row */}
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 mb-8">
               <div className="xl:col-span-7">
