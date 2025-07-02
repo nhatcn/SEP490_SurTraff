@@ -24,6 +24,7 @@ import ViolationDetail from '../Pages/Violations/ViolationDetail';
 import VehicleDetail from '../Pages/Dashboard/Vehicle/VehicleDetails';
 import CustomerHome from '../Pages/Home/HomePage';
 import CustomerProfile from '../Pages/Dashboard/User/CustomerProfile';
+import LoginPage from '../Pages/Auth/LoginPage';
 
 
 
@@ -34,7 +35,7 @@ const RoutesConfig = () => {
       <Route path="/dashboard" element={<CameraDashboard />} />
       <Route path="/cameras" element={<CameraDashboard />} />
       <Route path="/map" element={<MapDashboard />} />
-      <Route path="/login" element={<lo />} />
+      <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/forgotpassword" element={<ForgotPasswordPage />} />
       <Route path="/userdashboard" element={<UserDashboard />} />
