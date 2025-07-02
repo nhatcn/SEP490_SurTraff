@@ -1,37 +1,58 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Chart, registerables } from "chart.js";
+import {
+  Chart,
+  registerables,
+  ChartConfiguration,
+  Chart as ChartJS,
+} from "chart.js";
+
 Chart.register(...registerables);
 
-// Chuyển ngày về ISO nếu cần
-function toISODateString(dateStr) {
-  return dateStr.includes('T') ? dateStr : dateStr.replace(' ', 'T');
+interface Violation {
+  createdAt: string;
+  vehicleId: string | number | null;
 }
 
-// Hàm lấy số liệu theo tháng cho từng năm, có filter from/to
-function getMonthlyStats(violations, year, fromDate, toDate) {
-  const months = Array(12).fill(0);
-  violations.forEach(vio => {
+interface Props {
+  violations: Violation[];
+}
+
+const COLORS = [
+  "#4c51bf", "#ed64a6", "#38b2ac", "#ecc94b",
+  "#f56565", "#4299e1", "#48bb78", "#9f7aea",
+];
+
+// Chuyển chuỗi ngày về dạng ISO chính xác
+function toISODateString(dateStr: string): string {
+  return dateStr.includes("T") ? dateStr : dateStr.replace(" ", "T");
+}
+
+// Lấy số vi phạm theo tháng, có lọc theo năm và khoảng thời gian
+function getMonthlyStats(
+  violations: Violation[],
+  year: number,
+  fromDate?: Date | null,
+  toDate?: Date | null
+): number[] {
+  const monthlyCounts = Array(12).fill(0);
+  violations.forEach((vio) => {
     if (!vio.createdAt) return;
     const date = new Date(toISODateString(vio.createdAt));
     if (
-      !isNaN(date) &&
+      !isNaN(date.getTime()) &&
       date.getFullYear() === year &&
       (!fromDate || date >= fromDate) &&
       (!toDate || date <= toDate)
     ) {
-      months[date.getMonth()]++;
+      monthlyCounts[date.getMonth()]++;
     }
   });
-  return months;
+  return monthlyCounts;
 }
 
-const COLORS = [
-  "#4c51bf", "#ed64a6", "#38b2ac", "#ecc94b", "#f56565", "#4299e1", "#48bb78"
-];
-
-export default function CardLineChartViolations2({ violations }) {
-  const chartRef = useRef(null);
-  const chartInstanceRef = useRef(null);
+export default function CardLineChartViolations2({ violations }: Props) {
+  const chartRef = useRef<HTMLCanvasElement | null>(null);
+  const chartInstanceRef = useRef<ChartJS<"line"> | null>(null);
 
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -39,6 +60,7 @@ export default function CardLineChartViolations2({ violations }) {
   useEffect(() => {
     if (!chartRef.current) return;
 
+    // Cleanup chart if exists
     if (chartInstanceRef.current) {
       chartInstanceRef.current.destroy();
     }
@@ -46,12 +68,13 @@ export default function CardLineChartViolations2({ violations }) {
     const fromDate = from ? new Date(from) : null;
     const toDate = to ? new Date(to) : null;
 
-    const yearsSet = new Set();
-    violations.forEach(vio => {
+    // Lọc các năm có vi phạm trong khoảng thời gian
+    const yearsSet = new Set<number>();
+    violations.forEach((vio) => {
       if (!vio.createdAt) return;
       const date = new Date(toISODateString(vio.createdAt));
       if (
-        !isNaN(date) &&
+        !isNaN(date.getTime()) &&
         (!fromDate || date >= fromDate) &&
         (!toDate || date <= toDate)
       ) {
@@ -62,27 +85,23 @@ export default function CardLineChartViolations2({ violations }) {
 
     const months = [
       "January", "February", "March", "April", "May", "June",
-      "July", "August", "September", "October", "November", "December"
+      "July", "August", "September", "October", "November", "December",
     ];
 
     const datasets = years.map((year, idx) => ({
-      label: year,
+      label: `${year}`,
+      data: getMonthlyStats(violations, year, fromDate, toDate),
       backgroundColor: COLORS[idx % COLORS.length],
       borderColor: COLORS[idx % COLORS.length],
-      data: getMonthlyStats(violations, year, fromDate, toDate),
       fill: false,
       tension: 0.3,
     }));
 
-    // Debug log
-    // console.log("Years:", years);
-    // console.log("Datasets:", datasets);
-
-    const config = {
+    const config: ChartConfiguration<"line"> = {
       type: "line",
       data: {
         labels: months,
-        datasets: datasets,
+        datasets,
       },
       options: {
         maintainAspectRatio: false,
@@ -90,15 +109,10 @@ export default function CardLineChartViolations2({ violations }) {
         plugins: {
           legend: {
             display: true,
-            labels: {
-              color: "rgba(255,255,255,.7)",
-            },
-            align: "end",
             position: "bottom",
-          },
-          title: {
-            display: false,
-            text: "Violations by Year",
+            labels: {
+              color: "#1a202c",
+            },
           },
           tooltip: {
             mode: "index",
@@ -112,36 +126,27 @@ export default function CardLineChartViolations2({ violations }) {
         scales: {
           x: {
             ticks: {
-              color: "rgba(255,255,255,.7)",
             },
             title: {
-              display: false,
-              text: "Month",
-              color: "white",
+              display: true,
+              text: "Year",
             },
             grid: {
               display: false,
-              borderDash: [2],
-              color: "rgba(33, 37, 41, 0.3)",
-              zeroLineColor: "rgba(0, 0, 0, 0)",
-              zeroLineBorderDash: [2],
             },
           },
           y: {
+            beginAtZero: true,
             ticks: {
-              color: "rgba(255,255,255,.7)",
+              precision: 0,
             },
             title: {
-              display: false,
-              text: "Value",
-              color: "white",
+              display: true,
+              text: "Violations",
             },
             grid: {
-              borderDash: [3],
-              drawBorder: false,
-              color: "rgba(255, 255, 255, 0.15)",
-              zeroLineColor: "rgba(33, 37, 41, 0)",
-              zeroLineBorderDash: [2],
+              display: false,
+              color: "rgba(33, 37, 41, 0.3)",
             },
           },
         },
@@ -149,12 +154,12 @@ export default function CardLineChartViolations2({ violations }) {
     };
 
     const ctx = chartRef.current.getContext("2d");
+    if (!ctx) return;
+
     chartInstanceRef.current = new Chart(ctx, config);
 
     return () => {
-      if (chartInstanceRef.current) {
-        chartInstanceRef.current.destroy();
-      }
+      chartInstanceRef.current?.destroy();
     };
   }, [violations, from, to]);
 
@@ -171,26 +176,26 @@ export default function CardLineChartViolations2({ violations }) {
             </h2>
           </div>
           <div className="flex gap-2 items-center">
-            <label className="text-xs">From</label>
+            <label className="text-xs text-white">From</label>
             <input
               type="date"
               value={from}
-              onChange={e => setFrom(e.target.value)}
-              className="border rounded px-2 py-1 text-xs"
+              onChange={(e) => setFrom(e.target.value)}
+              className="border rounded px-2 py-1 text-xs bg-white"
             />
-            <label className="text-xs">To</label>
+            <label className="text-xs text-white">To</label>
             <input
               type="date"
               value={to}
-              onChange={e => setTo(e.target.value)}
-              className="border rounded px-2 py-1 text-xs"
+              onChange={(e) => setTo(e.target.value)}
+              className="border rounded px-2 py-1 text-xs bg-white"
             />
           </div>
         </div>
       </div>
       <div className="p-4 flex-auto">
         <div className="relative h-[200px]">
-          <canvas ref={chartRef} className="w-full h-full"></canvas>
+          <canvas ref={chartRef} className="w-full h-full" />
         </div>
       </div>
     </div>

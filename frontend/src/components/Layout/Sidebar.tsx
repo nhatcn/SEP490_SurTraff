@@ -1,5 +1,5 @@
 import {   
-  Camera, LayoutDashboard, Users, Settings, Bell, Map, LogOut 
+  Camera, LayoutDashboard, Users, Settings, Bell, Map, LogOut, AlertTriangle 
 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -21,6 +21,8 @@ export default function Sidebar({ defaultActiveItem = "dashboard" }: SidebarProp
     { id: "users", name: "Users", icon: <Users size={20} />, path: "/userdashboard" },
     { id: "alerts", name: "Alerts", icon: <Bell size={20} />, path: "/alerts" },
     { id: "settings", name: "Settings", icon: <Settings size={20} />, path: "/settings" },
+    { id: "accident", name: "Accident", icon: <AlertTriangle size={20} />, path: "/accidentdashboard" }
+
   ];
 
   const handleItemClick = (itemId: string, path: string) => {
