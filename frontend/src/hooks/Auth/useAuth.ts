@@ -1,6 +1,7 @@
 // hooks/useAuth.ts
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useGoogleLogin, CredentialResponse } from '@react-oauth/google';
 import axios from 'axios';
 import { 
   LoginFormData, 
@@ -140,12 +141,51 @@ export const useForgotPassword = () => {
 };
 
 export const useGoogleAuth = () => {
-  const handleGoogleLogin = () => {
-    console.log('Google login initiated');
-    // TODO: Implement Google OAuth logic
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
+
+  const handleGoogleLoginSuccess = async (credentialResponse: CredentialResponse) => {
+    setIsLoading(true);
+    setError('');
+
+    try {
+      if (!credentialResponse.credential) {
+        throw new Error('No credential received from Google');
+      }
+
+      const response = await axios.post(`${API_BASE_URL}/signin`, {
+        token: credentialResponse.credential
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      // Store auth data
+      localStorage.setItem('token', response.data.token);
+      localStorage.setItem('userId', response.data.userId);
+      localStorage.setItem('role', response.data.role);
+
+      setIsLoading(false);
+      navigate('/dashboard');
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.error || 'Google authentication failed';
+      setError(errorMessage);
+      setIsLoading(false);
+      console.error('Google login error:', err);
+    }
+  };
+
+  const handleGoogleLoginError = () => {
+    setError('Google login failed. Please try again.');
+    console.error('Google login failed');
   };
 
   return {
-    handleGoogleLogin
+    isLoading,
+    error,
+    handleGoogleLoginSuccess,
+    handleGoogleLoginError
   };
 };
