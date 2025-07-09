@@ -1,6 +1,7 @@
 "use client"
 
 // pages/Auth/LoginPage.tsx
+
 import type React from "react"
 import { useState } from "react"
 import { GoogleLogin } from "@react-oauth/google"
@@ -25,6 +26,7 @@ const LoginPage: React.FC = () => {
     handleGoogleLoginSuccess,
     handleGoogleLoginError,
   } = useGoogleAuth()
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -57,6 +59,9 @@ const LoginPage: React.FC = () => {
   const currentError = error || googleError
   const currentLoading = isLoading || googleLoading
 
+  const currentError = error || googleError;
+  const currentLoading = isLoading || googleLoading;
+
   return (
     <AuthLayout title="">
       {/* Logo Section */}
@@ -69,6 +74,7 @@ const LoginPage: React.FC = () => {
         <h1 className="text-2xl font-bold text-white mb-2">Welcome Back</h1>
         <p className="text-white/70">Sign in to your account to continue</p>
       </div>
+
 
       {currentError && (
         <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-500 text-sm">
@@ -136,7 +142,9 @@ const LoginPage: React.FC = () => {
         </div>
 
         <AuthButton type="submit" disabled={currentLoading}>
+
           {isLoading ? "Signing In..." : "Sign In"}
+
         </AuthButton>
       </form>
 
