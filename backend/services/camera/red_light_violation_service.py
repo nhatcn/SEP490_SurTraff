@@ -27,7 +27,6 @@ VIOLATIONS_DIR = "violations"
 os.makedirs(VIOLATIONS_DIR, exist_ok=True)
 
 
-
 def stream_violation_video_service1(youtube_url: str, camera_id: int):
     import requests
     import json
@@ -147,7 +146,7 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
     zone_lines = []
     frame_size_initialized = False
 
-    red_light_history = []
+    red_light_history = {zone_id: deque(maxlen=red_light_buffer_size) for zone_id in light_zones_percentage}
     track_zone_history = {}  # track_id: current_zone_id
     track_position_history = {}  # track_id: previous_position
     vehicle_violations = {}
@@ -205,64 +204,52 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
             # Step 1: Vẽ zones lên frame
             for zone_id, zone in lane_zones.items():
                 cv2.polylines(frame_annotated, [zone["polygon"]], isClosed=True, color=(255, 255, 0), thickness=2)
-                # Tính centroid để đặt label
                 if len(zone["polygon"]) > 0:
                     cx, cy = np.mean(zone["polygon"], axis=0).astype(int)
                     cv2.putText(frame_annotated, f"Lane: {zone['name']}", (cx, cy), 
                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
 
-            for zone_id, zone in light_zones.items():
-                cv2.polylines(frame_annotated, [zone["polygon"]], isClosed=True, color=(0, 0, 255), thickness=2)
-                if len(zone["polygon"]) > 0:
-                    cx, cy = np.mean(zone["polygon"], axis=0).astype(int)
-                    cv2.putText(frame_annotated, f"Light: {zone['name']}", (cx, cy), 
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+            # Step 2: Vẽ light zones và hiển thị trạng thái đèn
+            for light_zone_id, light_zone in light_zones.items():
+                cv2.polylines(frame_annotated, [light_zone["polygon"]], isClosed=True, color=(0, 0, 255), thickness=2)
+                if len(light_zone["polygon"]) > 0:
+                    # Tìm lane zone liên kết với light zone này
+                    lane_zone_id = next((k for k, v in light_control_map.items() if v == light_zone_id), None)
+                    lane_zone_name = lane_zones[lane_zone_id]["name"] if lane_zone_id in lane_zones else "Unknown"
+                    
+                    # Tìm tọa độ y nhỏ nhất (đỉnh trên cùng) để đặt label
+                    top_y = int(np.min(light_zone["polygon"][:, 1]))
+                    cx = int(np.mean(light_zone["polygon"][:, 0]))
+                    cv2.putText(frame_annotated, f"Light of Zone: {lane_zone_name}", 
+                               (cx, top_y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
 
-            for line in zone_lines:
-                if len(line["coordinates"]) >= 2:
-                    cv2.polylines(frame_annotated, [line["coordinates"]], isClosed=False, color=(0, 255, 255), thickness=3)
-                    # Đặt label ở giữa line
-                    mid_point = line["coordinates"][len(line["coordinates"])//2]
-                    cv2.putText(frame_annotated, f"Line: {line['name']}", tuple(mid_point), 
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
-
-            # Step 2: Detect đèn giao thông chỉ trong light zones
-            red_detected_in_light_zone = False
-            
-            if len(light_zones) > 0:
-                # Crop frame chỉ trong light zones để detect đèn
-                for light_zone_id, light_zone in light_zones.items():
-                    # Tạo mask cho light zone
+                    # Detect đèn trong light zone
                     mask = np.zeros((h, w), dtype=np.uint8)
                     cv2.fillPoly(mask, [light_zone["polygon"]], 255)
-                    
-                    # Crop frame theo light zone
                     light_frame = cv2.bitwise_and(frame, frame, mask=mask)
-                    
-                    # Detect đèn trong vùng này
                     light_results = model_light(light_frame)[0]
                     zone_red_detected = any(
                         model_light.names[int(box.cls[0])].lower() == 'red' and float(box.conf[0]) > 0.5
                         for box in light_results.boxes
                     )
                     
-                    if zone_red_detected:
-                        red_detected_in_light_zone = True
-                        break
-            
-            red_light_history.append(red_detected_in_light_zone)
-            if len(red_light_history) > 3:
-                red_light_history.pop(0)
-            is_red = red_light_history.count(True) > 1
+                    # Cập nhật lịch sử đèn cho light zone này
+                    red_light_history[light_zone_id].append(zone_red_detected)
+                    is_red = red_light_history[light_zone_id].count(True) > 1
 
-            # Hiển thị trạng thái đèn
-            status_color = (0, 0, 255) if is_red else (0, 255, 0)
-            cv2.putText(frame_annotated, f"Red Light: {'YES' if is_red else 'NO'}",
-                        (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, status_color, 2)
+                    # Hiển thị trạng thái đèn ở dưới cùng của light zone
+                    bottom_y = int(np.max(light_zone["polygon"][:, 1]))
+                    status_text = "Red" if is_red else "Green"
+                    status_color = (0, 0, 255) if is_red else (0, 255, 0)
+                    cv2.putText(frame_annotated, status_text, (cx, bottom_y + 20), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.6, status_color, 2)
 
-            # Hiển thị thông tin frame
-            cv2.putText(frame_annotated, f"Frame: {w}x{h} | Zones: L{len(lane_zones)}/Li{len(light_zones)}/Line{len(zone_lines)}",
-                        (10, h - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+            for line in zone_lines:
+                if len(line["coordinates"]) >= 2:
+                    cv2.polylines(frame_annotated, [line["coordinates"]], isClosed=False, color=(0, 255, 255), thickness=3)
+                    mid_point = line["coordinates"][len(line["coordinates"])//2]
+                    cv2.putText(frame_annotated, f"Line: {line['name']}", tuple(mid_point), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
 
             # Step 3: Detect và track phương tiện
             results = model_vehicle.track(source=frame, persist=True, conf=0.3, iou=0.5, tracker="bytetrack.yaml")[0]
@@ -293,29 +280,28 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
                     prev_zone_id = track_zone_history.get(track_id)
                     track_zone_history[track_id] = current_zone_id
 
-                    # Kiểm tra vi phạm vượt đèn đỏ (vượt qua line từ dưới lên khi đèn đỏ)
-                    if is_red and prev_position and len(zone_lines) > 0:
+                    # Kiểm tra vi phạm vượt đèn đỏ
+                    if prev_position and len(zone_lines) > 0:
                         for line_data in zone_lines:
                             line_coords = line_data["coordinates"]
                             if len(line_coords) >= 2:
                                 line_start = tuple(line_coords[0])
                                 line_end = tuple(line_coords[1])
                                 
-                                # Kiểm tra xe có vượt qua line từ dưới lên không
                                 if detect_line_crossing(prev_position, (cx, cy), line_start, line_end):
-                                    # Kiểm tra xe có đi đúng lane movement không
-                                    if (prev_zone_id and current_zone_id and 
-                                        (prev_zone_id, current_zone_id) in lane_transitions):
-                                        # Xe đi đúng lane nhưng vượt đèn đỏ
-                                        vehicle_violations[track_id] = True
-                                        vehicle_violation_types[track_id] = "RED_LIGHT"
-                                        print(f"RED LIGHT VIOLATION: Vehicle {track_id} crossed line from zone {prev_zone_id} to {current_zone_id} during red light")
+                                    if prev_zone_id and current_zone_id and (prev_zone_id, current_zone_id) in lane_transitions:
+                                        # Kiểm tra trạng thái đèn của lane zone hiện tại
+                                        light_zone_id = light_control_map.get(current_zone_id)
+                                        if light_zone_id and red_light_history[light_zone_id].count(True) > 1:
+                                            vehicle_violations[track_id] = True
+                                            vehicle_violation_types[track_id] = "RED_LIGHT"
+                                            print(f"RED LIGHT VIOLATION: Vehicle {track_id} crossed line from zone {prev_zone_id} to {current_zone_id} during red light")
 
-                    # Kiểm tra vi phạm đi sai làn (wrong way) khi đèn xanh
-                    if (not is_red and prev_zone_id and current_zone_id and 
+                    # Kiểm tra vi phạm đi sai làn
+                    if (not red_light_history.get(light_control_map.get(current_zone_id, None), deque([False])).count(True) > 1 and 
+                        prev_zone_id and current_zone_id and 
                         prev_zone_id != current_zone_id and 
                         (prev_zone_id, current_zone_id) not in lane_transitions):
-                        # Xe đi sai lane khi đèn xanh
                         vehicle_violations[track_id] = True
                         vehicle_violation_types[track_id] = "WRONG_WAY"
                         print(f"WRONG WAY VIOLATION: Vehicle {track_id} moved from zone {prev_zone_id} to {current_zone_id} (not allowed movement)")
@@ -342,7 +328,6 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
                                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
 
             # Step 4: Stream video với frame đầy đủ
-            # Không resize frame, giữ nguyên kích thước gốc
             _, jpeg = cv2.imencode('.jpg', frame_annotated, [cv2.IMWRITE_JPEG_QUALITY, 85])
             yield (
                 b"--frame\r\n"
