@@ -5,6 +5,7 @@ import AuthInput from '../../components/Auth/AuthInput';
 import AuthButton from '../../components/Auth/AuthButton';
 import { useForgotPassword } from '../../hooks/Auth/useAuth';
 import { ForgotPasswordFormData } from '../../types/Auth/auth';
+import Logo from '../../components/Logo/Logo';
 
 const ForgotPasswordPage: React.FC = () => {
   const [formData, setFormData] = useState<ForgotPasswordFormData>({
@@ -34,7 +35,16 @@ const ForgotPasswordPage: React.FC = () => {
   );
 
   return (
-    <AuthLayout title="Forgot Password">
+    <AuthLayout title="">      
+    <div className="flex justify-center mb-8">
+        <Logo />
+      </div>
+
+      {/* Welcome Text */}
+      <div className="text-center mb-8">
+        <h1 className="text-2xl font-bold text-white mb-2">Forgot password</h1>
+
+      </div>
       {!isSubmitted ? (
         <>
           {error && (
