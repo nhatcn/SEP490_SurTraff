@@ -30,6 +30,7 @@ import VehicleTrackingDashboard from '../Pages/Dashboard/VehicleTraking/VehicleT
 
 
 
+
 const RoutesConfig = () => {
   return (
     <Routes>
@@ -41,7 +42,7 @@ const RoutesConfig = () => {
       <Route path="/forgotpassword" element={<ForgotPasswordPage />} />
       <Route path="/userdashboard" element={<UserDashboard />} />
       <Route path="/addcamera" element={<AddCamera />} />
-       <Route path="/tracks" element={<VehicleTrackingDashboard />} />
+      <Route path="/tracks" element={<VehicleTrackingDashboard />} />
       <Route path="/accidentdashboard" element={<AccidentDashboard />} />
       <Route path="/cameras/edit/:id" element={<EditCamera />} />
       <Route path="/violations" element={<ViolationList />} />
