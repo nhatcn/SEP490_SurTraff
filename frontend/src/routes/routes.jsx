@@ -25,7 +25,6 @@ import VehicleDetail from '../Pages/Dashboard/Vehicle/VehicleDetails';
 import CustomerHome from '../Pages/Home/HomePage';
 import CustomerProfile from '../Pages/Dashboard/User/CustomerProfile';
 import LoginPage from '../Pages/Auth/LoginPage';
-
 import VehicleTrackingDashboard from '../Pages/Dashboard/VehicleTraking/VehicleTrackingDashboard';
 
 
@@ -43,9 +42,7 @@ const RoutesConfig = () => {
       <Route path="/forgotpassword" element={<ForgotPasswordPage />} />
       <Route path="/userdashboard" element={<UserDashboard />} />
       <Route path="/addcamera" element={<AddCamera />} />
-
-       <Route path="/tracks" element={<VehicleTrackingDashboard />} />
-
+      <Route path="/tracks" element={<VehicleTrackingDashboard />} />
       <Route path="/accidentdashboard" element={<AccidentDashboard />} />
       <Route path="/cameras/edit/:id" element={<EditCamera />} />
       <Route path="/violations" element={<ViolationList />} />

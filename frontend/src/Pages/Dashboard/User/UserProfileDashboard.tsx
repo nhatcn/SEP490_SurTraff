@@ -7,7 +7,7 @@ export default function UserProfileDashboard() {
     <div className="flex h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       <Sidebar />
       <div className="flex flex-col flex-grow overflow-hidden">
-        <Header title="Hồ sơ cá nhân" />
+        <Header title="User Dashboard" />
 
         {/* Enhanced background with animated elements */}
         <div className="flex-grow overflow-y-auto relative">
@@ -27,9 +27,11 @@ export default function UserProfileDashboard() {
                   <div className="flex items-center justify-between">
                     <div>
                       <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                        Chào mừng trở lại!
+                        Welcome back!
                       </h1>
-                      <p className="text-gray-600 mt-2">Quản lý thông tin cá nhân và cài đặt bảo mật của bạn</p>
+                      <p className="text-gray-600 mt-2">
+                        Manage your personal information and security settings
+                      </p>
                     </div>
                     <div className="hidden md:block">
                       <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">

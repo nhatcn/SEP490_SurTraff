@@ -12,12 +12,7 @@
     "axios": "^1.9.0",
     "bootstrap": "^5.3.5",
     "chart.js": "^4.4.9",
-
-
-    "chartjs-plugin-datalabels": "^2.2.0",
-
     "date-fns": "^4.1.0",
-    "framer-motion": "^12.18.1",
     "hls.js": "^1.6.2",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.503.0",
