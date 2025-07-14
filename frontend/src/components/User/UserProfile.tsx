@@ -314,21 +314,8 @@ export default function UserProfile() {
             </button>
           </div>
 
-          {/* Quick Stats */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="bg-green-50 rounded-xl p-3 border border-green-100">
-              <div className="text-lg font-bold text-green-700">{trafficStats.cleanDays}</div>
-              <div className="text-xs text-green-600">Clean Days</div>
-            </div>
-            <div className="bg-red-50 rounded-xl p-3 border border-red-100">
-              <div className="text-lg font-bold text-red-700">{trafficStats.totalViolations}</div>
-              <div className="text-xs text-red-600">Violations</div>
-            </div>
-            <div className="bg-blue-50 rounded-xl p-3 border border-blue-100">
-              <div className="text-lg font-bold text-blue-700">{trafficStats.recentViolations}</div>
-              <div className="text-xs text-blue-600">Recent</div>
-            </div>
-          </div>
+      
+          
         </div>
       </div>
 

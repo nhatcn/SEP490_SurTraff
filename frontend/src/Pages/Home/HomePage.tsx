@@ -105,6 +105,58 @@ const statsData: StatCard[] = [
   },
 ]
 
+// Background Slideshow Component
+function BackgroundSlideshow() {
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
+
+  // Array of background images - you can add more images here
+  const backgroundImages = [
+    "https://kajabi-storefronts-production.kajabi-cdn.com/kajabi-storefronts-production/file-uploads/blogs/22606/images/f082d2-6b14-c6a-8076-3304cc3a6c4_vlcsnap-error246.png",
+
+  ]
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentImageIndex((prevIndex) => (prevIndex + 1) % backgroundImages.length)
+    }, 5000) // Change image every 5 seconds
+
+    return () => clearInterval(interval)
+  }, [backgroundImages.length])
+
+  return (
+    <div className="relative w-full h-full">
+      {backgroundImages.map((image, index) => (
+        <div
+          key={index}
+          className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
+            index === currentImageIndex ? "opacity-100" : "opacity-0"
+          }`}
+        >
+          <img
+            src={image || "/placeholder.svg"}
+            alt={`Background ${index + 1}`}
+            className="w-full h-full object-cover"
+            style={{ filter: "brightness(0.7) contrast(1.1)" }}
+          />
+        </div>
+      ))}
+
+      {/* Slideshow indicators */}
+      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex space-x-2 z-50">
+        {backgroundImages.map((_, index) => (
+          <button
+            key={index}
+            onClick={() => setCurrentImageIndex(index)}
+            className={`w-3 h-3 rounded-full transition-all duration-300 ${
+              index === currentImageIndex ? "bg-white shadow-lg scale-110" : "bg-white/50 hover:bg-white/70"
+            }`}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function CustomerHome() {
   const [showMobileMenu, setShowMobileMenu] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
@@ -147,18 +199,23 @@ export default function CustomerHome() {
       <main>
         {/* Hero Section */}
         <div className="relative overflow-hidden">
-          {/* Animated Background */}
+          {/* Background Image Slideshow */}
           <div className="absolute inset-0">
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-900 via-indigo-900 to-purple-900"></div>
-            <div className="absolute inset-0 bg-black/20"></div>
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-700/10 via-indigo-900/20 to-purple-900/80 z-10"></div>
+            <div className="absolute inset-0 bg-black/40 z-20"></div>
+
+            {/* Slideshow Container */}
+            <div className="absolute inset-0 z-0">
+              <BackgroundSlideshow />
+            </div>
 
             {/* Animated Elements */}
-            <div className="absolute top-20 left-10 w-32 h-32 bg-blue-400/20 rounded-full blur-3xl animate-pulse"></div>
-            <div className="absolute top-40 right-20 w-48 h-48 bg-purple-400/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
-            <div className="absolute bottom-20 left-1/3 w-40 h-40 bg-cyan-400/20 rounded-full blur-3xl animate-pulse delay-500"></div>
+            <div className="absolute top-20 left-10 w-32 h-32 bg-blue-400/20 rounded-full blur-3xl animate-pulse z-30"></div>
+            <div className="absolute top-40 right-20 w-48 h-48 bg-purple-400/20 rounded-full blur-3xl animate-pulse delay-1000 z-30"></div>
+            <div className="absolute bottom-20 left-1/3 w-40 h-40 bg-cyan-400/20 rounded-full blur-3xl animate-pulse delay-500 z-30"></div>
 
             {/* Grid Pattern */}
-            <div className="absolute inset-0 opacity-10">
+            <div className="absolute inset-0 opacity-10 z-30">
               <div
                 className="h-full w-full"
                 style={{
@@ -169,7 +226,8 @@ export default function CustomerHome() {
             </div>
           </div>
 
-          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-32">
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-32 z-40">
+            {/* Rest of the hero content remains the same */}
             <div className="text-center">
               {/* Live Status Indicator */}
               <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-xl rounded-full px-4 py-2 mb-8 border border-white/20">
@@ -179,10 +237,7 @@ export default function CustomerHome() {
                 </span>
               </div>
 
-              <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight">
-                SurTraff
-
-              </h1>
+              <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight">SurTraff</h1>
 
               <p className="text-xl md:text-2xl text-blue-100 mb-12 max-w-4xl mx-auto leading-relaxed">
                 Advanced AI-powered traffic violation detection and monitoring system. Search violations, track
@@ -228,10 +283,10 @@ export default function CustomerHome() {
           </div>
 
           {/* Floating Elements */}
-          <div className="absolute top-1/4 right-10 opacity-20 animate-bounce">
+          <div className="absolute top-1/4 right-10 opacity-20 animate-bounce z-40">
             <Shield className="h-16 w-16 text-blue-300" />
           </div>
-          <div className="absolute bottom-1/4 left-10 opacity-20 animate-pulse">
+          <div className="absolute bottom-1/4 left-10 opacity-20 animate-pulse z-40">
             <Eye className="h-20 w-20 text-purple-300" />
           </div>
         </div>
@@ -266,7 +321,7 @@ export default function CustomerHome() {
                   </div>
                   <h3 className="text-2xl font-bold text-gray-900 mb-4">Instant Detection</h3>
                   <p className="text-gray-600 leading-relaxed">
-                    Advanced algorithms detect violations in real-time with 99.9% accuracy and instant alerts
+                    Advanced algorithms detect violations in real-time
                   </p>
                 </div>
               </div>
@@ -278,7 +333,7 @@ export default function CustomerHome() {
                   </div>
                   <h3 className="text-2xl font-bold text-gray-900 mb-4">Smart Analytics</h3>
                   <p className="text-gray-600 leading-relaxed">
-                    Comprehensive reporting and analytics to identify traffic patterns and improve road safety
+                    Comprehensive reporting and analytics to identify traffic patterns and improve safety
                   </p>
                 </div>
               </div>

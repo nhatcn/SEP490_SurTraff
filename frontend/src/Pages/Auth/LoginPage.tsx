@@ -1,6 +1,5 @@
 "use client"
 
-// pages/Auth/LoginPage.tsx
 import type React from "react"
 import { useState } from "react"
 import { GoogleLogin } from "@react-oauth/google"

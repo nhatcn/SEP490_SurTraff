@@ -11,6 +11,13 @@ import {
   ChevronLeft,
   ChevronRight,
   Activity,
+  User,
+  Car,
+  AlertTriangle,
+  BarChart3,
+  TrendingUp,
+  Shield,
+  ChevronDown,
 } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
@@ -24,6 +31,7 @@ export default function Sidebar({ defaultActiveItem = "dashboard" }: SidebarProp
   const [expanded, setExpanded] = useState(true)
   const [activeItem, setActiveItem] = useState(defaultActiveItem)
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
+  const [expandedSubmenu, setExpandedSubmenu] = useState<string | null>(null)
   const navigate = useNavigate()
 
   const menuItems = [
@@ -33,6 +41,13 @@ export default function Sidebar({ defaultActiveItem = "dashboard" }: SidebarProp
       icon: <LayoutDashboard size={20} />,
       path: "/dashboard",
       description: "Overview & Analytics",
+    },
+    {
+      id: "profile",
+      name: "My Profile",
+      icon: <User size={20} />,
+      path: "",
+      description: "Personal Information",
     },
     {
       id: "cameras",
@@ -47,6 +62,51 @@ export default function Sidebar({ defaultActiveItem = "dashboard" }: SidebarProp
       icon: <Map size={20} />,
       path: "/map",
       description: "Real-time Monitoring",
+    },
+    {
+      id: "vehicles",
+      name: "Vehicle Management",
+      icon: <Car size={20} />,
+      path: "",
+      description: "Vehicle Registry",
+    },
+    {
+      id: "violations",
+      name: "Violation Management",
+      icon: <AlertTriangle size={20} />,
+      path: "",
+      description: "Traffic Violations",
+    },
+    {
+      id: "accidents",
+      name: "Accident Management",
+      icon: <Shield size={20} />,
+      path: "",
+      description: "Accident Reports",
+    },
+    {
+      id: "statistics",
+      name: "Statistics",
+      icon: <BarChart3 size={20} />,
+      path: "",
+      description: "Data Analytics",
+      hasSubmenu: true,
+      submenu: [
+        {
+          id: "violation-stats",
+          name: "Violation Statistics",
+          icon: <TrendingUp size={16} />,
+          path: "",
+          description: "Violation Data Analysis",
+        },
+        {
+          id: "accident-stats",
+          name: "Accident Statistics",
+          icon: <TrendingUp size={16} />,
+          path: "",
+          description: "Accident Data Analysis",
+        },
+      ],
     },
     {
       id: "users",
@@ -73,8 +133,23 @@ export default function Sidebar({ defaultActiveItem = "dashboard" }: SidebarProp
   ]
 
   const handleItemClick = (itemId: string, path: string) => {
+    const item = menuItems.find(item => item.id === itemId)
+    
+    if (item?.hasSubmenu) {
+      setExpandedSubmenu(expandedSubmenu === itemId ? null : itemId)
+    } else {
+      setActiveItem(itemId)
+      if (path) {
+        navigate(path)
+      }
+    }
+  }
+
+  const handleSubmenuClick = (itemId: string, path: string) => {
     setActiveItem(itemId)
-    navigate(path)
+    if (path) {
+      navigate(path)
+    }
   }
 
   // Auto-collapse on mobile
@@ -82,6 +157,7 @@ export default function Sidebar({ defaultActiveItem = "dashboard" }: SidebarProp
     const handleResize = () => {
       if (window.innerWidth < 768) {
         setExpanded(false)
+        setExpandedSubmenu(null)
       }
     }
 
@@ -160,7 +236,7 @@ export default function Sidebar({ defaultActiveItem = "dashboard" }: SidebarProp
                     group relative w-full flex items-center py-3 px-4 rounded-xl
                     transition-all duration-300 transform hover:scale-[1.02]
                     ${
-                      activeItem === item.id
+                      activeItem === item.id || expandedSubmenu === item.id
                         ? "bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 text-white shadow-lg shadow-blue-500/25"
                         : "text-gray-300 hover:bg-gradient-to-r hover:from-gray-800/50 hover:to-slate-700/50 hover:text-white"
                     }
@@ -174,14 +250,14 @@ export default function Sidebar({ defaultActiveItem = "dashboard" }: SidebarProp
                   <div
                     className={`
                     relative flex items-center justify-center w-8 h-8 rounded-lg
-                    ${activeItem === item.id ? "bg-white/20 shadow-inner" : "group-hover:bg-white/10"}
+                    ${activeItem === item.id || expandedSubmenu === item.id ? "bg-white/20 shadow-inner" : "group-hover:bg-white/10"}
                     transition-all duration-300
                   `}
                   >
                     <span
                       className={`
                       transition-all duration-300
-                      ${activeItem === item.id ? "text-white drop-shadow-sm" : "text-gray-400 group-hover:text-white"}
+                      ${activeItem === item.id || expandedSubmenu === item.id ? "text-white drop-shadow-sm" : "text-gray-400 group-hover:text-white"}
                     `}
                     >
                       {item.icon}
@@ -193,16 +269,26 @@ export default function Sidebar({ defaultActiveItem = "dashboard" }: SidebarProp
                     <div className="ml-3 flex-1 min-w-0">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium truncate">{item.name}</span>
-                        {item.badge && (
-                          <span className="ml-2 px-2 py-0.5 bg-red-500 text-white text-xs rounded-full font-medium animate-pulse">
-                            {item.badge}
-                          </span>
-                        )}
+                        <div className="flex items-center space-x-2">
+                          {item.badge && (
+                            <span className="px-2 py-0.5 bg-red-500 text-white text-xs rounded-full font-medium animate-pulse">
+                              {item.badge}
+                            </span>
+                          )}
+                          {item.hasSubmenu && (
+                            <ChevronDown 
+                              size={14} 
+                              className={`transition-transform duration-300 ${
+                                expandedSubmenu === item.id ? "rotate-180" : ""
+                              }`} 
+                            />
+                          )}
+                        </div>
                       </div>
                       <p
                         className={`
                         text-xs truncate transition-all duration-300
-                        ${activeItem === item.id ? "text-blue-100" : "text-gray-500 group-hover:text-gray-400"}
+                        ${activeItem === item.id || expandedSubmenu === item.id ? "text-blue-100" : "text-gray-500 group-hover:text-gray-400"}
                       `}
                       >
                         {item.description}
@@ -218,7 +304,7 @@ export default function Sidebar({ defaultActiveItem = "dashboard" }: SidebarProp
                   )}
 
                   {/* Active Indicator */}
-                  {activeItem === item.id && (
+                  {(activeItem === item.id || expandedSubmenu === item.id) && (
                     <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-blue-300 to-indigo-300 rounded-r-full shadow-lg" />
                   )}
 
@@ -227,10 +313,39 @@ export default function Sidebar({ defaultActiveItem = "dashboard" }: SidebarProp
                     className={`
                     absolute inset-0 rounded-xl bg-gradient-to-r from-blue-600/0 to-indigo-600/0 
                     transition-all duration-300 pointer-events-none
-                    ${hoveredItem === item.id && activeItem !== item.id ? "from-blue-600/10 to-indigo-600/10" : ""}
+                    ${hoveredItem === item.id && activeItem !== item.id && expandedSubmenu !== item.id ? "from-blue-600/10 to-indigo-600/10" : ""}
                   `}
                   />
                 </button>
+
+                {/* Submenu */}
+                {item.hasSubmenu && expanded && expandedSubmenu === item.id && (
+                  <div className="ml-4 mt-2 space-y-1">
+                    {item.submenu?.map((subItem) => (
+                      <button
+                        key={subItem.id}
+                        onClick={() => handleSubmenuClick(subItem.id, subItem.path)}
+                        className={`
+                          w-full flex items-center py-2 px-3 rounded-lg text-sm
+                          transition-all duration-200 transform hover:scale-[1.01]
+                          ${
+                            activeItem === subItem.id
+                              ? "bg-blue-600/50 text-white"
+                              : "text-gray-400 hover:text-white hover:bg-gray-700/50"
+                          }
+                        `}
+                      >
+                        <div className="flex items-center justify-center w-6 h-6 rounded-md mr-3">
+                          {subItem.icon}
+                        </div>
+                        <div className="flex-1 text-left">
+                          <div className="font-medium">{subItem.name}</div>
+                          <div className="text-xs text-gray-500">{subItem.description}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 {/* Tooltip for collapsed state */}
                 {!expanded && hoveredItem === item.id && (
@@ -238,6 +353,15 @@ export default function Sidebar({ defaultActiveItem = "dashboard" }: SidebarProp
                     <div className="bg-gray-900 text-white px-3 py-2 rounded-lg shadow-xl border border-gray-700 whitespace-nowrap">
                       <div className="text-sm font-medium">{item.name}</div>
                       <div className="text-xs text-gray-400">{item.description}</div>
+                      {item.hasSubmenu && (
+                        <div className="mt-2 space-y-1">
+                          {item.submenu?.map((subItem) => (
+                            <div key={subItem.id} className="text-xs text-gray-500 pl-2">
+                              • {subItem.name}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       {/* Arrow */}
                       <div className="absolute left-0 top-1/2 transform -translate-x-1 -translate-y-1/2">
                         <div className="w-2 h-2 bg-gray-900 border-l border-t border-gray-700 transform rotate-45"></div>
