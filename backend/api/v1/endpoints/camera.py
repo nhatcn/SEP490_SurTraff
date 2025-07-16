@@ -45,6 +45,15 @@ def get_camera_by_id(camera_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Camera not found")
     return jsonable_encoder(camera)
 
+
+@router.get("/cameras/violationtype/{violation_type_id}")
+def get_camera_by_id(violation_type_id: int, db: Session = Depends(get_db)):
+    camera = db.query(Camera).filter(Camera.violation_type_id == violation_type_id).first()
+    if not camera:
+        raise HTTPException(status_code=404, detail="Camera not found")
+    return jsonable_encoder(camera)
+
+
 @router.post("/cameras")
 def create_camera(camera: CameraCreate, db: Session = Depends(get_db)):
     db_camera = db.query(Camera).filter(Camera.ip_address == camera.ip_address).first()
