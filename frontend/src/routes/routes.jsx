@@ -8,12 +8,9 @@ import ForgotPasswordPage from '../Pages/Auth/ForgotPasswordPage';
 import UserDashboard from '../Pages/Dashboard/User/UserDashboard';
 import AccidentDashboard from '../Pages/Dashboard/Accident/AccidentDashboard';
 
-import AccidentStatistics from '../Pages/Dashboard/AccidentStatistics';
-
 import ViolationList from '../Pages/Violations/ViolationList';
 import ViolationHistory from '../Pages/Violations/ViolationHistory';
 
-import ViolationStatistics from '../Pages/Dashboard/ViolationStatistics';
 import EditCamera from '../Pages/Dashboard/Camera/EditCamera';
 import UserProfileDashboard from '../Pages/Dashboard/User/UserProfileDashboard';
 import VehicleDashboard from '../Pages/Dashboard/Vehicle/VehicleDashboard';
@@ -26,6 +23,10 @@ import CustomerHome from '../Pages/Home/HomePage';
 import CustomerProfile from '../Pages/Dashboard/User/CustomerProfile';
 import LoginPage from '../Pages/Auth/LoginPage';
 import VehicleTrackingDashboard from '../Pages/Dashboard/VehicleTraking/VehicleTrackingDashboard';
+import AccidentStatistics from '../Pages/Dashboard/Accident/AccidentStatistics';
+import ViolationStatistics from '../Pages/Violations/ViolationStatistics';
+import UserTrafficMap from '../Pages/UserMap/UserTrafficMap';
+import AccidentDetails from '../Pages/Dashboard/Accident/AccidentDetails';
 
 
 
@@ -44,6 +45,7 @@ const RoutesConfig = () => {
       <Route path="/addcamera" element={<AddCamera />} />
       <Route path="/tracks" element={<VehicleTrackingDashboard />} />
       <Route path="/accidentdashboard" element={<AccidentDashboard />} />
+      <Route path="/accidents/:id" element={<AccidentDetails />} />
       <Route path="/cameras/edit/:id" element={<EditCamera />} />
       <Route path="/violations" element={<ViolationList />} />
       <Route path="/violations/:id" element={<ViolationDetail />} />
@@ -56,6 +58,7 @@ const RoutesConfig = () => {
       <Route path="/vehicles/:id" element={<VehicleDetail />} />
       <Route path="/home" element={<CustomerHome />} />
       <Route path="/myprofile" element={<CustomerProfile />} />
+      <Route path="/usermap" element={<UserTrafficMap />} />
     </Routes>
   );
 };
