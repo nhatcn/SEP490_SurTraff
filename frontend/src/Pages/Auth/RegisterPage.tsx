@@ -5,6 +5,7 @@ import AuthInput from '../../components/Auth/AuthInput';
 import AuthButton from '../../components/Auth/AuthButton';
 import { useRegister } from '../../hooks/Auth/useAuth';
 import { RegisterFormData } from '../../types/Auth/auth';
+import Logo from '../../components/Logo/Logo';
 
 const RegisterPage: React.FC = () => {
   const [formData, setFormData] = useState<RegisterFormData>({
@@ -49,7 +50,18 @@ const RegisterPage: React.FC = () => {
   );
 
   return (
-    <AuthLayout title="Register">
+    <AuthLayout title="">      
+    <div className="flex justify-center mb-8">
+        <Logo />
+      </div>
+
+      {/* Welcome Text */}
+      <div className="text-center mb-8">
+        <h1 className="text-2xl font-bold text-white mb-2">Create Account</h1>
+        <p className="text-white/70">Join us today and get started</p>
+      </div>
+
+      
       {error && (
         <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-500 text-sm">
           <pre className="whitespace-pre-wrap">{error}</pre>

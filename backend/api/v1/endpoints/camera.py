@@ -1,18 +1,25 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, Response, JSONResponse
 from fastapi.encoders import jsonable_encoder
-from fastapi import Body
 import cv2
-from fastapi.responses import Response
+
 from services.camera.camera_service import (
     stream_normal_video_service,
     stream_violation_video_service,
-    stream_count_video_service,stream_accident_video_service,stream_plate_with_ocr_video_service,
+    stream_violation_video_service1,
+    stream_count_video_service,
+    stream_accident_video_service,
+    stream_plate_with_ocr_video_service,
     stream_violation_wrongway_video_service
-
 )
-from services.camera.red_light_violation_service import stream_violation_video_service1, extract_thumbnail_from_stream_url
+
+from services.traffic_density_service import analyze_traffic_video
+from services.pothole_detection_service import detect_potholes_in_video
+from services.camera.red_light_violation_service import (
+    stream_violation_video_service1,
+    extract_thumbnail_from_stream_url
+)
 from db.session import get_db
 from models.model import Camera
 from schemas.camera_schema  import CameraCreate, CameraUpdate
@@ -108,7 +115,12 @@ def stream_video(camera_id: int, db: Session = Depends(get_db)):
         )
     elif camera_id == 6:
         return StreamingResponse(
-            stream_violation_wrongway_video_service(camera.stream_url),
+            analyze_traffic_video(camera.stream_url, camera.id),
+            media_type="multipart/x-mixed-replace; boundary=frame"
+        )
+    elif camera_id == 7:
+        return StreamingResponse(
+            detect_potholes_in_video(camera.stream_url, camera.id, db),
             media_type="multipart/x-mixed-replace; boundary=frame"
         )
     elif camera_id >= 25:
@@ -118,7 +130,7 @@ def stream_video(camera_id: int, db: Session = Depends(get_db)):
         )
     else:
         return StreamingResponse(
-            stream_normal_video_service(camera.stream_url),
+            analyze_traffic_video(camera.stream_url, camera.id),
             media_type="multipart/x-mixed-replace; boundary=frame"
         )
         
