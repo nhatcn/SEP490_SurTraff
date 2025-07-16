@@ -6,11 +6,12 @@ import { useNavigate } from "react-router-dom";
 import { AlertDialog } from "./AlertDialog";
 import { format } from "date-fns";
 import { toast } from "react-toastify";
-
+import ExportViolationsPDF from "./ExportViolationsPDF";
 import ChatBot from "../../components/Chatbot/chatbot";
 import GenericTable, { TableColumn, TableAction, FilterConfig } from "../../components/Table/GenericTable";
 import { Eye, Trash2 } from "lucide-react";
-import ExportViolationsPDF from "./ExportViolationsPDF";
+
+
 
 // Types
 interface ViolationType {
