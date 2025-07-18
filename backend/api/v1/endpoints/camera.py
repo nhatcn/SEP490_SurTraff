@@ -18,6 +18,10 @@ from services.camera.accidentService import (
     stream_accident_video_service,
 )
 
+# from services.camera.wrongwayService import (
+#     stream_violation_wrongway_video_service
+# )
+
 from services.traffic_density_service import analyze_traffic_video
 from services.pothole_detection_service import detect_potholes_in_video
 from services.camera.red_light_violation_service import (
@@ -125,6 +129,11 @@ def stream_video(camera_id: int, db: Session = Depends(get_db)):
     elif camera_id == 7:
         return StreamingResponse(
             detect_potholes_in_video(camera.stream_url, camera.id, db),
+            media_type="multipart/x-mixed-replace; boundary=frame"
+        )
+    elif camera_id == 8:
+        return StreamingResponse(
+            stream_violation_wrongway_video_service(camera.stream_url, camera.id, db),
             media_type="multipart/x-mixed-replace; boundary=frame"
         )
     elif camera_id >= 25:
