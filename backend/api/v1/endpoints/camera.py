@@ -9,9 +9,13 @@ from services.camera.camera_service import (
     stream_violation_video_service,
     stream_violation_video_service1,
     stream_count_video_service,
-    stream_accident_video_service,
+    # stream_accident_video_service,
     stream_plate_with_ocr_video_service,
     stream_violation_wrongway_video_service
+)
+
+from services.camera.accidentService import (
+    stream_accident_video_service,
 )
 
 from services.traffic_density_service import analyze_traffic_video
