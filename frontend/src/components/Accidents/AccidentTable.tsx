@@ -13,20 +13,20 @@ interface CameraType {
   id: number;
   name: string;
   location: string;
-  stream_url: string;
+  streamUrl: string;
   status: boolean;
   latitude: number;
   longitude: number;
   thumbnail: string | null;
-  created_at: string;
+  createdAt: string;
 }
 
 interface AccidentType {
   id: number;
-  camera_id: number;
+  cameraId: number;
   location: string;
   status: string;
-  accident_time: string;
+  accidentTime: string;
 }
 
 export default function AccidentTable() {
@@ -93,14 +93,14 @@ export default function AccidentTable() {
 
   const columns: TableColumn<AccidentType>[] = [
     {
-      key: "camera_id",
+      key: "cameraId",
       title: "Camera",
       render: (value) =>
         cameras.find((cam) => cam.id === value)?.name || "Unknown",
     },
     { key: "location", title: "Location" },
     {
-      key: "accident_time",
+      key: "accidentTime",
       title: "Time",
       render: (value) => new Date(value).toLocaleString(),
     },

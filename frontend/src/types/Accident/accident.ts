@@ -5,14 +5,15 @@ export interface AccidentType {
     id: number
     name: string
   }
-  image_url: string
+  
+  imageUrl: string
   description: string
-  video_url: string
+  videoUrl: string
   location: string
-  accident_time: string
-  created_at: string
-  user_fullName: string
-  user_email: string
+  accidentTime: string
+  createdAt: string
+  userFullName: string
+  userEmail: string
   licensePlate: string
   status: string
 }

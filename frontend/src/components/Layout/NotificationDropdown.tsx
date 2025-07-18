@@ -6,13 +6,13 @@ import axios from "axios"
 
 interface Notification {
   id: number
-  user_id: number | null
-  vehicle_id: number | null
-  accident_id: number | null
-  violation_id: number | null
+  userId: number | null
+  vehicleId: number | null
+  accidentId: number | null
+  violationId: number | null
   message: string
-  notification_type: string
-  created_at: string
+  notificationType: string
+  createdAt: string
   read: boolean
 }
 
@@ -187,14 +187,15 @@ const NotificationDropdown = () => {
             notifications.map((notification) => (
               <div
                 key={notification.id}
-                className={`px-4 py-3 cursor-pointer transition-colors duration-200 ${getNotificationBgColor(notification.notification_type)}`}
+
+                className={`px-4 py-3 cursor-pointer transition-colors duration-200 ${getNotificationBgColor(notification.notificationType)}`}
                 onClick={() => markAsRead(notification.id)}
               >
                 <div className="flex items-start space-x-3">
-                  {getNotificationIcon(notification.notification_type)}
+                  {getNotificationIcon(notification.notificationType)}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-800 break-words">{notification.message}</p>
-                    <p className="text-xs text-gray-500 mt-1">{timeAgo(notification.created_at)}</p>
+                    <p className="text-xs text-gray-500 mt-1">{timeAgo(notification.createdAt)}</p>
                   </div>
                 </div>
               </div>

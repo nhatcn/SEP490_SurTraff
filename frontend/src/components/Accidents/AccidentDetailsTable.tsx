@@ -64,16 +64,16 @@ export default function AccidentDetailsTable() {
         console.log("Fetched accident data:", data)
         setAccident({
           ...data,
-          camera: { id: data.camera_id, name: data.name || "Unknown" },
-          accident_time: new Date(data.accident_time).toISOString(),
-          created_at: new Date(data.created_at).toISOString(),
-          user_fullName: data.user_fullName || "No data",
-          user_email: data.user_email || "No data",
+          camera: { id: data.cameraId, name: data.name || "Unknown" },
+          accidentTime: new Date(data.accidentTime).toISOString(),
+          createdAt: new Date(data.createdAt).toISOString(),
+          userFullName: data.userFullName || "No data",
+          userEmail: data.userEmail || "No data",
           licensePlate: data.licensePlate || "No data",
           status: data.status ? data.status.toLowerCase() : "unknown",
         })
         setEditDescription(data.description || "")
-        setDisplayImageUrl(data.image_url ? `${data.image_url}?t=${Date.now()}` : null)
+        setDisplayImageUrl(data.imageUrl ? `${data.imageUrl}?t=${Date.now()}` : null)
         setLoading(false)
       })
       .catch((error) => {
@@ -101,13 +101,13 @@ export default function AccidentDetailsTable() {
       setAccident({
         ...updatedData,
         camera: {
-          id: updatedData.camera_id,
+          id: updatedData.cameraId,
           name: updatedData.name || "Unknown",
         },
-        accident_time: new Date(updatedData.accident_time).toISOString(),
-        created_at: new Date(updatedData.created_at).toISOString(),
-        user_fullName: updatedData.user_fullName || "No data",
-        user_email: updatedData.user_email || "No data",
+        accidentTime: new Date(updatedData.accidentTime).toISOString(),
+        createdAt: new Date(updatedData.createdAt).toISOString(),
+        userFullName: updatedData.userFullName || "No data",
+        userEmail: updatedData.userEmail || "No data",
         licensePlate: updatedData.licensePlate || "No data",
         status: updatedData.status ? updatedData.status.toLowerCase() : "unknown",
       })
@@ -145,10 +145,10 @@ export default function AccidentDetailsTable() {
           id: updatedData.camera_id,
           name: updatedData.name || "Unknown",
         },
-        accident_time: new Date(updatedData.accident_time).toISOString(),
-        created_at: new Date(updatedData.created_at).toISOString(),
-        user_fullName: updatedData.user_fullName || "No data",
-        user_email: updatedData.user_email || "No data",
+        accidentTime: new Date(updatedData.accidentTime).toISOString(),
+        createdAt: new Date(updatedData.createdAt).toISOString(),
+        userFullName: updatedData.userFullName || "No data",
+        userEmail: updatedData.userEmail || "No data",
         licensePlate: updatedData.licensePlate || "No data",
         status: updatedData.status ? updatedData.status.toLowerCase() : "unknown",
       })
@@ -258,7 +258,7 @@ export default function AccidentDetailsTable() {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-blue-700">Incident Time</p>
-                      <p className="text-gray-900 font-semibold">{new Date(accident.accident_time).toLocaleString()}</p>
+                      <p className="text-gray-900 font-semibold">{new Date(accident.accidentTime).toLocaleString()}</p>
                     </div>
                   </div>
                   <div className="group flex items-center space-x-3 p-4 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg border border-purple-200 hover:border-purple-300 transition-all duration-300 hover:shadow-lg transform hover:scale-105">
@@ -267,7 +267,7 @@ export default function AccidentDetailsTable() {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-purple-700">Reported At</p>
-                      <p className="text-gray-900 font-semibold">{new Date(accident.created_at).toLocaleString()}</p>
+                      <p className="text-gray-900 font-semibold">{new Date(accident.createdAt).toLocaleString()}</p>
                     </div>
                   </div>
                   <div className="group flex items-center space-x-3 p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-lg border border-green-200 hover:border-green-300 transition-all duration-300 hover:shadow-lg transform hover:scale-105">
@@ -310,7 +310,7 @@ export default function AccidentDetailsTable() {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-green-700">Full Name</p>
-                      <p className="text-gray-900 font-semibold">{accident.user_fullName}</p>
+                      <p className="text-gray-900 font-semibold">{accident.userFullName}</p>
                     </div>
                   </div>
                   <div className="group flex items-center space-x-3 p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border border-blue-200 hover:border-blue-300 transition-all duration-300 hover:shadow-lg transform hover:scale-105">
@@ -319,7 +319,7 @@ export default function AccidentDetailsTable() {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-blue-700">Email Address</p>
-                      <p className="text-gray-900 font-semibold">{accident.user_email}</p>
+                      <p className="text-gray-900 font-semibold">{accident.userEmail}</p>
                     </div>
                   </div>
                   <div className="group flex items-center space-x-3 p-4 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg border border-purple-200 hover:border-purple-300 transition-all duration-300 hover:shadow-lg transform hover:scale-105 md:col-span-2">
@@ -443,13 +443,14 @@ export default function AccidentDetailsTable() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {accident.video_url ? (
+
+                {accident.videoUrl ? (
                   <div className="relative group">
-                    {getYouTubeEmbedUrl(accident.video_url)?.includes("youtube.com") ? (
+                    {getYouTubeEmbedUrl(accident.videoUrl)?.includes("youtube.com") ? (
                       <iframe
                         className="w-full rounded-lg shadow-lg border border-gray-200 transition-all duration-300 group-hover:shadow-2xl"
                         style={{ height: "200px" }}
-                        src={getYouTubeEmbedUrl(accident.video_url)}
+                        src={getYouTubeEmbedUrl(accident.videoUrl)}
                         title="Incident Video"
                         frameBorder="0"
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -458,12 +459,12 @@ export default function AccidentDetailsTable() {
                     ) : (
                       <>
                         <video
-                          src={accident.video_url}
+                          src={accident.videoUrl}
                           controls
                           className="w-full rounded-lg shadow-lg border border-gray-200 transition-all duration-300 hover:shadow-2xl"
                           style={{ maxHeight: "200px" }}
                           onError={(e) => {
-                            console.error("Failed to load video:", accident.video_url)
+                            console.error("Failed to load video:", accident.videoUrl)
                             e.currentTarget.style.display = "none"
                             if (e.currentTarget.nextElementSibling) {
                               ;(e.currentTarget.nextElementSibling as HTMLElement).style.display = "block"
