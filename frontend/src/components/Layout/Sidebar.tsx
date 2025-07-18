@@ -46,7 +46,7 @@ export default function Sidebar({ defaultActiveItem = "dashboard" }: SidebarProp
       id: "profile",
       name: "My Profile",
       icon: <User size={20} />,
-      path: "",
+      path: "profile",
       description: "Personal Information",
     },
     {
@@ -171,20 +171,11 @@ export default function Sidebar({ defaultActiveItem = "dashboard" }: SidebarProp
     <div
       className={`
       relative flex flex-col h-full transition-all duration-500 ease-in-out
-      ${expanded ? "w-64" : "w-26"}
+      ${expanded ? "w-66" : "w-26"}
       bg-gradient-to-b from-slate-900 via-gray-900 to-slate-800
       border-r border-gray-700/30 shadow-2xl
     `}
     >
-      {/* Background Pattern */}
-      <div className="absolute inset-0 opacity-5">
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fillRule='evenodd'%3E%3Cg fill='%23ffffff' fillOpacity='0.1'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-          }}
-        />
-      </div>
 
       {/* Header Section */}
       <div className="relative p-4 border-b border-gray-700/30 backdrop-blur-sm">
@@ -224,7 +215,7 @@ export default function Sidebar({ defaultActiveItem = "dashboard" }: SidebarProp
 
       {/* Navigation Menu */}
       <div className="flex-1 py-4 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
-        <nav className="px-3">
+        <nav className="pt-2 pr-2 pb-2 pl-0">
           <ul className="space-y-2">
             {menuItems.map((item, index) => (
               <li key={item.id} className="relative">

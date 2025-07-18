@@ -11,6 +11,8 @@ import ChatBot from "../../components/Chatbot/chatbot";
 import GenericTable, { TableColumn, TableAction, FilterConfig } from "../../components/Table/GenericTable";
 import { Eye, Trash2 } from "lucide-react";
 
+
+
 // Types
 interface ViolationType {
   id: number;
