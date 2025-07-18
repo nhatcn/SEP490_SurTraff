@@ -10,10 +10,6 @@ import {
   Car,
   MapPin,
   Clock,
-  Edit3,
-  Save,
-  X,
-  Check,
   ImageIcon,
   Video,
   Shield,
@@ -21,33 +17,25 @@ import {
   FileText,
   Sparkles,
 } from "lucide-react"
-
 // Import components
 import { Button } from "../UI/AccidentUI/button"
 import { Card, CardHeader, CardTitle, CardContent } from "../UI/AccidentUI/card"
-import { Textarea } from "../UI/AccidentUI/textarea"
+// Removed Textarea as edit functionality is removed
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
+  // Removed Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter as confirm dialog is removed
 } from "../UI/AccidentUI/dialog"
 import { LoadingScreen, ErrorScreen } from "../UI/AccidentUI/loading"
-
 // Import utilities
 import { getStatusBadge } from "../Accidents/status-badge"
 import { getYouTubeEmbedUrl } from "../Accidents/video-utils"
 import type { AccidentType } from "../../types/Accident/accident"
 
-export default function AccidentDetailsTable() {
+export default function AccidentDetailsUserTable() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [accident, setAccident] = useState<AccidentType | null>(null)
-  const [isEditing, setIsEditing] = useState(false)
-  const [editDescription, setEditDescription] = useState("")
-  const [showConfirm, setShowConfirm] = useState(false)
+  // Removed isEditing and editDescription states
+  // Removed showConfirm state
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [imageLoading, setImageLoading] = useState(true)
@@ -72,7 +60,7 @@ export default function AccidentDetailsTable() {
           licensePlate: data.licensePlate || "No data",
           status: data.status ? data.status.toLowerCase() : "unknown",
         })
-        setEditDescription(data.description || "")
+        // Removed setEditDescription
         setDisplayImageUrl(data.imageUrl ? `${data.imageUrl}?t=${Date.now()}` : null)
         setLoading(false)
       })
@@ -84,40 +72,7 @@ export default function AccidentDetailsTable() {
       })
   }, [id])
 
-  const handleSave = async () => {
-    if (!accident) return
-    try {
-      const updatedAccident = { description: editDescription }
-      const res = await fetch(`http://localhost:8081/api/accident/${accident.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updatedAccident),
-      })
-      const updatedData = await res.json()
-      if (!res.ok) {
-        alert("Failed to update description.")
-        return
-      }
-      setAccident({
-        ...updatedData,
-        camera: {
-          id: updatedData.cameraId,
-          name: updatedData.name || "Unknown",
-        },
-        accidentTime: new Date(updatedData.accidentTime).toISOString(),
-        createdAt: new Date(updatedData.createdAt).toISOString(),
-        userFullName: updatedData.userFullName || "No data",
-        userEmail: updatedData.userEmail || "No data",
-        licensePlate: updatedData.licensePlate || "No data",
-        status: updatedData.status ? updatedData.status.toLowerCase() : "unknown",
-      })
-      setIsEditing(false)
-      setShowConfirm(false)
-    } catch (error) {
-      console.error("Error saving description:", error)
-      alert("An error occurred while updating the description.")
-    }
-  }
+  // Removed handleSave function
 
   const handleApprove = async () => {
     if (!accident) return
@@ -152,7 +107,7 @@ export default function AccidentDetailsTable() {
         licensePlate: updatedData.licensePlate || "No data",
         status: updatedData.status ? updatedData.status.toLowerCase() : "unknown",
       })
-      navigate("/accidentdashboard")
+      navigate("/accidentdashboard") // Kept this navigation as it's part of the approve flow
     } catch (error) {
       console.error("Error approving accident:", error)
       alert("An error occurred while approving the accident.")
@@ -164,7 +119,7 @@ export default function AccidentDetailsTable() {
   }
 
   if (error || !accident) {
-    return <ErrorScreen error={error || "Accident Not Found"} onBackClick={() => navigate("/accidentdashboard")} />
+    return <ErrorScreen error={error || "Accident Not Found"} onBackClick={() => navigate("/home")} />
   }
 
   return (
@@ -181,17 +136,16 @@ export default function AccidentDetailsTable() {
           style={{ animationDelay: "4s" }}
         ></div>
       </div>
-
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Enhanced Header */}
         <div className="mb-8">
           <Button
             variant="ghost"
-            onClick={() => navigate("/accidentdashboard")}
+            onClick={() => navigate("/home")} // Changed navigation to /home
             className="mb-6 inline-flex items-center"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Dashboard
+            Back to Home
           </Button>
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/50 p-6 hover:shadow-2xl transition-all duration-300">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -208,35 +162,11 @@ export default function AccidentDetailsTable() {
               </div>
               <div className="flex items-center gap-3">
                 {getStatusBadge(accident.status)}
-                {!isEditing ? (
-                  <Button onClick={() => setIsEditing(true)} variant="primary" className="inline-flex items-center">
-                    <Edit3 className="w-4 h-4 mr-2" />
-                    Edit
-                  </Button>
-                ) : (
-                  <div className="flex gap-2">
-                    <Button onClick={() => setShowConfirm(true)} variant="success" className="inline-flex items-center">
-                      <Save className="w-4 h-4 mr-2" />
-                      Save
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        setIsEditing(false)
-                        setEditDescription(accident.description || "")
-                      }}
-                      variant="secondary"
-                      className="inline-flex items-center"
-                    >
-                      <X className="w-4 h-4 mr-2" />
-                      Cancel
-                    </Button>
-                  </div>
-                )}
+                {/* Removed Edit/Save/Cancel buttons */}
               </div>
             </div>
           </div>
         </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column - Details */}
           <div className="lg:col-span-2 space-y-6">
@@ -291,7 +221,6 @@ export default function AccidentDetailsTable() {
                 </div>
               </CardContent>
             </Card>
-
             {/* Vehicle Owner Information */}
             <Card>
               <CardHeader className="bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-t-xl">
@@ -338,7 +267,6 @@ export default function AccidentDetailsTable() {
                 </div>
               </CardContent>
             </Card>
-
             {/* Description */}
             <Card>
               <CardHeader className="bg-gradient-to-r from-orange-500 to-amber-600 text-white rounded-t-xl">
@@ -350,25 +278,15 @@ export default function AccidentDetailsTable() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {isEditing ? (
-                  <Textarea
-                    value={editDescription}
-                    onChange={(e) => setEditDescription(e.target.value)}
-                    placeholder="Enter incident description..."
-                    className="min-h-[120px] resize-none focus:ring-4 focus:ring-orange-300 border-2 hover:border-orange-300"
-                    rows={5}
-                  />
-                ) : (
-                  <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg p-4 border border-orange-200 hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02]">
-                    <p className="text-gray-900 whitespace-pre-wrap leading-relaxed">
-                      {accident.description || "No description available."}
-                    </p>
-                  </div>
-                )}
+                {/* Always display the description, no editing */}
+                <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg p-4 border border-orange-200 hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02]">
+                  <p className="text-gray-900 whitespace-pre-wrap leading-relaxed">
+                    {accident.description || "No description available."}
+                  </p>
+                </div>
               </CardContent>
             </Card>
           </div>
-
           {/* Right Column - Media & Actions */}
           <div className="space-y-6">
             {/* Incident Image */}
@@ -431,7 +349,6 @@ export default function AccidentDetailsTable() {
                 </div>
               </CardContent>
             </Card>
-
             {/* Incident Video */}
             <Card>
               <CardHeader className="bg-gradient-to-r from-indigo-500 to-blue-600 text-white rounded-t-xl">
@@ -492,7 +409,6 @@ export default function AccidentDetailsTable() {
                 )}
               </CardContent>
             </Card>
-
             {/* Approval Action */}
             {accident.status === "pending" && (
               <Card className="border-2 border-green-300 bg-gradient-to-br from-green-50 to-emerald-50 shadow-xl hover:shadow-2xl">
@@ -520,33 +436,7 @@ export default function AccidentDetailsTable() {
           </div>
         </div>
       </div>
-
-      {/* Enhanced Confirmation Dialog */}
-      <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
-        <DialogContent className="bg-gradient-to-br from-white to-blue-50 border-2 border-blue-200 shadow-2xl">
-          <DialogHeader>
-            <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse shadow-xl">
-              <Save className="w-8 h-8 text-white" />
-            </div>
-            <DialogTitle className="text-center text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-              Confirm Changes
-            </DialogTitle>
-            <DialogDescription className="text-center">
-              Are you sure you want to save the updated description? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowConfirm(false)}>
-              <X className="w-4 h-4 mr-2" />
-              Cancel
-            </Button>
-            <Button onClick={handleSave} variant="primary">
-              <Check className="w-4 h-4 mr-2" />
-              Save Changes
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Removed Confirmation Dialog */}
     </div>
   )
 }

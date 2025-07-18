@@ -187,7 +187,6 @@ const NotificationDropdown = () => {
             notifications.map((notification) => (
               <div
                 key={notification.id}
-
                 className={`px-4 py-3 cursor-pointer transition-colors duration-200 ${getNotificationBgColor(notification.notificationType)}`}
                 onClick={() => markAsRead(notification.id)}
               >

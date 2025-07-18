@@ -1,36 +1,12 @@
 "use client"
 
 import type React from "react"
-import {
-  Car,
-  Calendar,
-  Clock,
-  MapPin,
-  Shield,
-  Eye,
-  BarChart3,
-  Camera,
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
-  Activity,
-  Zap,
-} from "lucide-react"
+import { Shield, Eye, BarChart3, Camera, AlertTriangle, CheckCircle, Activity, Zap } from "lucide-react"
 import { useState, useEffect } from "react"
 import { Header, MobileDropdownMenu } from "../../components/Layout/Menu"
 import Footer from "../../components/Layout/Footer"
-import { SearchBar } from "../../components/HomeSearch/search-bar" // Import the new SearchBar component
-
-interface Violation {
-  id: number
-  plateNumber: string
-  violationType: string
-  location: string
-  time: string
-  fine: string
-  status: string
-  image: string
-}
+import { SearchBar } from "../../components/HomeSearch/search-bar"
+import RecentViolationsSection from "../../components/RecentViolationsSection" // Import the new component
 
 interface StatCard {
   title: string
@@ -39,49 +15,6 @@ interface StatCard {
   icon: React.ReactNode
   color: string
 }
-
-const mockViolations: Violation[] = [
-  {
-    id: 1,
-    plateNumber: "30A-12345",
-    violationType: "Red Light Violation",
-    location: "Le Loi - Nguyen Hue Intersection",
-    time: "2024-06-15 14:30:25",
-    fine: "$45",
-    status: "Pending",
-    image: "/api/placeholder/300/200",
-  },
-  {
-    id: 2,
-    plateNumber: "30A-12345",
-    violationType: "Speeding",
-    location: "Vo Van Kiet Street",
-    time: "2024-06-10 09:15:42",
-    fine: "$35",
-    status: "Processed",
-    image: "/api/placeholder/300/200",
-  },
-  {
-    id: 3,
-    plateNumber: "51B-67890",
-    violationType: "Illegal Parking",
-    location: "Nguyen Hue Walking Street",
-    time: "2024-06-08 16:45:18",
-    fine: "$25",
-    status: "Pending",
-    image: "/api/placeholder/300/200",
-  },
-  {
-    id: 4,
-    plateNumber: "51C-11111",
-    violationType: "No Helmet",
-    location: "District 1, Ho Chi Minh City",
-    time: "2024-06-07 10:00:00",
-    fine: "$15",
-    status: "Processed",
-    image: "/api/placeholder/300/200",
-  },
-]
 
 const statsData: StatCard[] = [
   {
@@ -122,14 +55,12 @@ function BackgroundSlideshow() {
     "https://kajabi-storefronts-production.kajabi-cdn.com/kajabi-storefronts-production/file-uploads/blogs/22606/images/f082d2-6b14-c6a-8076-3304cc3a6c4_vlcsnap-error246.png",
     // Add more images here if desired
   ]
-
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentImageIndex((prevIndex) => (prevIndex + 1) % backgroundImages.length)
     }, 5000) // Change image every 5 seconds
     return () => clearInterval(interval)
   }, [backgroundImages.length])
-
   return (
     <div className="relative w-full h-full">
       {backgroundImages.map((image, index) => (
@@ -166,10 +97,10 @@ function BackgroundSlideshow() {
 
 export default function CustomerHome() {
   const [showMobileMenu, setShowMobileMenu] = useState(false)
-  const [searchResults, setSearchResults] = useState<Violation[]>([])
+  const [searchResults, setSearchResults] = useState<any[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
-  const [currentSearchQuery, setCurrentSearchQuery] = useState("") // State to hold the current search query from SearchBar
+  const [currentSearchQuery, setCurrentSearchQuery] = useState("")
   const [currentTime, setCurrentTime] = useState(new Date())
 
   useEffect(() => {
@@ -177,18 +108,55 @@ export default function CustomerHome() {
     return () => clearInterval(timer)
   }, [])
 
-  const handleSearch = (query: string) => {
-    if (!query.trim()) return
-    setCurrentSearchQuery(query) // Update the current search query
+  const handleSearch = async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([])
+      setHasSearched(false)
+      setCurrentSearchQuery("")
+      return
+    }
+    setCurrentSearchQuery(query)
     setIsSearching(true)
     setHasSearched(true)
-    setTimeout(() => {
-      const results = mockViolations.filter((violation) =>
-        violation.plateNumber.toLowerCase().includes(query.toLowerCase()),
-      )
-      setSearchResults(results)
+
+    try {
+      const response = await fetch("http://localhost:8081/api/accident/user/7")
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      const data = await response.json()
+      const transformedData = data
+        .map((item: any) => {
+          let displayStatusText = item.status
+          if (item.status === "Approve") {
+            displayStatusText = "New"
+          }
+          return {
+            id: item.id,
+            plateNumber: item.licensePlate,
+            violationType: item.description,
+            location: item.location,
+            time: new Date(item.accidentTime).toLocaleString(),
+            status: item.status,
+            displayStatus: displayStatusText,
+            image: item.imageUrl || "/placeholder.svg",
+          }
+        })
+        .filter(
+          (violation: any) =>
+            (violation.status === "Approve" ||
+              violation.status === "Requested" ||
+              violation.status === "Processed" ||
+              violation.status === "Rejected") &&
+            violation.plateNumber.toLowerCase().includes(query.toLowerCase()),
+        )
+      setSearchResults(transformedData)
+    } catch (error) {
+      console.error("Failed to fetch search results:", error)
+      setSearchResults([])
+    } finally {
       setIsSearching(false)
-    }, 1000)
+    }
   }
 
   return (
@@ -296,160 +264,13 @@ export default function CustomerHome() {
             </div>
           </div>
         </div>
-        {/* Search Results or Recent Violations */}
-        <div className="py-20 relative z-[10]">
-          {" "}
-          {/* Increased z-index */}
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            {hasSearched && (
-              <div className="mb-12">
-                <div className="bg-white/70 backdrop-blur-xl rounded-3xl p-8 shadow-xl border border-white/20 mb-8">
-                  <h2 className="text-3xl font-bold text-gray-900 mb-2">Search Results for "{currentSearchQuery}"</h2>
-                  <p className="text-gray-600">
-                    {searchResults.length} violation{searchResults.length !== 1 ? "s" : ""} found
-                  </p>
-                </div>
-                {searchResults.length === 0 ? (
-                  <div className="text-center py-16 bg-white/70 backdrop-blur-xl rounded-3xl shadow-xl border border-white/20">
-                    <div className="w-24 h-24 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                      <CheckCircle className="h-12 w-12 text-white" />
-                    </div>
-                    <h3 className="text-2xl font-bold text-gray-900 mb-4">No Violations Found</h3>
-                    <p className="text-gray-600 text-lg">
-                      This license plate has a clean record with no traffic violations
-                    </p>
-                  </div>
-                ) : (
-                  <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-                    {searchResults.map((violation) => (
-                      <div
-                        key={violation.id}
-                        className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-xl border border-white/20 overflow-hidden hover:shadow-2xl transition-all duration-500 hover:scale-105 group"
-                      >
-                        <div className="relative">
-                          <img
-                            src={violation.image || "/placeholder.svg"}
-                            alt="Violation evidence"
-                            className="w-full h-48 object-cover bg-gray-200 group-hover:scale-110 transition-transform duration-500"
-                          />
-                          <div className="absolute top-4 right-4">
-                            <span
-                              className={`px-3 py-1 rounded-full text-xs font-bold backdrop-blur-xl border ${
-                                violation.status === "Processed"
-                                  ? "bg-green-500/90 text-white border-green-400"
-                                  : "bg-red-500/90 text-white border-red-400"
-                              }`}
-                            >
-                              {violation.status}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="p-6">
-                          <div className="flex items-center justify-between mb-4">
-                            <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                              {violation.plateNumber}
-                            </span>
-                          </div>
-                          <h3 className="font-bold text-gray-900 mb-4 text-lg">{violation.violationType}</h3>
-                          <div className="space-y-3 text-sm text-gray-600 mb-6">
-                            <div className="flex items-center">
-                              <MapPin className="h-4 w-4 mr-3 text-blue-500" />
-                              <span>{violation.location}</span>
-                            </div>
-                            <div className="flex items-center">
-                              <Clock className="h-4 w-4 mr-3 text-green-500" />
-                              <span>{violation.time}</span>
-                            </div>
-                            <div className="flex items-center">
-                              <Calendar className="h-4 w-4 mr-3 text-purple-500" />
-                              <span>Fine: </span>
-                              <span className="font-bold text-red-600 ml-1">{violation.fine}</span>
-                            </div>
-                          </div>
-                          <button className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3 px-6 rounded-2xl transition-all duration-300 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105">
-                            View Full Details
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-            {!hasSearched && (
-              <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-xl border border-white/20 overflow-hidden">
-                <div className="px-8 py-6 border-b border-gray-200/50 bg-gradient-to-r from-blue-50 to-purple-50">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h2 className="text-2xl font-bold text-gray-900">Recent Traffic Violations</h2>
-                      <p className="text-gray-600 mt-1">Latest violations detected by our monitoring system</p>
-                    </div>
-                    <div className="flex items-center gap-2 bg-white/50 rounded-full px-4 py-2">
-                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                      <span className="text-sm font-medium text-gray-700">Live Data</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full">
-                    <thead className="bg-gray-50/50">
-                      <tr>
-                        <th className="px-8 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
-                          License Plate
-                        </th>
-                        <th className="px-8 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
-                          Violation Type
-                        </th>
-                        <th className="px-8 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
-                          Time & Date
-                        </th>
-                        <th className="px-8 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
-                          Status
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200/50">
-                      {mockViolations.map((violation) => (
-                        <tr key={violation.id} className="hover:bg-blue-50/50 transition-colors duration-200 group">
-                          <td className="px-8 py-6 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center mr-4">
-                                <Car className="w-5 h-5 text-white" />
-                              </div>
-                              <div className="text-lg font-bold text-gray-900">{violation.plateNumber}</div>
-                            </div>
-                          </td>
-                          <td className="px-8 py-6 whitespace-nowrap">
-                            <div className="text-sm font-semibold text-gray-900">{violation.violationType}</div>
-                          </td>
-                          <td className="px-8 py-6 whitespace-nowrap">
-                            <div className="text-sm text-gray-600">{violation.time}</div>
-                          </td>
-                          <td className="px-8 py-6 whitespace-nowrap">
-                            <span
-                              className={`inline-flex items-center px-3 py-1 text-sm font-bold rounded-full ${
-                                violation.status === "Processed"
-                                  ? "bg-green-100 text-green-800 border border-green-200"
-                                  : "bg-red-100 text-red-800 border border-red-200"
-                              }`}
-                            >
-                              {violation.status === "Processed" ? (
-                                <CheckCircle className="w-4 h-4 mr-1" />
-                              ) : (
-                                <XCircle className="w-4 h-4 mr-1" />
-                              )}
-                              {violation.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+        {/* Recent Violations Section (now a separate component) */}
+        <RecentViolationsSection
+          hasSearched={hasSearched}
+          searchResults={searchResults}
+          isSearching={isSearching}
+          currentSearchQuery={currentSearchQuery}
+        />
       </main>
       <Footer />
     </div>

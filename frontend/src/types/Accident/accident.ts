@@ -5,7 +5,6 @@ export interface AccidentType {
     id: number
     name: string
   }
-  
   imageUrl: string
   description: string
   videoUrl: string
