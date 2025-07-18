@@ -443,6 +443,7 @@ export default function AccidentDetailsTable() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
+
                 {accident.videoUrl ? (
                   <div className="relative group">
                     {getYouTubeEmbedUrl(accident.videoUrl)?.includes("youtube.com") ? (
