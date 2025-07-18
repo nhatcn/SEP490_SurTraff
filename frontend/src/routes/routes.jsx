@@ -27,6 +27,7 @@ import AccidentStatistics from '../Pages/Dashboard/Accident/AccidentStatistics';
 import ViolationStatistics from '../Pages/Violations/ViolationStatistics';
 import UserTrafficMap from '../Pages/UserMap/UserTrafficMap';
 import AccidentDetails from '../Pages/Dashboard/Accident/AccidentDetails';
+import ViewAccidentDetails from '../Pages/Dashboard/Accident/ViewAccidentDetailsUser';
 
 
 
@@ -46,6 +47,7 @@ const RoutesConfig = () => {
       <Route path="/tracks" element={<VehicleTrackingDashboard />} />
       <Route path="/accidentdashboard" element={<AccidentDashboard />} />
       <Route path="/accidents/:id" element={<AccidentDetails />} />
+      <Route path="/accidentsdetails/:id" element={<ViewAccidentDetails />} />
       <Route path="/cameras/edit/:id" element={<EditCamera />} />
       <Route path="/violations" element={<ViolationList />} />
       <Route path="/violations/:id" element={<ViolationDetail />} />
