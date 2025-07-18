@@ -18,6 +18,10 @@ from services.camera.accidentService import (
     stream_accident_video_service,
 )
 
+# from services.camera.wrongwayService import (
+#     stream_violation_wrongway_video_service
+# )
+
 from services.traffic_density_service import analyze_traffic_video
 from services.pothole_detection_service import detect_potholes_in_video
 from services.camera.red_light_violation_service import (
@@ -48,15 +52,6 @@ def get_camera_by_id(camera_id: int, db: Session = Depends(get_db)):
     if not camera:
         raise HTTPException(status_code=404, detail="Camera not found")
     return jsonable_encoder(camera)
-
-
-@router.get("/cameras/violationtype/{violation_type_id}")
-def get_camera_by_id(violation_type_id: int, db: Session = Depends(get_db)):
-    camera = db.query(Camera).filter(Camera.violation_type_id == violation_type_id).first()
-    if not camera:
-        raise HTTPException(status_code=404, detail="Camera not found")
-    return jsonable_encoder(camera)
-
 
 @router.post("/cameras")
 def create_camera(camera: CameraCreate, db: Session = Depends(get_db)):
@@ -134,6 +129,11 @@ def stream_video(camera_id: int, db: Session = Depends(get_db)):
     elif camera_id == 7:
         return StreamingResponse(
             detect_potholes_in_video(camera.stream_url, camera.id, db),
+            media_type="multipart/x-mixed-replace; boundary=frame"
+        )
+    elif camera_id == 8:
+        return StreamingResponse(
+            stream_violation_wrongway_video_service(camera.stream_url, camera.id, db),
             media_type="multipart/x-mixed-replace; boundary=frame"
         )
     elif camera_id >= 25:

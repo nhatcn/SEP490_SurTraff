@@ -389,110 +389,188 @@ def stream_plate_with_ocr_video_service(youtube_url: str):
     finally:
         cap.release()
         
-def stream_violation_wrongway_video_service(youtube_url: str):
-    model_plate = YOLO("yolov8m.pt")
+def put_text_with_background(img, text, org, font_scale=1, thickness=1, text_color=(255, 255, 255), bg_color=(0, 0, 0)):
+    import cv2
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    (w, h), _ = cv2.getTextSize(text, font, font_scale, thickness)
+    x, y = org
+    # Vẽ hình chữ nhật làm nền
+    cv2.rectangle(img, (x, y - h - 5), (x + w, y + 5), bg_color, -1)
+    # Vẽ text lên trên
+    cv2.putText(img, text, (x, y), font, font_scale, text_color, thickness, cv2.LINE_AA)
+
+def stream_violation_wrongway_video_service(youtube_url: str, camera_id: int, db=None):
+    from ultralytics import YOLO
+    import cv2
+    import numpy as np
+    import time
+    import uuid
+    from collections import defaultdict
+
+    # --- Load Models ---
+    model_sign_path = "trafficsign.pt"
+    model_vehicle_path = "yolov8m.pt"
+
+    try:
+        model_sign = YOLO(model_sign_path)
+        model_vehicle = YOLO(model_vehicle_path)
+    except Exception as e:
+        print(f"❌ Error loading models: {e}")
+        return
+
+    # --- Get stream URL from your function (you keep your original) ---
     stream_url = get_stream_url(youtube_url)
     cap = cv2.VideoCapture(stream_url)
 
     if not cap.isOpened():
-        raise ValueError("Cannot open stream")
+        raise ValueError(f"❌ Cannot open stream from {stream_url}")
 
-    TARGET_CLASSES = {'car', 'truck', 'motorcycle'}
+    original_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    original_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    width, height = 640, 640
+    scale_x, scale_y = width / original_width, height / original_height
 
-    # Kích thước video gốc (bạn cần thay chính xác theo video gốc của bạn)
-    orig_w, orig_h = 3840, 2160  # Ví dụ video gốc 4K, thay bằng đúng kích thước video gốc của bạn
+    original_zones_data = [
+        ([(744, 404), (212, 1016), (540, 1044), (832, 428)], (0, 255, 0)),
+        ([(828, 424), (560, 1016), (932, 1028), (936, 428)], (0, 0, 255)),
+        ([(956, 440), (1016, 1024), (1372, 1004), (1060, 444)], (0, 0, 255)),
+        ([(1064, 448), (1376, 1024), (1688, 984), (1164, 444)], (0, 255, 0)),
+    ]
+    zone_allowed_vehicles = {
+        0: ['motorcycle'], 1: ['car', 'truck'], 2: ['car', 'truck'], 3: ['motorcycle']
+    }
 
-    # Vùng polygon stop line theo video gốc
-    stop_line_zone1 = [(1405, 780), (1540, 765), (960, 2115), (190, 2110)]    
-    stop_line_zone2 = [(1680, 740), (1545, 750), (955, 2130), (1750, 2065)]   
-    stop_line_zone3 = [(1805, 675), (1925, 700), (3515, 2075), (2800, 2080)] 
-    stop_line_zone4 = [(1940, 720), (2075, 735), (3800, 1785), (3615, 2145)]
+    scaled_zones = []
+    for zone_points, color in original_zones_data:
+        scaled_zones.append((
+            [(int(x * scale_x), int(y * scale_y)) for x, y in zone_points], color
+        ))
 
-    def scale_polygon(polygon, scale_x, scale_y):
-        return [(int(x * scale_x), int(y * scale_y)) for x, y in polygon]
+    LINE_Y = int(height * 0.5)
+    DIRECTION_THRESHOLD = 5
+    object_tracks = defaultdict(list)
+    OBJECT_SIZE, MARGIN, TEXT_HEIGHT = 64, 10, 25
+    target_vehicle_classes = ['car', 'motorcycle', 'truck']
 
-    def get_zones_for_class(cls, zones):
-        return {
-            'car': [zones[1], zones[3]],
-            'truck': [zones[0], zones[2]],
-            'motorcycle': [zones[2]]
-        }.get(cls, [])
+    print(f"🔴 Starting camera {camera_id}, resolution: {original_width}x{original_height}")
 
-    def box_in_polygon(box, polygon, frame_shape, threshold=500):
-        mask_poly = np.zeros((frame_shape[0], frame_shape[1]), dtype=np.uint8)
-        cv2.fillPoly(mask_poly, [np.array(polygon, dtype=np.int32)], 255)
-
-        x1, y1, x2, y2 = map(int, box)
-        x1, y1 = max(0, x1), max(0, y1)
-        x2, y2 = min(frame_shape[1], x2), min(frame_shape[0], y2)
-
-        mask_box = np.zeros_like(mask_poly)
-        cv2.rectangle(mask_box, (x1, y1), (x2, y2), 255, -1)
-
-        intersection = cv2.bitwise_and(mask_poly, mask_box)
-        inter_area = np.count_nonzero(intersection)
-
-        return inter_area > threshold
+    # Mình sẽ dùng 1 biến global id_counter để tạo ID tạm tracking
+    id_counter = 0
 
     try:
         while True:
             ret, frame = cap.read()
             if not ret:
+                print("⚠️ Reconnecting...")
                 cap.release()
                 time.sleep(1)
                 cap = cv2.VideoCapture(stream_url)
+                if not cap.isOpened():
+                    break
                 continue
 
-            stream_h, stream_w = frame.shape[:2]
+            resized_frame = cv2.resize(frame, (width, height))
+            annotated_frame = resized_frame.copy()
 
-            scale_x = stream_w / orig_w
-            scale_y = stream_h / orig_h
+            alpha = 0.4
+            for zone_points, color in scaled_zones:
+                overlay = annotated_frame.copy()
+                pts = np.array(zone_points, np.int32).reshape((-1, 1, 2))
+                cv2.fillPoly(overlay, [pts], color)
+                cv2.addWeighted(overlay, alpha, annotated_frame, 1 - alpha, 0, annotated_frame)
+                cv2.polylines(annotated_frame, [pts], True, color, 2)
 
-            zones_scaled = [
-                scale_polygon(stop_line_zone1, scale_x, scale_y),
-                scale_polygon(stop_line_zone2, scale_x, scale_y),
-                scale_polygon(stop_line_zone3, scale_x, scale_y),
-                scale_polygon(stop_line_zone4, scale_x, scale_y),
-            ]
+            results_sign = model_sign(resized_frame, conf=0.1)
+            boxes_sign = results_sign[0].boxes
+            display_y = MARGIN
 
-            colors = [(0,0,255), (0,255,0), (0,0,255), (0,255,0)]
-            for i, zone in enumerate(zones_scaled):
-                cv2.polylines(frame, [np.array(zone, np.int32)], isClosed=True, color=colors[i], thickness=3)
-                # cx = int(np.mean([p[0] for p in zone]))
-                # cy = int(np.mean([p[1] for p in zone]))
-                # cv2.putText(frame, f"zone{i+1}", (cx, cy), cv2.FONT_HERSHEY_SIMPLEX, 1, colors[i], 2)
+            for box in boxes_sign:
+                cls_id = int(box.cls)
+                label = model_sign.names[cls_id]
+                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                x1, y1, x2, y2 = max(0, x1), max(0, y1), min(width, x2), min(height, y2)
+                if x2 <= x1 or y2 <= y1:
+                    continue
 
-            results = model_plate(frame)[0]
+                cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 165, 255), 2)
+                crop = resized_frame[y1:y2, x1:x2]
+                if crop.size == 0:
+                    continue
+                thumb = cv2.resize(crop, (OBJECT_SIZE, OBJECT_SIZE))
 
-            for box in results.boxes:
+                if display_y + OBJECT_SIZE + MARGIN + TEXT_HEIGHT > height:
+                    break
+
+                x_thumb = width - OBJECT_SIZE - MARGIN
+                annotated_frame[display_y:display_y+OBJECT_SIZE, x_thumb:x_thumb+OBJECT_SIZE] = thumb
+                put_text_with_background(annotated_frame, label, (x_thumb, display_y+OBJECT_SIZE+MARGIN), font_scale=0.6)
+
+                display_y += OBJECT_SIZE + MARGIN + TEXT_HEIGHT + MARGIN
+
+            results_vehicle = model_vehicle(resized_frame, conf=0.3)
+            # Tạo 1 list tạm để lưu ID của các object hiện frame này
+            current_ids = []
+
+            for box in results_vehicle[0].boxes:
                 cls_id = int(box.cls[0])
-                class_name = model_plate.names[cls_id]
+                cls_name = model_vehicle.names[cls_id]
 
-                if class_name not in TARGET_CLASSES:
+                if cls_name not in target_vehicle_classes:
                     continue
 
                 x1, y1, x2, y2 = map(int, box.xyxy[0])
-                zones_for_cls = get_zones_for_class(class_name, zones_scaled)
-                in_any_zone = any(box_in_polygon((x1, y1, x2, y2), zone, frame.shape) for zone in zones_for_cls)
+                cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+                label = f"{cls_name} {box.conf[0]:.2f}"
+                bbox_color = (255, 255, 255)
+                is_violation = False
 
-                label = 'normal' if in_any_zone else 'wrongway'
-                color = (0, 255, 0) if label == 'normal' else (0, 0, 255)
+                # Tạo ID object bằng cách tăng dần (đơn giản)
+                id_counter += 1
+                object_id = f"id{id_counter}"
+                current_ids.append(object_id)
+                object_tracks[object_id].append((cx, cy))
+                if len(object_tracks[object_id]) > DIRECTION_THRESHOLD:
+                    object_tracks[object_id] = object_tracks[object_id][-DIRECTION_THRESHOLD:]
 
-                cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-                cv2.putText(frame, f"{class_name} - {label}", (x1, y1 - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+                if len(object_tracks[object_id]) >= 2:
+                    dy = object_tracks[object_id][-1][1] - object_tracks[object_id][0][1]
+                    if dy < -15:  # moving up
+                        label += " - WRONG WAY"
+                        bbox_color = (0, 0, 255)
+                        is_violation = True
 
-                if label == 'wrongway':
-                    pass  # Không lưu ảnh, không ghi log
+                for zone_idx, (zone_points, _) in enumerate(scaled_zones):
+                    pts = np.array(zone_points, np.int32).reshape((-1, 2))
+                    if cv2.pointPolygonTest(pts, (cx, cy), False) >= 0:
+                        if cls_name not in zone_allowed_vehicles.get(zone_idx, []):
+                            label += " - ZONE VIOLATION"
+                            bbox_color = (0, 0, 255)
+                            is_violation = True
+                        break
 
-            _, jpeg = cv2.imencode('.jpg', frame)
+                cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), bbox_color, 2)
+                put_text_with_background(annotated_frame, label, (x1, y1 - 5), font_scale=0.5)
+                cv2.circle(annotated_frame, (cx, cy), 4, (0, 255, 255), -1)
+
+            # Xóa track của object không còn xuất hiện trong frame
+            for obj_id in list(object_tracks.keys()):
+                if obj_id not in current_ids:
+                    del object_tracks[obj_id]
+
+            # cv2.line(annotated_frame, (0, LINE_Y), (width, LINE_Y), (0, 255, 0), 2)
+            # put_text_with_background(annotated_frame, "Correct Direction → ↓", (10, LINE_Y - 10), font_scale=0.6)
+
+            _, jpeg = cv2.imencode('.jpg', annotated_frame)
             yield (
                 b"--frame\r\n"
                 b"Content-Type: image/jpeg\r\n\r\n" + jpeg.tobytes() + b"\r\n"
             )
 
     finally:
-        cap.release()
+        if cap.isOpened():
+            cap.release()
+        print("✅ Stream ended.")
+
         
 def stream_violation_video_service1(youtube_url: str, camera_id: int):
     import requests
