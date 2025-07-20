@@ -165,8 +165,8 @@ export default function CardBarChartViolationsMonth({ violations }: Props) {
         </div>
       </div>
       <div className="p-4 flex-auto">
-        <div className="relative h-[175px]">
-          <canvas ref={chartRef} className="w-full h-full"></canvas>
+        <div className="relative w-full" style={{ height: "clamp(160px, 30vw, 200px)" }}>
+          <canvas ref={chartRef} className="w-full h-full" />
         </div>
       </div>
     </div>
