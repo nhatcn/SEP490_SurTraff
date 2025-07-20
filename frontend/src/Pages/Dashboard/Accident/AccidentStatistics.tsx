@@ -5,6 +5,7 @@ import Header from "../../../components/Layout/Header";
 import CardLineChart from "../../../components/Cards/CardLineChart";
 import CardBarChart from "../../../components/Cards/CardBarChart";
 import CardLineChart2 from "../../../components/Cards/CardLineChart2";
+import CardMapChart from "../../../components/Cards/CardMapChart";
 
 interface Camera {
   id: number;
@@ -54,6 +55,11 @@ const AccidentStatistics: React.FC = () => {
         <Header title="Accident Statistics Dashboard" />
         <div className="flex-1 overflow-y-auto">
           <div className="p-6 min-h-full">
+            <div className="w-full">
+              <div className={chartContainerClass} style={{ height: 600, minHeight: 400, maxHeight: 700 }}>
+  <CardMapChart accidents={accidents} />
+</div>
+            </div>
             {/* First Row */}
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 mb-8">
               <div className="xl:col-span-8">
