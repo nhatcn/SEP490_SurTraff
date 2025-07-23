@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import {
   User,
   Mail,
@@ -20,11 +20,12 @@ import {
   Palette,
   Hash,
   Tag,
-  MapPin,
   TrendingUp,
   Activity,
-  Zap,
   BarChart3,
+  Camera,
+  Upload,
+  Loader2,
 } from "lucide-react"
 
 interface UserData {
@@ -56,6 +57,14 @@ interface TrafficStats {
   lastViolation: string
 }
 
+interface UpdateUserForm {
+  name: string
+  userName: string
+  email: string
+  roleId: number
+  avatar?: File | null
+}
+
 export default function UserProfile() {
   const [user, setUser] = useState<UserData | null>(null)
   const [vehicle, setVehicle] = useState<VehicleData | null>(null)
@@ -68,6 +77,8 @@ export default function UserProfile() {
   const [loading, setLoading] = useState(true)
   const [vehicleLoading, setVehicleLoading] = useState(true)
   const [isEditingPassword, setIsEditingPassword] = useState(false)
+  const [isEditingProfile, setIsEditingProfile] = useState(false)
+  const [isUpdating, setIsUpdating] = useState(false)
   const [showPasswords, setShowPasswords] = useState({
     current: false,
     new: false,
@@ -78,14 +89,35 @@ export default function UserProfile() {
     newPassword: "",
     confirmPassword: "",
   })
+  const [updateForm, setUpdateForm] = useState<UpdateUserForm>({
+    name: "",
+    userName: "",
+    email: "",
+    roleId: 1,
+    avatar: null,
+  })
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [errors, setErrors] = useState<{ [key: string]: string }>({})
   const [success, setSuccess] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     fetchUserData()
     fetchVehicleData()
   }, [])
+
+  useEffect(() => {
+    if (user) {
+      setUpdateForm({
+        name: user.name,
+        userName: user.userName,
+        email: user.email || "",
+        roleId: user.roleId,
+        avatar: null,
+      })
+    }
+  }, [user])
 
   const fetchUserData = async () => {
     try {
@@ -113,6 +145,114 @@ export default function UserProfile() {
       console.error("Error fetching vehicle data:", error)
     } finally {
       setVehicleLoading(false)
+    }
+  }
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith("image/")) {
+        setErrors({ avatar: "Please select a valid image file" })
+        return
+      }
+
+      // Validate file size (5MB max)
+      if (file.size > 5 * 1024 * 1024) {
+        setErrors({ avatar: "File size must be less than 5MB" })
+        return
+      }
+
+      setUpdateForm((prev) => ({ ...prev, avatar: file }))
+
+      // Create preview
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        setAvatarPreview(e.target?.result as string)
+      }
+      reader.readAsDataURL(file)
+
+      // Clear any previous errors
+      setErrors((prev) => ({ ...prev, avatar: "" }))
+    }
+  }
+
+  const validateUpdateForm = () => {
+    const newErrors: { [key: string]: string } = {}
+
+    if (!updateForm.name.trim()) {
+      newErrors.name = "Name is required"
+    }
+
+    if (!updateForm.userName.trim()) {
+      newErrors.userName = "Username is required"
+    }
+
+    if (!updateForm.email.trim()) {
+      newErrors.email = "Email is required"
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(updateForm.email)) {
+      newErrors.email = "Please enter a valid email address"
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  const handleUpdateProfile = async () => {
+    if (!validateUpdateForm()) return
+
+    setIsUpdating(true)
+    setErrors({})
+
+    try {
+      const formData = new FormData()
+      formData.append("fullName", updateForm.name) 
+      formData.append("userName", updateForm.userName)
+      formData.append("email", updateForm.email)
+      formData.append("roleId", updateForm.roleId.toString())
+
+      if (updateForm.avatar) {
+        formData.append("avatar", updateForm.avatar) 
+      }
+
+      const response = await fetch(`http://localhost:8081/api/users/${user?.userId}`, {
+        method: "PUT",
+        body: formData,
+      })
+
+      if (response.ok) {
+        const updatedUser = await response.json()
+        setUser(updatedUser)
+        setSuccess("Profile updated successfully!")
+        setIsEditingProfile(false)
+        setAvatarPreview(null)
+        setTimeout(() => setSuccess(""), 3000)
+      } else {
+        const errorData = await response.json()
+        setErrors({ general: errorData.message || "Failed to update profile" })
+      }
+    } catch (error) {
+      setErrors({ general: "An error occurred. Please try again." })
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  const cancelProfileEdit = () => {
+    if (user) {
+      setUpdateForm({
+        name: user.name,
+        userName: user.userName,
+        email: user.email || "",
+        roleId: user.roleId,
+        avatar: null,
+      })
+    }
+    setIsEditingProfile(false)
+    setAvatarPreview(null)
+    setErrors({})
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
     }
   }
 
@@ -153,7 +293,7 @@ export default function UserProfile() {
     setErrors({})
 
     try {
-      const response = await fetch(`http://localhost:8081/api/users/${user?.userId}/change-password`, {
+      const response = await fetch(`http://localhost:8081/api/users/${user?.userId}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -268,22 +408,31 @@ export default function UserProfile() {
         <div className="relative px-6 pb-6">
           {/* Avatar */}
           <div className="flex items-end -mt-16 mb-4">
-            <div className="relative">
-              <div className="w-24 h-24 rounded-2xl border-4 border-white shadow-lg overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
+            <div className="relative group">
+              <div
+                className="w-24 h-24 rounded-2xl border-4 border-white shadow-lg overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 cursor-pointer"
+                onClick={() => fileInputRef.current?.click()}
+              >
                 <img
-                  src={user.avatar || "/api/placeholder/96/96"}
+                  src={avatarPreview || user.avatar || "/api/placeholder/96/96"}
                   alt={user.name}
                   className="w-full h-full object-cover"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement
                     target.style.display = "none"
                     if (target.nextElementSibling) {
-                      ;(target.nextElementSibling as HTMLElement).style.display = "flex"
+                      ; (target.nextElementSibling as HTMLElement).style.display = "flex"
                     }
                   }}
                 />
                 <div className="w-full h-full hidden items-center justify-center bg-gradient-to-br from-blue-100 to-purple-100">
                   <UserCircle className="w-12 h-12 text-gray-400" />
+                </div>
+
+                {/* Hover overlay */}
+                <div className="absolute inset-0 bg-black/50 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center">
+                  <Camera className="w-6 h-6 text-white mb-1" />
+                  <span className="text-white text-xs font-medium">Update</span>
                 </div>
               </div>
               <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-full border-2 border-white"></div>
@@ -295,11 +444,10 @@ export default function UserProfile() {
               <p className="text-gray-100 mb-2">@{user.userName}</p>
               <div className="flex items-center gap-3">
                 <span
-                  className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    user.status
+                  className={`px-3 py-1 rounded-full text-xs font-medium ${user.status
                       ? "bg-green-100 text-green-700 border border-green-200"
                       : "bg-red-100 text-red-700 border border-red-200"
-                  }`}
+                    }`}
                 >
                   {user.status ? "Active" : "Inactive"}
                 </span>
@@ -309,15 +457,18 @@ export default function UserProfile() {
               </div>
             </div>
 
-            <button className="p-2 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors duration-200">
+            <button
+              onClick={() => setIsEditingProfile(!isEditingProfile)}
+              className="p-2 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors duration-200"
+            >
               <Edit3 className="w-4 h-4 text-gray-600" />
             </button>
           </div>
-
-      
-          
         </div>
       </div>
+
+      {/* Hidden file input */}
+      <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
 
       {/* Main Content Grid */}
       <div className="grid lg:grid-cols-3 gap-6">
@@ -332,32 +483,147 @@ export default function UserProfile() {
                 </div>
                 Personal Information
               </h2>
-              <button className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200">
-                <Edit3 className="w-4 h-4 text-gray-600" />
-              </button>
+              {!isEditingProfile && (
+                <button
+                  onClick={() => setIsEditingProfile(true)}
+                  className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200"
+                >
+                  <Edit3 className="w-4 h-4 text-gray-600" />
+                </button>
+              )}
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Full Name</label>
-                <div className="text-sm font-medium text-gray-900 bg-gray-50 rounded-lg p-3">{user.name}</div>
+            {errors.general && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm font-medium mb-4">
+                {errors.general}
               </div>
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Username</label>
-                <div className="text-sm font-medium text-gray-900 bg-gray-50 rounded-lg p-3">{user.userName}</div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Email Address</label>
-                <div className="text-sm font-medium text-gray-900 bg-gray-50 rounded-lg p-3 flex items-center gap-2">
-                  <Mail className="w-4 h-4 text-gray-400" />
-                  {user.email || "Not provided"}
+            )}
+
+            {!isEditingProfile ? (
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Full Name</label>
+                  <div className="text-sm font-medium text-gray-900 bg-gray-50 rounded-lg p-3">{user.name}</div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Username</label>
+                  <div className="text-sm font-medium text-gray-900 bg-gray-50 rounded-lg p-3">{user.userName}</div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Email Address</label>
+                  <div className="text-sm font-medium text-gray-900 bg-gray-50 rounded-lg p-3 flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-gray-400" />
+                    {user.email || "Not provided"}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">User ID</label>
+                  <div className="text-sm font-medium text-gray-900 bg-gray-50 rounded-lg p-3">#{user.userId}</div>
                 </div>
               </div>
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">User ID</label>
-                <div className="text-sm font-medium text-gray-900 bg-gray-50 rounded-lg p-3">#{user.userId}</div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid md:grid-cols-2 gap-4">
+                  {/* Full Name */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-gray-700 uppercase tracking-wider">Full Name</label>
+                    <input
+                      type="text"
+                      value={updateForm.name}
+                      onChange={(e) => setUpdateForm((prev) => ({ ...prev, name: e.target.value }))}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 text-sm ${errors.name ? "border-red-500 bg-red-50" : "border-gray-200 bg-white"
+                        }`}
+                      placeholder="Enter full name"
+                    />
+                    {errors.name && <p className="text-red-500 text-xs font-medium">{errors.name}</p>}
+                  </div>
+
+                  {/* Username */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-gray-700 uppercase tracking-wider">Username</label>
+                    <input
+                      type="text"
+                      value={updateForm.userName}
+                      onChange={(e) => setUpdateForm((prev) => ({ ...prev, userName: e.target.value }))}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 text-sm ${errors.userName ? "border-red-500 bg-red-50" : "border-gray-200 bg-white"
+                        }`}
+                      placeholder="Enter username"
+                    />
+                    {errors.userName && <p className="text-red-500 text-xs font-medium">{errors.userName}</p>}
+                  </div>
+
+                  {/* Email */}
+                  <div className="md:col-span-2 space-y-2">
+                    <label className="text-xs font-medium text-gray-700 uppercase tracking-wider">Email Address</label>
+                    <input
+                      type="email"
+                      value={updateForm.email}
+                      onChange={(e) => setUpdateForm((prev) => ({ ...prev, email: e.target.value }))}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 text-sm ${errors.email ? "border-red-500 bg-red-50" : "border-gray-200 bg-white"
+                        }`}
+                      placeholder="Enter email address"
+                    />
+                    {errors.email && <p className="text-red-500 text-xs font-medium">{errors.email}</p>}
+                  </div>
+                </div>
+
+                {/* Avatar Upload */}
+                {errors.avatar && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm font-medium">
+                    {errors.avatar}
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-gray-700 uppercase tracking-wider">Profile Picture</label>
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50">
+                      {avatarPreview ? (
+                        <img
+                          src={avatarPreview || "/placeholder.svg"}
+                          alt="Preview"
+                          className="w-full h-full object-cover rounded-lg"
+                        />
+                      ) : (
+                        <Upload className="w-6 h-6 text-gray-400" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded-lg transition-colors duration-200 text-sm flex items-center gap-2"
+                      >
+                        <Camera className="w-4 h-4" />
+                        Choose Image
+                      </button>
+                      <p className="text-xs text-gray-500 mt-1">JPG, PNG or GIF (max 5MB)</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-4 border-t border-gray-200">
+                  <button
+                    type="button"
+                    disabled={isUpdating}
+                    onClick={handleUpdateProfile}
+                    className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 text-sm"
+                  >
+                    {isUpdating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                    {isUpdating ? "Updating..." : "Save Changes"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelProfileEdit}
+                    className="flex-1 bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 text-sm"
+                  >
+                    <X className="w-4 h-4" />
+                    Cancel
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Traffic Statistics */}
@@ -489,8 +755,6 @@ export default function UserProfile() {
                     </div>
                   </div>
                 </div>
-
-                
               </div>
             ) : (
               <div className="text-center py-8">
@@ -532,11 +796,10 @@ export default function UserProfile() {
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Status</label>
                   <div
-                    className={`text-sm font-medium rounded-lg p-3 ${
-                      user.status
+                    className={`text-sm font-medium rounded-lg p-3 ${user.status
                         ? "text-green-700 bg-green-50 border border-green-200"
                         : "text-red-700 bg-red-50 border border-red-200"
-                    }`}
+                      }`}
                   >
                     {user.status ? "✅ Active & Secure" : "🔒 Account Locked"}
                   </div>
@@ -566,9 +829,8 @@ export default function UserProfile() {
                       type={showPasswords.current ? "text" : "password"}
                       value={passwordForm.currentPassword}
                       onChange={(e) => setPasswordForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 pr-10 text-sm ${
-                        errors.currentPassword ? "border-red-500 bg-red-50" : "border-gray-200 bg-white"
-                      }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 pr-10 text-sm ${errors.currentPassword ? "border-red-500 bg-red-50" : "border-gray-200 bg-white"
+                        }`}
                       placeholder="Enter current password"
                     />
                     <button
@@ -592,9 +854,8 @@ export default function UserProfile() {
                       type={showPasswords.new ? "text" : "password"}
                       value={passwordForm.newPassword}
                       onChange={(e) => setPasswordForm((prev) => ({ ...prev, newPassword: e.target.value }))}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 pr-10 text-sm ${
-                        errors.newPassword ? "border-red-500 bg-red-50" : "border-gray-200 bg-white"
-                      }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 pr-10 text-sm ${errors.newPassword ? "border-red-500 bg-red-50" : "border-gray-200 bg-white"
+                        }`}
                       placeholder="Enter new password"
                     />
                     <button
@@ -616,9 +877,8 @@ export default function UserProfile() {
                       type={showPasswords.confirm ? "text" : "password"}
                       value={passwordForm.confirmPassword}
                       onChange={(e) => setPasswordForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 pr-10 text-sm ${
-                        errors.confirmPassword ? "border-red-500 bg-red-50" : "border-gray-200 bg-white"
-                      }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 pr-10 text-sm ${errors.confirmPassword ? "border-red-500 bg-red-50" : "border-gray-200 bg-white"
+                        }`}
                       placeholder="Confirm new password"
                     />
                     <button
@@ -661,8 +921,6 @@ export default function UserProfile() {
               </div>
             )}
           </div>
-
-         
 
           {/* System Info */}
           <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-6">

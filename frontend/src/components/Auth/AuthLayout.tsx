@@ -10,7 +10,7 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ title, children }) => {
     <div 
       className="min-h-screen bg-cover bg-center flex items-center justify-center"
       style={{
-        backgroundImage: `url('https://www.suffolknewsherald.com/wp-content/uploads/sites/19/2023/03/traffic-camera.jpeg')`, 
+        backgroundImage: `url('/traffic-camera.webp')`, 
         backgroundBlendMode: 'overlay',
         backgroundColor: 'rgba(0,0,0,0.5)'
       }}
