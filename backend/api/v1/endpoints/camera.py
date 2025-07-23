@@ -126,7 +126,7 @@ def stream_video(camera_id: int, db: Session = Depends(get_db)):
             analyze_traffic_video(camera.stream_url, camera.id),
             media_type="multipart/x-mixed-replace; boundary=frame"
         )
-    elif camera_id == 7:
+    elif camera_id == 12:
         return StreamingResponse(
             detect_potholes_in_video(camera.stream_url, camera.id, db),
             media_type="multipart/x-mixed-replace; boundary=frame"
@@ -134,6 +134,16 @@ def stream_video(camera_id: int, db: Session = Depends(get_db)):
     elif camera_id == 8:
         return StreamingResponse(
             stream_violation_wrongway_video_service(camera.stream_url, camera.id, db),
+            media_type="multipart/x-mixed-replace; boundary=frame"
+        )
+    elif camera_id == 11:
+        return StreamingResponse(
+            analyze_traffic_video(camera.stream_url, camera.id, db),
+            media_type="multipart/x-mixed-replace; boundary=frame"
+        )
+    elif camera_id == 13:
+        return StreamingResponse(
+            detect_potholes_in_video(camera.stream_url, camera.id, db),
             media_type="multipart/x-mixed-replace; boundary=frame"
         )
     elif camera_id >= 25:
