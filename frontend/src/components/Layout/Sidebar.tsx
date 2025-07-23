@@ -81,7 +81,7 @@ export default function Sidebar({ defaultActiveItem = "dashboard" }: SidebarProp
       id: "accidents",
       name: "Accident Management",
       icon: <Shield size={20} />,
-      path: "",
+      path: "/accidentdashboard",
       description: "Accident Reports",
     },
     {

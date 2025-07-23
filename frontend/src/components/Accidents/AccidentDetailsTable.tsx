@@ -21,11 +21,10 @@ import {
   FileText,
   Sparkles,
 } from "lucide-react"
-
 // Import components
-import { Button } from "../UI/AccidentUI/button"
-import { Card, CardHeader, CardTitle, CardContent } from "../UI/AccidentUI/card"
-import { Textarea } from "../UI/AccidentUI/textarea"
+import { Button } from "../UI/AccidentUI/button" // Adjusted import path
+import { Card, CardHeader, CardTitle, CardContent } from "../UI/AccidentUI/card" // Adjusted import path
+import { Textarea } from "../UI/AccidentUI/textarea" // Adjusted import path
 import {
   Dialog,
   DialogContent,
@@ -33,10 +32,10 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "../UI/AccidentUI/dialog"
+} from "../UI/AccidentUI/dialog" // Adjusted import path
+// Assuming LoadingScreen and ErrorScreen are custom components, keeping their original paths
 import { LoadingScreen, ErrorScreen } from "../UI/AccidentUI/loading"
-
-// Import utilities
+// Assuming getStatusBadge and getYouTubeEmbedUrl are custom utilities, keeping their original paths
 import { getStatusBadge } from "../Accidents/status-badge"
 import { getYouTubeEmbedUrl } from "../Accidents/video-utils"
 import type { AccidentType } from "../../types/Accident/accident"
@@ -181,7 +180,6 @@ export default function AccidentDetailsTable() {
           style={{ animationDelay: "4s" }}
         ></div>
       </div>
-
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Enhanced Header */}
         <div className="mb-8">
@@ -208,35 +206,39 @@ export default function AccidentDetailsTable() {
               </div>
               <div className="flex items-center gap-3">
                 {getStatusBadge(accident.status)}
-                {!isEditing ? (
-                  <Button onClick={() => setIsEditing(true)} variant="primary" className="inline-flex items-center">
-                    <Edit3 className="w-4 h-4 mr-2" />
-                    Edit
-                  </Button>
-                ) : (
-                  <div className="flex gap-2">
-                    <Button onClick={() => setShowConfirm(true)} variant="success" className="inline-flex items-center">
-                      <Save className="w-4 h-4 mr-2" />
-                      Save
+                {accident.status === "pending" && // Only show edit/save/cancel if status is pending
+                  (!isEditing ? (
+                    <Button onClick={() => setIsEditing(true)} variant="primary" className="inline-flex items-center">
+                      <Edit3 className="w-4 h-4 mr-2" />
+                      Edit
                     </Button>
-                    <Button
-                      onClick={() => {
-                        setIsEditing(false)
-                        setEditDescription(accident.description || "")
-                      }}
-                      variant="secondary"
-                      className="inline-flex items-center"
-                    >
-                      <X className="w-4 h-4 mr-2" />
-                      Cancel
-                    </Button>
-                  </div>
-                )}
+                  ) : (
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => setShowConfirm(true)}
+                        variant="success"
+                        className="inline-flex items-center"
+                      >
+                        <Save className="w-4 h-4 mr-2" />
+                        Save
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setIsEditing(false)
+                          setEditDescription(accident.description || "")
+                        }}
+                        variant="secondary"
+                        className="inline-flex items-center"
+                      >
+                        <X className="w-4 h-4 mr-2" />
+                        Cancel
+                      </Button>
+                    </div>
+                  ))}
               </div>
             </div>
           </div>
         </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column - Details */}
           <div className="lg:col-span-2 space-y-6">
@@ -291,7 +293,6 @@ export default function AccidentDetailsTable() {
                 </div>
               </CardContent>
             </Card>
-
             {/* Vehicle Owner Information */}
             <Card>
               <CardHeader className="bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-t-xl">
@@ -338,7 +339,6 @@ export default function AccidentDetailsTable() {
                 </div>
               </CardContent>
             </Card>
-
             {/* Description */}
             <Card>
               <CardHeader className="bg-gradient-to-r from-orange-500 to-amber-600 text-white rounded-t-xl">
@@ -368,7 +368,6 @@ export default function AccidentDetailsTable() {
               </CardContent>
             </Card>
           </div>
-
           {/* Right Column - Media & Actions */}
           <div className="space-y-6">
             {/* Incident Image */}
@@ -431,7 +430,6 @@ export default function AccidentDetailsTable() {
                 </div>
               </CardContent>
             </Card>
-
             {/* Incident Video */}
             <Card>
               <CardHeader className="bg-gradient-to-r from-indigo-500 to-blue-600 text-white rounded-t-xl">
@@ -492,7 +490,6 @@ export default function AccidentDetailsTable() {
                 )}
               </CardContent>
             </Card>
-
             {/* Approval Action */}
             {accident.status === "pending" && (
               <Card className="border-2 border-green-300 bg-gradient-to-br from-green-50 to-emerald-50 shadow-xl hover:shadow-2xl">
@@ -512,6 +509,7 @@ export default function AccidentDetailsTable() {
                     className="w-full shadow-xl hover:shadow-2xl"
                     size="lg"
                   >
+                    <Check className="w-4 h-4 mr-2" />
                     Approve
                   </Button>
                 </CardContent>
@@ -520,7 +518,6 @@ export default function AccidentDetailsTable() {
           </div>
         </div>
       </div>
-
       {/* Enhanced Confirmation Dialog */}
       <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
         <DialogContent className="bg-gradient-to-br from-white to-blue-50 border-2 border-blue-200 shadow-2xl">

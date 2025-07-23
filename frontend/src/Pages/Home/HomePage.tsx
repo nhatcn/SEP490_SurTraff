@@ -128,7 +128,7 @@ export default function CustomerHome() {
       const transformedData = data
         .map((item: any) => {
           let displayStatusText = item.status
-          if (item.status === "Approve") {
+          if (item.status === "Approved") {
             displayStatusText = "New"
           }
           return {
@@ -144,7 +144,7 @@ export default function CustomerHome() {
         })
         .filter(
           (violation: any) =>
-            (violation.status === "Approve" ||
+            (violation.status === "Approved" ||
               violation.status === "Requested" ||
               violation.status === "Processed" ||
               violation.status === "Rejected") &&

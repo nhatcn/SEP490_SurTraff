@@ -17,30 +17,30 @@ interface TrafficDensity {
   id: number;
   camera_id: number;
   location: string;
-  vehicle_count: number;
-  created_at: string;
+  vehicleCount: number;
+  createdAt: string;
   latitude: number;
   longitude: number;
 }
 
 interface Accident {
   id: number;
-  camera_id: number;
+  cameraId: number;
   latitude: number;
   longitude: number;
-  vehicle_id: number;
-  user_id: number;
-  user_email?: string | null;
-  user_fullName: string;
+  vehicleId: number;
+  userId: number;
+  userEmail?: string | null;
+  userFullName: string;
   licensePlate: string;
   name: string;
   description: string;
-  image_url: string;
-  video_url?: string;
+  imageUrl: string;
+  videoUrl?: string;
   location?: string | null;
   status: string;
-  accident_time: string;
-  created_at: string;
+  accidentTime: string;
+  createdAt: string;
 }
 
 const getColorByDensity = (count: number) => {
@@ -142,8 +142,8 @@ export default function UserTrafficMap() {
   }, []);
 
   const defaultCenter: [number, number] = [10.7769, 106.6957];
-  const totalVehicles = trafficData.reduce((sum, item) => sum + item.vehicle_count, 0);
-  const highTrafficPoints = trafficData.filter((item) => item.vehicle_count >= 20).length;
+  const totalVehicles = trafficData.reduce((sum, item) => sum + item.vehicleCount, 0);
+  const highTrafficPoints = trafficData.filter((item) => item.vehicleCount >= 20).length;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -204,16 +204,16 @@ export default function UserTrafficMap() {
                 />
 
                 {trafficData.map((entry) => {
-                  const trafficLevel = getTrafficLevel(entry.vehicle_count);
+                  const trafficLevel = getTrafficLevel(entry.vehicleCount);
                   return (
                     <CircleMarker
                       key={`traffic-${entry.id}`}
                       center={[entry.latitude, entry.longitude]}
-                      radius={Math.max(8, Math.min(20, entry.vehicle_count * 0.8))}
+                      radius={Math.max(8, Math.min(20, entry.vehicleCount * 0.8))}
                       pathOptions={{
                         color: "#ffffff",
                         weight: 3,
-                        fillColor: getColorByDensity(entry.vehicle_count),
+                        fillColor: getColorByDensity(entry.vehicleCount),
                         fillOpacity: 0.8,
                       }}
                     >
@@ -228,7 +228,7 @@ export default function UserTrafficMap() {
                           <div className="space-y-1 text-xs text-gray-600">
                             <div className="flex items-center justify-between">
                               <span>Vehicle Count:</span>
-                              <span className="font-semibold text-gray-800">{entry.vehicle_count}</span>
+                              <span className="font-semibold text-gray-800">{entry.vehicleCount}</span>
                             </div>
                             <div className="flex items-center justify-between">
                               <span>Camera ID:</span>
@@ -236,7 +236,7 @@ export default function UserTrafficMap() {
                             </div>
                             <div className="flex items-center justify-between">
                               <span>Recorded At:</span>
-                              <span>{new Date(entry.created_at).toLocaleString("en-US")}</span>
+                              <span>{new Date(entry.createdAt).toLocaleString("en-US")}</span>
                             </div>
                           </div>
                         </div>
@@ -253,15 +253,15 @@ export default function UserTrafficMap() {
                         <div className="p-3 min-w-[280px]">
                           <div className="font-bold text-red-700 mb-2 text-center text-lg">Accident</div>
                           <img
-                            src={acc.image_url}
-                            alt={`Accident at camera #${acc.camera_id}`}
+                            src={acc.imageUrl}
+                            alt={`Accident at camera #${acc.cameraId}`}
                             className="w-full rounded-md mb-2"
                             loading="lazy"
                           />
                           <p><strong>Description:</strong> {acc.description}</p>
                           <p><strong>Vehicle:</strong> {acc.name} ({acc.licensePlate})</p>
-                          <p><strong>Reported by:</strong> {acc.user_fullName || "Unknown"}</p>
-                          <p><strong>Time:</strong> {new Date(acc.accident_time).toLocaleString("en-US")}</p>
+                          <p><strong>Reported by:</strong> {acc.userFullName || "Unknown"}</p>
+                          <p><strong>Time:</strong> {new Date(acc.accidentTime).toLocaleString("en-US")}</p>
                         </div>
                       </Tooltip>
                     </Marker>
