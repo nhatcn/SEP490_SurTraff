@@ -40,7 +40,11 @@ export const useLogin = () => {
       localStorage.setItem('role', response.data.role);
 
       setState({ isLoading: false, error: '' });
-      navigate('/dashboard');
+      if (response.data.role === 'CUSTOMER') {
+        navigate('/home');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err: any) {
       const errorMessage = err.response?.data?.error || 'An error occurred during login';
       setState({ isLoading: false, error: errorMessage });
@@ -168,7 +172,7 @@ export const useGoogleAuth = () => {
       localStorage.setItem('role', response.data.role);
 
       setIsLoading(false);
-      navigate('/dashboard');
+      navigate('/home');
     } catch (err: any) {
       const errorMessage = err.response?.data?.error || 'Google authentication failed';
       setError(errorMessage);

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Header from "../../../components/Layout/Header";
 import Sidebar from "../../../components/Layout/Sidebar";
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import ZoneCanvas from "../../../components/Camera/ZoneCanvas";
@@ -45,9 +45,17 @@ interface CameraData {
   longitude: number;
   location: string;
   thumbnail?: string;
-  zones: any[];
-  laneDirections: any[];
-  lightZoneMappings: any[];
+  maxSpeed?: number;
+  violationTypeId?: number;
+  zones?: any[];
+  zoneLightLaneLinks?: any[];
+  laneMovements?: any[];
+}
+
+// Type for violation type from API
+interface ViolationType {
+  id: number;
+  typeName: string;
 }
 
 const defaultIcon = new L.Icon({
@@ -74,12 +82,16 @@ const currentLocationIcon = new L.Icon({
 
 function LocationPicker({ 
   onLocationSelect, 
-  currentLocation 
+  currentLocation,
+  initialLocation
 }: { 
   onLocationSelect: (lat: number, lng: number, address: string) => void;
   currentLocation: [number, number] | null;
+  initialLocation: { lat: number; lng: number; selected: boolean };
 }) {
-  const [position, setPosition] = useState<[number, number] | null>(null);
+  const [position, setPosition] = useState<[number, number] | null>(
+    initialLocation.selected ? [initialLocation.lat, initialLocation.lng] : null
+  );
 
   const MapEvents = () => {
     useMapEvents({
@@ -132,7 +144,7 @@ export default function EditCamera() {
   const [location, setLocation] = useState({ lat: 0, lng: 0, selected: false });
   const [zones, setZones] = useState<Zone[]>([]);
   const [activeZoneType, setActiveZoneType] = useState<string | null>(null);
-  const [thumbnailUrl, setThumbnailUrl] = useState("https://cdn.discordapp.com/attachments/1242410259205591071/1377269674659811389/image.png?ex=683a5416&is=68390296&hm=490eca1145356df872482526625906149950bef8b99763406476284304405471&");
+  const [thumbnailUrl, setThumbnailUrl] = useState("");
   const [laneDirections, setLaneDirections] = useState<LaneDirection[]>([]);
   const [lightZoneMappings, setLightZoneMappings] = useState<LightZoneMapping[]>([]);
   const [nextZoneId, setNextZoneId] = useState<number>(1);
@@ -144,6 +156,18 @@ export default function EditCamera() {
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<[number, number] | null>(null);
 
+  // Speed configuration state
+  const [speedLimit, setSpeedLimit] = useState<number>(50);
+  
+  // Violation type state
+  const [violationTypeId, setViolationTypeId] = useState<number | null>(null);
+  const [violationTypes, setViolationTypes] = useState<ViolationType[]>([]);
+  const [isLoadingViolationTypes, setIsLoadingViolationTypes] = useState(false);
+
+  // Thumbnail extraction state
+  const [isExtractingThumbnail, setIsExtractingThumbnail] = useState(false);
+  const [thumbnailError, setThumbnailError] = useState<string | null>(null);
+
   // Helper function to get zone color based on type
   const getZoneColor = (zoneType: string): string => {
     switch(zoneType.toLowerCase()) {
@@ -154,6 +178,28 @@ export default function EditCamera() {
       default: return "#888";
     }
   };
+
+  // Fetch violation types from API
+  useEffect(() => {
+    const fetchViolationTypes = async () => {
+      setIsLoadingViolationTypes(true);
+      try {
+        const response = await fetch("http://localhost:8081/api/violation-type");
+        if (!response.ok) {
+          throw new Error(`Failed to fetch violation types: ${response.status}`);
+        }
+        const data: ViolationType[] = await response.json();
+        setViolationTypes(data);
+      } catch (error) {
+        console.error("Error fetching violation types:", error);
+        setViolationTypes([]);
+      } finally {
+        setIsLoadingViolationTypes(false);
+      }
+    };
+
+    fetchViolationTypes();
+  }, []);
 
   // Get current location on component mount
   useEffect(() => {
@@ -230,25 +276,34 @@ export default function EditCamera() {
         }
 
         const cameraData: CameraData = await response.json();
+        console.log('Camera data from API:', cameraData);
         setOriginalCameraData(cameraData);
 
         // Set basic camera info
         setName(cameraData.name);
         setStreamUrl(cameraData.streamUrl);
-        setLocationAddress(cameraData.location);
+        setLocationAddress(cameraData.location || "");
         setLocation({
           lat: cameraData.latitude,
           lng: cameraData.longitude,
           selected: true
         });
 
-        // Set thumbnail URL if available
+        // Set speed limit and violation type
+        setSpeedLimit(cameraData.maxSpeed || 50);
+        setViolationTypeId(cameraData.violationTypeId || null);
+
+        // Set thumbnail from API if available, otherwise try to extract
         if (cameraData.thumbnail) {
           setThumbnailUrl(cameraData.thumbnail);
+          console.log('Using existing thumbnail from API:', cameraData.thumbnail);
+        } else if (cameraData.streamUrl) {
+          console.log('No thumbnail found, extracting from stream URL');
+          extractThumbnail(cameraData.streamUrl);
         }
 
         // Transform and set zones
-        const transformedZones: Zone[] = cameraData.zones.map(zone => ({
+        const transformedZones: Zone[] = (cameraData.zones || []).map(zone => ({
           id: zone.id.toString(),
           type: zone.zoneType as "lane" | "line" | "light" | "speed",
           coordinates: JSON.parse(zone.coordinates),
@@ -258,7 +313,7 @@ export default function EditCamera() {
         setZones(transformedZones);
 
         // Transform and set lane directions
-        const transformedLaneDirections: LaneDirection[] = cameraData.laneDirections.map(dir => {
+        const transformedLaneDirections: LaneDirection[] = (cameraData.laneMovements || []).map(dir => {
           const fromZone = transformedZones.find(z => z.id === dir.fromLaneZoneId.toString());
           const toZone = transformedZones.find(z => z.id === dir.toLaneZoneId.toString());
           
@@ -274,7 +329,7 @@ export default function EditCamera() {
         setLaneDirections(transformedLaneDirections);
 
         // Transform and set light zone mappings
-        const transformedLightMappings: LightZoneMapping[] = cameraData.lightZoneMappings.map(mapping => {
+        const transformedLightMappings: LightZoneMapping[] = (cameraData.zoneLightLaneLinks || []).map(mapping => {
           const lightZone = transformedZones.find(z => z.id === mapping.lightZoneId.toString());
           const laneZone = transformedZones.find(z => z.id === mapping.laneZoneId.toString());
           
@@ -289,7 +344,9 @@ export default function EditCamera() {
         setLightZoneMappings(transformedLightMappings);
 
         // Set next zone ID for new zones
-        const maxZoneId = Math.max(...transformedZones.map(z => parseInt(z.id)), 0);
+        const maxZoneId = transformedZones.length > 0 
+          ? Math.max(...transformedZones.map(z => parseInt(z.id)), 0)
+          : 0;
         setNextZoneId(maxZoneId + 1);
 
       } catch (error) {
@@ -303,6 +360,65 @@ export default function EditCamera() {
 
     fetchCameraData();
   }, [id, navigate]);
+
+  const extractThumbnail = async (streamUrl: string) => {
+    if (!streamUrl.trim()) {
+      setThumbnailError("Stream URL is required");
+      return;
+    }
+
+    setIsExtractingThumbnail(true);
+    setThumbnailError(null);
+
+    try {
+      const response = await fetch("http://localhost:8000/api/thumbnail/extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stream_url: streamUrl })
+      });
+
+      if (!response.ok) {
+        let errorMessage = `Failed to extract thumbnail: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch {
+          // If response is not JSON, use default error message
+        }
+        throw new Error(errorMessage);
+      }
+
+      // Convert the image response to a blob and create object URL
+      const blob = await response.blob();
+      const imageUrl = URL.createObjectURL(blob);
+      
+      setThumbnailUrl(imageUrl);
+      setThumbnailError(null);
+    } catch (error: unknown) {
+      console.error("Thumbnail extraction error:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      setThumbnailError(errorMessage);
+      setThumbnailUrl(""); // Clear thumbnail on error
+    } finally {
+      setIsExtractingThumbnail(false);
+    }
+  };
+
+  const handleStreamUrlChange = (url: string) => {
+    setStreamUrl(url);
+    // Only clear thumbnail if it was extracted (not from database)
+    if (thumbnailUrl && !originalCameraData?.thumbnail) {
+      URL.revokeObjectURL(thumbnailUrl);
+      setThumbnailUrl("");
+    }
+    setThumbnailError(null);
+  };
+
+  const handleExtractThumbnail = () => {
+    if (streamUrl.trim()) {
+      extractThumbnail(streamUrl);
+    }
+  };
 
   const handleLocationSelect = (lat: number, lng: number, address: string) => {
     setLocation({
@@ -416,6 +532,16 @@ export default function EditCamera() {
       return;
     }
 
+    if (!thumbnailUrl) {
+      alert("Please extract a thumbnail from the stream URL first.");
+      return;
+    }
+
+    if (violationTypeId === null) {
+      alert("Please select a violation type.");
+      return;
+    }
+
     try {
       const updateData = {
         cameraName: name,
@@ -423,7 +549,9 @@ export default function EditCamera() {
         latitude: location.lat,
         longitude: location.lng,
         location: locationAddress,
-        thumbnail: thumbnailUrl, // Add thumbnail to update data
+        thumbnail: thumbnailUrl,
+        maxSpeed: speedLimit,
+        violationTypeId: violationTypeId,
         zones: zones.map(z => ({
           id: parseInt(z.id),
           name: z.name,
@@ -454,6 +582,12 @@ export default function EditCamera() {
       }
 
       alert("Camera updated successfully!");
+      
+      // Clean up object URL before navigating (only for extracted thumbnails)
+      if (thumbnailUrl && thumbnailUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(thumbnailUrl);
+      }
+      
       navigate("/cameras");
     } catch (error: unknown) {
       console.error("Update error:", error);
@@ -461,7 +595,17 @@ export default function EditCamera() {
     }
   };
 
-  if (loading) {
+  // Cleanup function to revoke object URLs (only for extracted thumbnails)
+  useEffect(() => {
+    return () => {
+      // Only revoke if it's an object URL (extracted), not a regular URL from database
+      if (thumbnailUrl && thumbnailUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(thumbnailUrl);
+      }
+    };
+  }, []);
+
+  if (loading || isLoadingViolationTypes) {
     return (
       <div className="flex h-screen">
         <Sidebar />
@@ -509,14 +653,69 @@ export default function EditCamera() {
 
               <div>
                 <label className="block mb-2 font-medium">Stream URL *</label>
-                <input
-                  type="text"
-                  value={streamUrl}
-                  onChange={e => setStreamUrl(e.target.value)}
-                  className="w-full p-2 border rounded focus:ring focus:ring-blue-300"
-                  placeholder="rtsp:// or http:// stream URL"
-                  required
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={streamUrl}
+                    onChange={e => handleStreamUrlChange(e.target.value)}
+                    className="flex-1 p-2 border rounded focus:ring focus:ring-blue-300"
+                    placeholder="rtsp:// or http:// stream URL"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={handleExtractThumbnail}
+                    disabled={!streamUrl.trim() || isExtractingThumbnail}
+                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 whitespace-nowrap"
+                  >
+                    {isExtractingThumbnail ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Extracting...
+                      </>
+                    ) : (
+                      <>
+                        📷 Re-extract Thumbnail
+                      </>
+                    )}
+                  </button>
+                </div>
+                
+                {/* Thumbnail status */}
+                {thumbnailError && (
+                  <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded">
+                    <div className="text-red-700 text-sm">
+                      <strong>Error:</strong> {thumbnailError}
+                    </div>
+                  </div>
+                )}
+                
+                {thumbnailUrl && (
+                  <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded">
+                    <div className="text-green-700 text-sm flex items-center gap-2">
+                      <span>✅ Thumbnail available</span>
+                      <img 
+                        src={thumbnailUrl} 
+                        alt="Camera thumbnail preview" 
+                        className="h-12 w-16 object-cover rounded border"
+                      />
+                    </div>
+                    <div className="text-green-600 text-xs mt-1">
+                      {originalCameraData?.thumbnail ? 
+                        'Using saved thumbnail from database. Click "Re-extract" to generate a new one.' :
+                        'Thumbnail extracted from stream. You can configure zones below.'
+                      }
+                    </div>
+                  </div>
+                )}
+
+                {!thumbnailUrl && !isExtractingThumbnail && (
+                  <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded">
+                    <div className="text-yellow-700 text-sm">
+                      ⚠️ No thumbnail available. Please extract one to configure zones.
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -601,6 +800,7 @@ export default function EditCamera() {
                   <LocationPicker 
                     onLocationSelect={handleLocationSelect}
                     currentLocation={currentLocation}
+                    initialLocation={location}
                   />
                 </MapContainer>
               </div>
@@ -626,80 +826,156 @@ export default function EditCamera() {
               </div>
             </div>
 
-            <div className="mb-6">
-              <h3 className="text-xl font-semibold mb-4">Camera Thumbnail & Zones</h3>
-              
-              <div className="mb-4 p-4 bg-blue-50 rounded">
-                <h4 className="font-medium text-blue-900 mb-2">Zone Management</h4>
-                <p className="text-sm text-blue-800 mb-3">
-                  You can edit existing zones or add new ones. Existing zones: {zones.filter(z => parseInt(z.id) <= (originalCameraData?.zones.length || 0)).length}, 
-                  New zones: {zones.filter(z => parseInt(z.id) > (originalCameraData?.zones.length || 0)).length}
-                </p>
-                
-                <div className="mb-4">
-                  <label className="block mb-2 font-medium">Select Zone Type to Draw</label>
-                  <div className="flex space-x-4">
-                    <button
-                      onClick={() => setActiveZoneType("lane")}
-                      className={`px-4 py-2 rounded ${activeZoneType === "lane"
-                        ? "bg-blue-600 text-white"
-                        : "bg-blue-100 text-blue-800 hover:bg-blue-200"}`}
-                    >
-                      Lane Zone
-                    </button>
-                    <button
-                      onClick={() => setActiveZoneType("line")}
-                      className={`px-4 py-2 rounded ${activeZoneType === "line"
-                        ? "bg-red-600 text-white"
-                        : "bg-red-100 text-red-800 hover:bg-red-200"}`}
-                    >
-                      Line Zone
-                    </button>
-                    <button
-                      onClick={() => setActiveZoneType("light")}
-                      className={`px-4 py-2 rounded ${activeZoneType === "light"
-                        ? "bg-amber-600 text-white"
-                        : "bg-amber-100 text-amber-800 hover:bg-amber-200"}`}
-                    >
-                      Light Zone
-                    </button>
-                    {activeZoneType && (
-                      <button
-                        onClick={() => setActiveZoneType(null)}
-                        className="px-4 py-2 rounded bg-gray-200 text-gray-800 hover:bg-gray-300"
-                      >
-                        Cancel
-                      </button>
-                    )}
-                  </div>
+            {/* Speed Limit Configuration and Violation Type */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div>
+                <label className="block mb-2 font-medium">Speed Limit: {speedLimit} km/h</label>
+                <input
+                  type="range"
+                  min="40"
+                  max="120"
+                  step="5"
+                  value={speedLimit}
+                  onChange={e => setSpeedLimit(Number(e.target.value))}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                />
+                <div className="flex justify-between text-sm text-gray-500 mt-1">
+                  <span>40 km/h</span>
+                  <span>120 km/h</span>
+                </div>
+                <div className="mt-1 text-sm text-gray-500">
+                  Set the speed limit for this camera location
                 </div>
               </div>
 
-              <ZoneCanvas
-                zones={zones}
-                setZones={setZones}
-                thumbnailUrl={thumbnailUrl}
-                nextZoneId={nextZoneId}
-                setNextZoneId={setNextZoneId}
-                onDeleteZone={handleDeleteZone}
-              />
+              <div>
+                <label className="block mb-2 font-medium">Violation Type *</label>
+                <select
+                  value={violationTypeId || ""}
+                  onChange={e => setViolationTypeId(Number(e.target.value))}
+                  className="w-full p-2 border rounded focus:ring focus:ring-blue-300"
+                  required
+                >
+                  <option value="">Select violation type...</option>
+                  {violationTypes.map(type => (
+                    <option key={type.id} value={type.id}>
+                      {type.typeName}
+                    </option>
+                  ))}
+                </select>
+                <div className="mt-1 text-sm text-gray-500">
+                  Select the primary type of violation this camera will detect
+                </div>
+                {violationTypes.length === 0 && !isLoadingViolationTypes && (
+                  <div className="mt-1 text-sm text-red-500">
+                    Failed to load violation types. Please refresh the page.
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="mb-6">
-              <LaneDirectionConfig
-                zones={zones}
-                laneDirections={laneDirections}
-                setLaneDirections={setLaneDirections}
-              />
-            </div>
+            {/* Zone Configuration - Show if thumbnail is available */}
+            {thumbnailUrl ? (
+              <div className="mb-6">
+                <h3 className="text-xl font-semibold mb-4">Camera Thumbnail & Zones</h3>
+                
+                <div className="mb-4 p-4 bg-blue-50 rounded">
+                  <h4 className="font-medium text-blue-900 mb-2">Zone Management</h4>
+                  <p className="text-sm text-blue-800 mb-3">
+                    Current zones: {zones.length} total
+                    {originalCameraData?.zones && (
+                      <span> (Original: {originalCameraData.zones.length}, Modified: {zones.length - originalCameraData.zones.length >= 0 ? '+' + (zones.length - originalCameraData.zones.length) : zones.length - originalCameraData.zones.length})</span>
+                    )}
+                  </p>
+                  
+                  <div className="mb-4">
+                    <label className="block mb-2 font-medium">Select Zone Type to Draw</label>
+                    <div className="flex space-x-4">
+                      <button
+                        onClick={() => setActiveZoneType("lane")}
+                        className={`px-4 py-2 rounded ${activeZoneType === "lane"
+                          ? "bg-blue-600 text-white"
+                          : "bg-blue-100 text-blue-800 hover:bg-blue-200"}`}
+                      >
+                        🛣️ Lane Zone
+                      </button>
+                      <button
+                        onClick={() => setActiveZoneType("line")}
+                        className={`px-4 py-2 rounded ${activeZoneType === "line"
+                          ? "bg-red-600 text-white"
+                          : "bg-red-100 text-red-800 hover:bg-red-200"}`}
+                      >
+                        📏 Line Zone
+                      </button>
+                      <button
+                        onClick={() => setActiveZoneType("light")}
+                        className={`px-4 py-2 rounded ${activeZoneType === "light"
+                          ? "bg-amber-600 text-white"
+                          : "bg-amber-100 text-amber-800 hover:bg-amber-200"}`}
+                      >
+                        🚦 Light Zone
+                      </button>
+                      {activeZoneType && (
+                        <button
+                          onClick={() => setActiveZoneType(null)}
+                          className="px-4 py-2 rounded bg-gray-200 text-gray-800 hover:bg-gray-300"
+                        >
+                          ❌ Cancel
+                        </button>
+                      )}
+                    </div>
+                  </div>
 
-            <div className="mb-6">
-              <LightZoneMappingConfig
-                zones={zones}
-                lightZoneMappings={lightZoneMappings}
-                setLightZoneMappings={setLightZoneMappings}
-              />
-            </div>
+                  {originalCameraData?.thumbnail && (
+                    <div className="text-sm text-blue-700 bg-blue-100 p-2 rounded">
+                      💾 Using saved thumbnail from database. All existing zones are preserved.
+                    </div>
+                  )}
+                </div>
+
+                <ZoneCanvas
+                  zones={zones}
+                  setZones={setZones}
+                  thumbnailUrl={thumbnailUrl}
+                  nextZoneId={nextZoneId}
+                  setNextZoneId={setNextZoneId}
+                  onDeleteZone={handleDeleteZone}
+                />
+              </div>
+            ) : (
+              <div className="mb-6">
+                <h3 className="text-xl font-semibold mb-4">Camera Thumbnail & Zones</h3>
+                <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                  <div className="text-gray-500 mb-2">
+                    📷 No thumbnail available
+                  </div>
+                  <div className="text-sm text-gray-400">
+                    Please extract a thumbnail from the stream URL to configure zones
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Lane Direction and Light Zone Mappings - Only show if zones exist */}
+            {zones.length > 0 && (
+              <>
+                <div className="mb-6">
+                  <LaneDirectionConfig
+                    zones={zones}
+                    laneDirections={laneDirections}
+                    setLaneDirections={setLaneDirections}
+                  />
+                </div>
+
+                <div className="mb-6">
+                  <LightZoneMappingConfig
+                    zones={zones}
+                    lightZoneMappings={lightZoneMappings}
+                    setLightZoneMappings={setLightZoneMappings}
+                  />
+                </div>
+              </>
+            )}
 
             <div className="mt-8 flex justify-end space-x-4">
               <button
