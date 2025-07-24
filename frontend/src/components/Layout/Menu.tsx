@@ -6,15 +6,43 @@ import { User, ChevronDown, Menu, X, Shield, LogOut, Eye, Search } from "lucide-
 import { useState, useEffect, useRef } from "react"
 import Logo from "../../components/Logo/Logo"
 import NotificationDropdown from "./NotificationDropdown"
+import { eraseCookie } from "../../utils/cookieUltil"
 
 interface HeaderProps {
   showMobileMenu: boolean
   setShowMobileMenu: React.Dispatch<React.SetStateAction<boolean>>
 }
 
+interface UserData {
+  id: string
+  name: string
+  email: string
+  avatar?: string
+  role: string
+}
+
 const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [hoveredMenuItem, setHoveredMenuItem] = useState<string | null>(null)
+  const [userData, setUserData] = useState<UserData | null>(null)
+  const [loading, setLoading] = useState(true)
   const userMenuRef = useRef<HTMLDivElement>(null)
+
+
+  const userId = localStorage.getItem("userId")
+  // Handle sign out
+  const handleSignOut = () => {
+    // Erase userId cookie
+    eraseCookie('userId')
+    
+    // Remove items from localStorage
+    localStorage.removeItem('token')
+    localStorage.removeItem('role')
+    localStorage.removeItem('userId')
+    
+    // Redirect to login page
+    window.location.href = '/login'
+  }
 
   // Close user dropdown when clicking outside
   useEffect(() => {
@@ -26,6 +54,87 @@ const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
     document.addEventListener("mousedown", handleClickOutside)
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
+
+  // Fetch user data - same logic as Header.tsx
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        
+        const role = localStorage.getItem("role") || "Admin"
+
+        if (!userId) {
+          setUserData({
+            id: "",
+            name: "Admin",
+            email: "admin@system.com",
+            role: role,
+          })
+          setLoading(false)
+          return
+        }
+
+        const response = await fetch(`http://localhost:8081/api/users/${userId}`)
+
+        if (response.ok) {
+          const user = await response.json()
+          setUserData({
+            ...user,
+            role: role || user.role || "Admin",
+          })
+        } else {
+          setUserData({
+            id: userId,
+            name: "User",
+            email: "",
+            role: role,
+          })
+        }
+      } catch (error) {
+        console.error("Error fetching user data:", error)
+        const userId = localStorage.getItem("userId") || ""
+        const role = localStorage.getItem("role") || "Admin"
+        setUserData({
+          id: userId,
+          name: "User",
+          email: "",
+          role: role,
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchUserData()
+  }, [])
+
+  // Get avatar initials - same logic as Header.tsx
+  const getAvatarInitials = (user: UserData) => {
+    if (user.name) {
+      const words = user.name.split(" ").filter((word) => word.length > 0)
+      if (words.length >= 2) {
+        return (words[0][0] + words[1][0]).toUpperCase()
+      }
+      return user.name.substring(0, 2).toUpperCase()
+    }
+    return "AD"
+  }
+
+  const userMenuItems = [
+    {
+      id: "profile",
+      name: "Your Profile",
+      icon: <User size={16} />,
+      description: "Personal Information",
+      href: "#"
+    },
+    {
+      id: "settings", 
+      name: "Settings",
+      icon: <Shield size={16} />,
+      description: "System Configuration",
+      href: "#"
+    }
+  ]
 
   return (
     <header className="bg-white border-b border-gray-200 py-4 px-6 flex items-center justify-between shadow-sm relative z-50">
@@ -55,7 +164,7 @@ const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
 
       <div className="flex items-center space-x-4">
         <nav className="hidden lg:flex space-x-6 mr-8">
-          <a href="#" className="text-blue-700 font-medium hover:text-blue-900 transition-colors duration-200">
+          <a href="home" className="text-blue-700 font-medium hover:text-blue-900 transition-colors duration-200">
             Home
           </a>
           <a href="#" className="text-gray-500 hover:text-gray-800 transition-colors duration-200">
@@ -72,78 +181,79 @@ const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
         {/* Notification Component */}
         <NotificationDropdown />
 
-        {/* User Dropdown */}
+        {/* User Dropdown - Updated with dynamic user data */}
         <div className="relative" ref={userMenuRef}>
           <button
             className="flex items-center space-x-2 rounded-lg hover:bg-gray-100 py-2 px-3 transition-all duration-200 transform hover:scale-105"
             onClick={() => setShowUserMenu(!showUserMenu)}
             aria-label="Toggle user menu"
           >
-            <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm shadow-lg">
-              CU
+            {/* Avatar - Updated logic */}
+            <div className="relative">
+              {userData?.avatar ? (
+                <img
+                  src={userData.avatar || "/placeholder.svg"}
+                  alt="User Avatar"
+                  className="w-8 h-8 rounded-full object-cover"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement
+                    target.style.display = "none"
+                    target.nextElementSibling?.classList.remove("hidden")
+                  }}
+                />
+              ) : null}
+              <div
+                className={`bg-blue-100 text-blue-600 w-8 h-8 rounded-full flex items-center justify-center font-medium text-sm ${
+                  userData?.avatar ? "hidden" : ""
+                }`}
+              >
+                {loading ? "..." : userData ? getAvatarInitials(userData) : "AD"}
+              </div>
+              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 rounded-full border-2 border-white" />
             </div>
-            <span className="text-sm text-gray-700 font-medium hidden sm:block">Customer</span>
+            
+            {/* User name - Updated */}
+            <span className="text-sm text-gray-700 font-medium hidden sm:block max-w-24 truncate">
+              {loading ? "Loading..." : userData?.name || userData?.role || "Admin"}
+            </span>
             <ChevronDown
               size={16}
               className={`text-gray-400 transition-transform duration-200 ${showUserMenu ? "rotate-180" : "rotate-0"}`}
             />
           </button>
 
-          <div
-            className={`absolute right-0 mt-2 w-52 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50 transition-all duration-300 ease-out transform ${
-              showUserMenu
-                ? "opacity-100 translate-y-0 scale-100"
-                : "opacity-0 -translate-y-2 scale-95 pointer-events-none"
-            }`}
-          >
-            <div className="py-2">
-              <div className="px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-100">
-                <div className="flex items-center space-x-3">
-                  <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white w-10 h-10 rounded-full flex items-center justify-center font-semibold shadow-lg">
-                    CU
-                  </div>
-                  <div>
-                    <p className="font-semibold text-gray-800">Customer</p>
-                    <p className="text-xs text-gray-500">customer@example.com</p>
-                  </div>
-                </div>
+          {/* User Dropdown - Updated with sign out functionality */}
+          {showUserMenu && (
+            <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+              <div className="px-4 py-3 border-b border-gray-100">
+                <p className="font-medium text-gray-800">{loading ? "Loading..." : userData?.name || userData?.role || "Admin"}</p>
+                <p className="text-sm text-gray-600">{loading ? "" : userData?.email || ""}</p>
               </div>
 
-              <a
-                href="#"
-                className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 group"
-              >
-                <User
-                  size={16}
-                  className="mr-3 text-gray-400 group-hover:text-blue-600 transition-colors duration-200"
-                />
-                Your Profile
-              </a>
-              <a
-                href="#"
-                className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 group"
-              >
-                <Shield
-                  size={16}
-                  className="mr-3 text-gray-400 group-hover:text-blue-600 transition-colors duration-200"
-                />
-                Settings
-              </a>
+              <div className="py-1">
+                <a href="myprofile" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                  <User size={16} className="mr-2" />
+                  Your Profile
+                </a>
 
-              <div className="border-t border-gray-100 my-1"></div>
-
-              <a
-                href="#"
-                className="flex items-center px-4 py-3 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 transition-all duration-200 group"
-              >
-                <LogOut
-                  size={16}
-                  className="mr-3 text-red-400 group-hover:text-red-600 transition-colors duration-200"
-                />
-                Sign out
-              </a>
+                <div className="border-t border-gray-100 my-1"></div>
+                <button 
+                  onClick={handleSignOut}
+                  className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-gray-100 transition-colors duration-200"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                    />
+                  </svg>
+                  Sign out
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </header>
@@ -152,6 +262,25 @@ const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
 
 // MobileDropdownMenu component
 const MobileDropdownMenu = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
+  // Function to erase cookie
+  const eraseCookie = (name: string) => {
+    document.cookie = `${name}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;`
+  }
+
+  // Handle sign out for mobile menu
+  const handleSignOut = () => {
+    // Erase userId cookie
+    eraseCookie('userId')
+    
+    // Remove items from localStorage
+    localStorage.removeItem('token')
+    localStorage.removeItem('role')
+    localStorage.removeItem('userId')
+    
+    // Redirect to login page
+    window.location.href = '/login'
+  }
+
   const menuItems = [
     { id: "home", name: "Home", icon: <Eye size={20} />, path: "/home", active: true },
     { id: "search", name: "Search Violations", icon: <Search size={20} />, path: "/search" },
@@ -185,7 +314,10 @@ const MobileDropdownMenu = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) 
                 <button
                   onClick={() => {
                     setShowMobileMenu(false)
-                    // Add navigation logic here if needed
+                    if (item.id === "logout") {
+                      handleSignOut()
+                    }
+                    // Add navigation logic for other items here if needed
                   }}
                   className={`w-full flex items-center py-3 px-6 transition-all duration-200 relative group
                     ${

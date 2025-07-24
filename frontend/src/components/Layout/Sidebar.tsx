@@ -46,7 +46,7 @@ export default function Sidebar({ defaultActiveItem = "dashboard" }: SidebarProp
       id: "profile",
       name: "My Profile",
       icon: <User size={20} />,
-      path: "profile",
+      path: "/profile",
       description: "Personal Information",
     },
     {

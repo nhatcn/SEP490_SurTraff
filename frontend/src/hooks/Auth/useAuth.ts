@@ -11,6 +11,7 @@ import {
   AuthError,
   AuthState
 } from '../../types/Auth/auth';
+import { setCookie } from '../../utils/cookieUltil';
 
 const API_BASE_URL = 'http://localhost:8080/api/users';
 
@@ -47,8 +48,7 @@ export const useLogin = () => {
       });
 
       localStorage.setItem('token', response.data.token);
-      localStorage.setItem('userId', response.data.userId);
-      localStorage.setItem('role', response.data.role);
+      setCookie('userId', response.data.userId);
 
       setState({ isLoading: false, error: '' });
 

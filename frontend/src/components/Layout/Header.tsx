@@ -2,6 +2,7 @@
 
 import { Search, Bell, User, ChevronDown, Activity, Clock } from "lucide-react"
 import { useState, useEffect } from "react"
+import { getCookie } from "../../utils/cookieUltil"
 
 interface HeaderProps {
   title: string
@@ -34,7 +35,7 @@ export default function Header({ title }: HeaderProps) {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const userId = localStorage.getItem("userId")
+        const userId = getCookie('userId')
         const role = localStorage.getItem("role") || "Admin"
 
         if (!userId) {
@@ -241,13 +242,9 @@ export default function Header({ title }: HeaderProps) {
                   </div>
 
                   <div className="py-1">
-                    <a href="#" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                    <a href="profile" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                       <User size={16} className="mr-2" />
                       Your Profile
-                    </a>
-                    <a href="#" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                      <Activity size={16} className="mr-2" />
-                      Settings
                     </a>
                     <div className="border-t border-gray-100 my-1"></div>
                     <a href="#" className="flex items-center px-4 py-2 text-sm text-red-600 hover:bg-gray-100">

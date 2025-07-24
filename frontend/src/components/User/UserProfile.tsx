@@ -26,7 +26,11 @@ import {
   Camera,
   Upload,
   Loader2,
+  AlertTriangle,
+  LogIn,
+  Home,
 } from "lucide-react"
+import { getCookie } from "../../utils/cookieUltil"
 
 interface UserData {
   userId: number
@@ -101,11 +105,17 @@ export default function UserProfile() {
   const [success, setSuccess] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const userId = getCookie('userId')
 
   useEffect(() => {
-    fetchUserData()
-    fetchVehicleData()
-  }, [])
+    if (userId) {
+      fetchUserData()
+      fetchVehicleData()
+    } else {
+      setLoading(false)
+      setVehicleLoading(false)
+    }
+  }, [userId])
 
   useEffect(() => {
     if (user) {
@@ -121,7 +131,6 @@ export default function UserProfile() {
 
   const fetchUserData = async () => {
     try {
-      const userId = 1 // Replace with actual userId source
       const response = await fetch(`http://localhost:8081/api/users/${userId}`)
       const userData = await response.json()
       setUser(userData)
@@ -134,8 +143,6 @@ export default function UserProfile() {
 
   const fetchVehicleData = async () => {
     try {
-      // Get userId from cookie or use default
-      const userId = 1 // Replace with actual userId from cookie
       const response = await fetch(`http://localhost:8081/api/vehicle/${userId}`)
       if (response.ok) {
         const vehicleData = await response.json()
@@ -212,7 +219,7 @@ export default function UserProfile() {
       formData.append("roleId", updateForm.roleId.toString())
 
       if (updateForm.avatar) {
-        formData.append("avatar", updateForm.avatar) 
+        formData.append("avatarFile", updateForm.avatar) 
       }
 
       const response = await fetch(`http://localhost:8081/api/users/${user?.userId}`, {
@@ -356,6 +363,61 @@ export default function UserProfile() {
     return colorMap[color.toLowerCase()] || "🎨"
   }
 
+  // Show not logged in state when no userId cookie
+  if (!userId) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full">
+          {/* Main Card */}
+          <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-8 text-center">
+            {/* Icon */}
+            <div className="w-20 h-20 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+              <AlertTriangle className="w-10 h-10 text-white" />
+            </div>
+
+            {/* Content */}
+            <h1 className="text-2xl font-bold text-gray-900 mb-3">
+              Access Restricted
+            </h1>
+            <p className="text-gray-600 mb-8 leading-relaxed">
+              You need to be logged in to view your profile information. Please sign in to continue.
+            </p>
+
+            {/* Action Buttons */}
+            <div className="space-y-4">
+              <button
+                onClick={() => window.location.href = '/login'}
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl transform hover:scale-105"
+              >
+                <LogIn className="w-5 h-5" />
+                Sign In
+              </button>
+              
+              <button
+                onClick={() => window.location.href = '/home'}
+                className="w-full bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 text-gray-700 font-medium py-3 px-6 rounded-xl transition-all duration-200 flex items-center justify-center gap-3 hover:shadow-md"
+              >
+                <Home className="w-5 h-5" />
+                Go to Home
+              </button>
+            </div>
+
+            {/* Additional Info */}
+            <div className="mt-8 p-4 bg-blue-50 rounded-xl border border-blue-100">
+              <p className="text-sm text-blue-700 font-medium">
+                💡 Need help? Contact our support team
+              </p>
+            </div>
+          </div>
+
+          {/* Decorative Elements */}
+          <div className="absolute top-10 left-10 w-20 h-20 bg-blue-200/30 rounded-full blur-xl"></div>
+          <div className="absolute bottom-10 right-10 w-32 h-32 bg-purple-200/30 rounded-full blur-xl"></div>
+        </div>
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -375,7 +437,21 @@ export default function UserProfile() {
             <X className="w-8 h-8 text-red-600" />
           </div>
           <h3 className="text-xl font-bold text-gray-900 mb-3">Unable to load user information</h3>
-          <p className="text-gray-600">Please try refreshing the page or contact support if the problem persists.</p>
+          <p className="text-gray-600 mb-6">Please try refreshing the page or contact support if the problem persists.</p>
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={() => window.location.reload()}
+              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200"
+            >
+              Refresh Page
+            </button>
+            <button
+              onClick={() => window.location.href = '/home'}
+              className="bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200"
+            >
+              Go Home
+            </button>
+          </div>
         </div>
       </div>
     )
@@ -626,62 +702,7 @@ export default function UserProfile() {
             )}
           </div>
 
-          {/* Traffic Statistics */}
-          <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-3">
-                <div className="w-8 h-8 bg-gradient-to-br from-red-500 to-pink-600 rounded-lg flex items-center justify-center">
-                  <BarChart3 className="w-4 h-4 text-white" />
-                </div>
-                Traffic Statistics
-              </h2>
-              <div className="flex items-center gap-2 bg-green-100 rounded-full px-3 py-1">
-                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-xs font-medium text-green-700">Live</span>
-              </div>
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-4 mb-6">
-              <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4 border border-green-100">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
-                    <CheckCircle className="w-4 h-4 text-white" />
-                  </div>
-                  <TrendingUp className="w-4 h-4 text-green-600" />
-                </div>
-                <div className="text-2xl font-bold text-green-700 mb-1">{trafficStats.cleanDays}</div>
-                <div className="text-green-600 font-medium text-sm">Consecutive Clean Days</div>
-                <div className="text-xs text-green-500 mt-1">Keep it up!</div>
-              </div>
-
-              <div className="bg-gradient-to-br from-red-50 to-pink-50 rounded-xl p-4 border border-red-100">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center">
-                    <X className="w-4 h-4 text-white" />
-                  </div>
-                  <Activity className="w-4 h-4 text-red-600" />
-                </div>
-                <div className="text-2xl font-bold text-red-700 mb-1">{trafficStats.totalViolations}</div>
-                <div className="text-red-600 font-medium text-sm">Total Violations</div>
-                <div className="text-xs text-red-500 mt-1">Last: {trafficStats.lastViolation}</div>
-              </div>
-            </div>
-
-            {/* Chart Placeholder */}
-            <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-4 border border-blue-100">
-              <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-blue-600" />
-                Monthly Behavior
-              </h3>
-              <div className="h-24 bg-white/50 rounded-lg flex items-center justify-center">
-                <div className="text-gray-500 text-center">
-                  <BarChart3 className="w-6 h-6 mx-auto mb-1 opacity-50" />
-                  <div className="text-xs">Chart visualization</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
+          
           {/* Vehicle Information */}
           <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-6">
             <div className="flex items-center justify-between mb-6">
@@ -920,31 +941,6 @@ export default function UserProfile() {
                 </div>
               </div>
             )}
-          </div>
-
-          {/* System Info */}
-          <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <div className="w-6 h-6 bg-gradient-to-br from-gray-500 to-gray-600 rounded-lg flex items-center justify-center">
-                <Activity className="w-3 h-3 text-white" />
-              </div>
-              System Info
-            </h3>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between py-2">
-                <span className="text-sm text-gray-600">Last Login</span>
-                <span className="text-sm font-medium text-gray-900">Today, 09:30 AM</span>
-              </div>
-              <div className="flex items-center justify-between py-2">
-                <span className="text-sm text-gray-600">Session Time</span>
-                <span className="text-sm font-medium text-gray-900">2h 15m</span>
-              </div>
-              <div className="flex items-center justify-between py-2">
-                <span className="text-sm text-gray-600">IP Address</span>
-                <span className="text-sm font-medium text-gray-900">192.168.1.100</span>
-              </div>
-            </div>
           </div>
         </div>
       </div>
