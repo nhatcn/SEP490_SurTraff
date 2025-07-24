@@ -51,7 +51,9 @@ export const useLogin = () => {
       localStorage.setItem('role', response.data.role);
 
       setState({ isLoading: false, error: '' });
+
       if (response.data.role === 'customer') {
+
         navigate('/home');
       } else {
         navigate('/dashboard');
