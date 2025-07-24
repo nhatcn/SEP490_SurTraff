@@ -8,7 +8,8 @@ interface AuthInputProps {
   value: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   icon: React.ReactNode;
-  disabled?: boolean; // Thêm dòng này
+  disabled?: boolean;
+  error?: string; // ✅ Thêm prop lỗi
 }
 
 const AuthInput: React.FC<AuthInputProps> = ({
@@ -19,7 +20,8 @@ const AuthInput: React.FC<AuthInputProps> = ({
   value,
   onChange,
   icon,
-  disabled = false, // Và thêm mặc định ở đây
+  disabled = false,
+  error, // ✅ Nhận prop lỗi
 }) => {
   return (
     <div>
@@ -28,16 +30,21 @@ const AuthInput: React.FC<AuthInputProps> = ({
         <span className="absolute inset-y-0 left-0 flex items-center pl-3">
           {icon}
         </span>
-        <input 
+        <input
           id={id}
           type={type}
           placeholder={placeholder}
           value={value}
           onChange={onChange}
-          disabled={disabled} // Thêm vào đây
-          className="w-full py-2 pl-10 pr-4 bg-white/20 text-white placeholder-white/70 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+          disabled={disabled}
+          className={`w-full py-2 pl-10 pr-4 rounded-lg bg-white/20 text-white placeholder-white/70 focus:outline-none focus:ring-2
+            ${error ? 'border border-red-500 focus:ring-red-500' : 'focus:ring-blue-500'}
+            ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
         />
       </div>
+      {error && (
+        <p className="mt-1 text-sm text-red-500">{error}</p>
+      )}
     </div>
   );
 };

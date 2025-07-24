@@ -1,5 +1,3 @@
-"use client"
-
 import type React from "react"
 import { useState } from "react"
 import { GoogleLogin } from "@react-oauth/google"
@@ -17,7 +15,7 @@ const LoginPage: React.FC = () => {
     rememberMe: false,
   })
 
-  const { isLoading, error, login } = useLogin()
+  const { isLoading, error, login, fieldErrors } = useLogin()
   const {
     isLoading: googleLoading,
     error: googleError,
@@ -58,12 +56,10 @@ const LoginPage: React.FC = () => {
 
   return (
     <AuthLayout title="">
-      {/* Logo Section */}
       <div className="flex justify-center mb-8">
         <Logo />
       </div>
 
-      {/* Welcome Text */}
       <div className="text-center mb-8">
         <h1 className="text-2xl font-bold text-white mb-2">Welcome Back</h1>
         <p className="text-white/70">Sign in to your account to continue</p>
@@ -75,7 +71,6 @@ const LoginPage: React.FC = () => {
         </div>
       )}
 
-      {/* Google Login Button */}
       <div className="mb-4">
         <GoogleLogin
           onSuccess={handleGoogleLoginSuccess}
@@ -111,6 +106,7 @@ const LoginPage: React.FC = () => {
           value={formData.username}
           onChange={handleInputChange("username")}
           icon={<UserIcon />}
+          error={fieldErrors.username}
           disabled={currentLoading}
         />
 
@@ -122,6 +118,7 @@ const LoginPage: React.FC = () => {
           value={formData.password}
           onChange={handleInputChange("password")}
           icon={<LockIcon />}
+          error={fieldErrors.password}
           disabled={currentLoading}
         />
 

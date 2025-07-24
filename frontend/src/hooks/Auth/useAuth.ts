@@ -3,13 +3,13 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGoogleLogin, CredentialResponse } from '@react-oauth/google';
 import axios from 'axios';
-import { 
-  LoginFormData, 
-  RegisterFormData, 
-  ForgotPasswordFormData, 
-  AuthResponse, 
+import {
+  LoginFormData,
+  RegisterFormData,
+  ForgotPasswordFormData,
+  AuthResponse,
   AuthError,
-  AuthState 
+  AuthState
 } from '../../types/Auth/auth';
 
 const API_BASE_URL = 'http://localhost:8080/api/users';
@@ -19,10 +19,22 @@ export const useLogin = () => {
     isLoading: false,
     error: ''
   });
+  const [fieldErrors, setFieldErrors] = useState<{ username?: string; password?: string }>({});
   const navigate = useNavigate();
 
   const login = async (formData: LoginFormData) => {
+    setFieldErrors({});
     setState({ isLoading: true, error: '' });
+
+    const errors: { username?: string; password?: string } = {};
+    if (!formData.username) errors.username = 'Username is required';
+    if (!formData.password) errors.password = 'Password is required';
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setState({ isLoading: false, error: '' });
+      return;
+    }
 
     try {
       const response = await axios.post<AuthResponse>(`${API_BASE_URL}/login`, {
@@ -34,13 +46,14 @@ export const useLogin = () => {
         }
       });
 
-      // Store auth data
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('userId', response.data.userId);
       localStorage.setItem('role', response.data.role);
 
       setState({ isLoading: false, error: '' });
-      if (response.data.role === 'CUSTOMER') {
+
+      if (response.data.role === 'customer') {
+
         navigate('/home');
       } else {
         navigate('/dashboard');
@@ -53,6 +66,7 @@ export const useLogin = () => {
 
   return {
     ...state,
+    fieldErrors,
     login
   };
 };
@@ -62,19 +76,23 @@ export const useRegister = () => {
     isLoading: false,
     error: ''
   });
+  const [fieldErrors, setFieldErrors] = useState<{ username?: string; fullName?: string; password?: string; confirmPassword?: string }>({});
   const navigate = useNavigate();
 
   const register = async (formData: RegisterFormData) => {
     setState({ isLoading: true, error: '' });
+    setFieldErrors({});
 
-    // Validation
-    if (!formData.username || !formData.fullName || !formData.password || !formData.confirmPassword) {
-      setState({ isLoading: false, error: 'All fields are required!' });
-      return;
-    }
+    const errors: typeof fieldErrors = {};
+    if (!formData.username) errors.username = 'Username is required';
+    if (!formData.fullName) errors.fullName = 'Full name is required';
+    if (!formData.password) errors.password = 'Password is required';
+    if (!formData.confirmPassword) errors.confirmPassword = 'Please confirm your password';
+    if (formData.password !== formData.confirmPassword) errors.confirmPassword = 'Passwords do not match';
 
-    if (formData.password !== formData.confirmPassword) {
-      setState({ isLoading: false, error: 'Passwords do not match!' });
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setState({ isLoading: false, error: '' });
       return;
     }
 
@@ -96,9 +114,11 @@ export const useRegister = () => {
 
   return {
     ...state,
+    fieldErrors,
     register
   };
 };
+
 
 export const useForgotPassword = () => {
   const [state, setState] = useState<AuthState & { isSubmitted: boolean }>({
