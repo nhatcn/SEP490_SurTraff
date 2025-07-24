@@ -1,4 +1,3 @@
-// pages/Auth/RegisterPage.tsx
 import React, { useState } from 'react';
 import AuthLayout from '../../components/Auth/AuthLayout';
 import AuthInput from '../../components/Auth/AuthInput';
@@ -15,7 +14,7 @@ const RegisterPage: React.FC = () => {
     confirmPassword: ''
   });
 
-  const { isLoading, error, register } = useRegister();
+  const { isLoading, error, register, fieldErrors } = useRegister(); // ✅ lấy thêm fieldErrors
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,17 +50,15 @@ const RegisterPage: React.FC = () => {
 
   return (
     <AuthLayout title="">      
-    <div className="flex justify-center mb-8">
+      <div className="flex justify-center mb-8">
         <Logo />
       </div>
 
-      {/* Welcome Text */}
       <div className="text-center mb-8">
         <h1 className="text-2xl font-bold text-white mb-2">Create Account</h1>
         <p className="text-white/70">Join us today and get started</p>
       </div>
 
-      
       {error && (
         <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-500 text-sm">
           <pre className="whitespace-pre-wrap">{error}</pre>
@@ -77,6 +74,7 @@ const RegisterPage: React.FC = () => {
           value={formData.username}
           onChange={handleInputChange('username')}
           icon={<UserIcon />}
+          error={fieldErrors.username}
           disabled={isLoading}
         />
 
@@ -88,6 +86,7 @@ const RegisterPage: React.FC = () => {
           value={formData.fullName}
           onChange={handleInputChange('fullName')}
           icon={<NameIcon />}
+          error={fieldErrors.fullName}
           disabled={isLoading}
         />
 
@@ -99,6 +98,7 @@ const RegisterPage: React.FC = () => {
           value={formData.password}
           onChange={handleInputChange('password')}
           icon={<LockIcon />}
+          error={fieldErrors.password}
           disabled={isLoading}
         />
 
@@ -110,6 +110,7 @@ const RegisterPage: React.FC = () => {
           value={formData.confirmPassword}
           onChange={handleInputChange('confirmPassword')}
           icon={<LockIcon />}
+          error={fieldErrors.confirmPassword}
           disabled={isLoading}
         />
 
