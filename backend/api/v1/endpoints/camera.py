@@ -18,6 +18,12 @@ from services.camera.accidentService import (
     stream_accident_video_service,
 )
 
+from services.stream_overspeed_service import (
+    stream_overspeed_service
+)
+from services.nohelmet_service import (
+    stream_no_helmet_service
+)
 # from services.camera.wrongwayService import (
 #     stream_violation_wrongway_video_service
 # )
@@ -126,7 +132,7 @@ def stream_video(camera_id: int, db: Session = Depends(get_db)):
             analyze_traffic_video(camera.stream_url, camera.id),
             media_type="multipart/x-mixed-replace; boundary=frame"
         )
-    elif camera_id == 12:
+    elif camera_id == 7:
         return StreamingResponse(
             detect_potholes_in_video(camera.stream_url, camera.id, db),
             media_type="multipart/x-mixed-replace; boundary=frame"
@@ -136,16 +142,16 @@ def stream_video(camera_id: int, db: Session = Depends(get_db)):
             stream_violation_wrongway_video_service(camera.stream_url, camera.id, db),
             media_type="multipart/x-mixed-replace; boundary=frame"
         )
+    elif camera_id == 9:
+        return StreamingResponse(
+            stream_overspeed_service(camera.stream_url, camera.id, db),
+            media_type="multipart/x-mixed-replace; boundary=frame"
+        )
     elif camera_id == 11:
         return StreamingResponse(
-            analyze_traffic_video(camera.stream_url, camera.id, db),
+            stream_no_helmet_service(camera.stream_url, camera.id, db),
             media_type="multipart/x-mixed-replace; boundary=frame"
-        )
-    elif camera_id == 13:
-        return StreamingResponse(
-            detect_potholes_in_video(camera.stream_url, camera.id, db),
-            media_type="multipart/x-mixed-replace; boundary=frame"
-        )
+        )        
     elif camera_id >= 25:
         return StreamingResponse(
             stream_violation_video_service1(camera.stream_url, camera.id),
