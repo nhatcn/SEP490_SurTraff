@@ -38,7 +38,7 @@ const ViolationStatistics: React.FC = () => {
   useEffect(() => {
     const fetchViolations = async () => {
       try {
-        const response = await fetch("http://localhost:8081/api/violations/all");
+        const response = await fetch("http://localhost:8081/api/violations");
         const data = await response.json();
         setViolations(data);
       } catch (error) {

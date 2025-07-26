@@ -31,7 +31,7 @@ const AccidentStatistics: React.FC = () => {
 
   useEffect(() => {
     setLoading(true);
-    fetch("http://localhost:8081/api/accidents/all")
+    fetch("http://localhost:8081/api/accident")
       .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch accident data");
         return res.json();
