@@ -68,6 +68,31 @@ export default function CardBarChartViolationsMonth({ violations }: Props) {
       "July", "August", "September", "October", "November", "December"
     ];
 
+    // Kiểm tra có dữ liệu cho từng năm không
+    const hasCurrent = dataCurrent.some((v) => v > 0);
+    const hasLast = dataLast.some((v) => v > 0);
+
+    // Tạo datasets động
+    const datasets = [];
+    if (hasCurrent) {
+      datasets.push({
+        label: `${currentYear}`,
+        backgroundColor: "#4c51bf", // Xanh tím cho năm hiện tại
+        borderColor: "#4c51bf",
+        data: dataCurrent,
+        barThickness: 8,
+      });
+    }
+    if (hasLast) {
+      datasets.push({
+        label: `${lastYear}`,
+        backgroundColor: "#a0aec0", // Xám nhạt cho năm trước (hoặc đổi màu khác nếu muốn)
+        borderColor: "#a0aec0",
+        data: dataLast,
+        barThickness: 8,
+      });
+    }
+
     const ctx = chartRef.current.getContext("2d");
     if (!ctx) return;
 
@@ -75,22 +100,7 @@ export default function CardBarChartViolationsMonth({ violations }: Props) {
       type: "bar",
       data: {
         labels: months,
-        datasets: [
-          {
-            label: `${currentYear}`,
-            backgroundColor: "#ed64a6",
-            borderColor: "#ed64a6",
-            data: dataCurrent,
-            barThickness: 8,
-          },
-          {
-            label: `${lastYear}`,
-            backgroundColor: "#4c51bf",
-            borderColor: "#4c51bf",
-            data: dataLast,
-            barThickness: 8,
-          },
-        ],
+        datasets: datasets,
       },
       options: {
         responsive: true,
@@ -135,7 +145,7 @@ export default function CardBarChartViolationsMonth({ violations }: Props) {
   }, [violations, from, to]);
 
   return (
-    <div className="relative flex flex-col min-w-0 break-words bg-white w-full mb-6 shadow-lg rounded">
+    <div className="relative flex flex-col min-w-0 break-words bg-white w-full mb-6 shadow-lg rounded h-[340px] md:h-[380px]">
       <div className="rounded-t mb-0 px-4 py-3 bg-transparent">
         <div className="flex flex-wrap items-center justify-between">
           <div>
@@ -164,8 +174,8 @@ export default function CardBarChartViolationsMonth({ violations }: Props) {
           </div>
         </div>
       </div>
-      <div className="p-4 flex-auto">
-        <div className="relative w-full" style={{ height: "clamp(160px, 30vw, 200px)" }}>
+      <div className="p-4 flex-1 flex flex-col min-h-0">
+        <div className="relative flex-1 min-h-[120px]">
           <canvas ref={chartRef} className="w-full h-full" />
         </div>
       </div>

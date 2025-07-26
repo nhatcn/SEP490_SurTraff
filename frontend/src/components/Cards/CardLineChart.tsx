@@ -67,8 +67,8 @@ export default function CardLineChart({ accidents }: Props) {
         datasets: [
           {
             label: "Accidents",
-            backgroundColor: "#e53e3e", // đỏ cho phân biệt
-            borderColor: "#e53e3e",
+            backgroundColor: "#4c51bf", // đỏ cho phân biệt
+            borderColor: "#4c51bf",
             data: counts,
             fill: false,
             tension: 0.3,
@@ -128,24 +128,24 @@ export default function CardLineChart({ accidents }: Props) {
   }, [accidents]);
 
   return (
-    <div className="relative flex flex-col min-w-0 break-words w-full mb-6 shadow-lg rounded bg-blueGray-700">
-      <div className="rounded-t mb-0 px-4 py-3 bg-transparent">
-        <div className="flex flex-wrap items-center justify-between">
-          <div>
-            <h6 className="uppercase text-blueGray-400 mb-1 text-xs font-semibold">
-              Statistics
-            </h6>
-            <h2 className="text-blueGray-700 text-xl font-semibold">
-              Accidents by Week
-            </h2>
-          </div>
-        </div>
-      </div>
-      <div className="p-4 flex-auto">
-        <div className="relative h-[200px]">
-          <canvas ref={chartRef} className="w-full h-full" />
+  <div className="relative flex flex-col min-w-0 break-words w-full mb-6 shadow-lg rounded bg-blueGray-700 h-[340px] md:h-[380px] overflow-hidden">
+    <div className="rounded-t mb-0 px-4 py-3 bg-transparent">
+      <div className="flex flex-wrap items-center justify-between">
+        <div>
+          <h6 className="uppercase text-blueGray-400 mb-1 text-xs font-semibold">
+            Statistics
+          </h6>
+          <h2 className="text-blueGray-700 text-xl font-semibold">
+            Accidents by Week
+          </h2>
         </div>
       </div>
     </div>
-  );
+    <div className="p-4 flex-1 flex flex-col min-h-0">
+      <div className="relative flex-1 min-h-[120px]">
+        <canvas ref={chartRef} className="w-full h-full" />
+      </div>
+    </div>
+  </div>
+);
 }
