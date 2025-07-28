@@ -1,4 +1,3 @@
-
 import os
 import cv2
 import numpy as np
@@ -8,23 +7,21 @@ import traceback
 from datetime import datetime
 from collections import deque
 from ultralytics import YOLO
-import requests
-import easyocr
-from fastapi import FastAPI
-from fastapi.responses import StreamingResponse
+import aiohttp
+import asyncio
 from utils.yt_stream import get_stream_url
 
 # Constants
 VIOLATIONS_DIR = "violations"
 os.makedirs(VIOLATIONS_DIR, exist_ok=True)
 FRAME_RATE = 30  # FPS
-STANDARD_WIDTH = 640
-STANDARD_HEIGHT = 480
 ROI_SCALE = 1.5  # Scale vùng đầu
 MIN_HEAD_SIZE = 20  # Kích thước tối thiểu vùng đầu (pixel)
+RECONNECT_ATTEMPTS = 3
+RECONNECT_DELAY = 1
 
-# Load the fine-tuned YOLO model
-model = YOLO("no_helmet2.pt")  # Replace with your fine-tuned model path
+# Load the YOLO model
+model = YOLO("no_helmet2.pt")  # Thay bằng path đến model của bạn
 
 # Define class names mapping
 class_names = {
@@ -34,87 +31,118 @@ class_names = {
     3: "without_helmet"
 }
 
-# Initialize EasyOCR
-ocr_reader = easyocr.Reader(['en'], gpu=False)
-
-app = FastAPI()
-
-def fetch_camera_config(cid: int, retries=3, delay=1):
+async def fetch_camera_config(cid: int, retries=3, delay=1):
     """
-    Fetch camera configuration from Spring Boot API
+    Lấy cấu hình camera từ API Spring Boot
     """
-    url = f"http://localhost:8000/api/cameras/{cid}"
-    for attempt in range(retries):
+    url = f"http://localhost:8081/api/cameras/{cid}"
+    async with aiohttp.ClientSession() as session:
+        for attempt in range(1, retries + 1):  # Sửa lỗi cú pháp: retries + 1
+            try:
+                async with session.get(url, timeout=10) as response:
+                    response.raise_for_status()
+                    return await response.json()
+            except Exception as e:
+                print(f"[-] Retry {attempt}/{retries}: Error fetching camera config: {str(e)}")
+                if attempt == retries:
+                    raise RuntimeError(f"Failed to fetch camera config after {retries} retries: {e}")
+                await asyncio.sleep(delay)
+
+async def send_violation_async(violation_data, snapshot_filepath, video_filepath):
+    """
+    Gửi dữ liệu vi phạm đến API bất đồng bộ
+    """
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=60)) as session:
+            with open(snapshot_filepath, "rb") as img_file, open(video_filepath, "rb") as vid_file:
+                files = {
+                    "imageFile": (os.path.basename(snapshot_filepath), img_file, "image/jpeg"),
+                    "videoFile": (os.path.basename(video_filepath), vid_file, "video/mp4")
+                }
+                data = {"Violation": json.dumps(violation_data)}
+                async with session.post("http://localhost:8081/api/violations", data=data, files=files) as response:
+                    if response.status == 200:
+                        print(f"[+] Violation saved to API: {await response.json()}")
+                    else:
+                        print(f"[-] HTTP error when saving violation to API: {response.status}")
+    except Exception as e:
+        print(f"[-] Error saving violation to API: {str(e)}")
+
+def stream_no_helmet_service(youtube_url: str, camera_id: int):
+    """
+    Stream video và phát hiện vi phạm không đội mũ bảo hiểm
+    """
+    print(f"[+] Starting stream_no_helmet_service for camera {camera_id}: {youtube_url}")
+    print(f"[+] Loaded model classes: {model.names}")
+
+    # Handle YouTube URL
+    stream_url = youtube_url
+    if "youtube.com" in stream_url or "youtu.be" in stream_url:
         try:
-            res = requests.get(url)
-            res.raise_for_status()
-            return res.json()
+            stream_url = get_stream_url(youtube_url)
+            print(f"[+] Converted YouTube URL to stream: {stream_url}")
         except Exception as e:
-            print(f"Retry {attempt+1}/{retries}: Error fetching zones: {e}")
-            time.sleep(delay)
-    raise ValueError("Failed to fetch camera config after retries")
+            print(f"[-] Cannot convert YouTube URL: {str(e)}")
+            raise ValueError(f"Cannot convert YouTube URL: {str(e)}")
 
-def extract_license_plate(frame, boxes):
-    """
-    Extract license plate text
-    """
-    license_plate_text = "Unknown"
-    for box in boxes:
-        if class_names.get(int(box.cls), "") == "number_plate":
-            x1, y1, x2, y2 = map(int, box.xyxy[0])
-            plate_roi = frame[y1:y2, x1:x2]
-            if plate_roi.size > 0:
-                try:
-                    plate_roi = cv2.cvtColor(plate_roi, cv2.COLOR_BGR2GRAY)
-                    plate_roi = cv2.equalizeHist(plate_roi)
-                    ocr_results = ocr_reader.readtext(plate_roi, detail=0)
-                    license_plate_text = ocr_results[0] if ocr_results else "Unknown"
-                    license_plate_text = "".join(c for c in license_plate_text if c.isalnum()).upper()
-                except Exception as e:
-                    print(f"Error in OCR: {e}")
-                    license_plate_text = "Unknown"
-            break
-    return license_plate_text
+    # Fetch camera config
+    try:
+        camera_config = asyncio.run(fetch_camera_config(camera_id))
+        if not camera_config:
+            print("[-] Failed to fetch camera config")
+            raise ValueError("Could not fetch camera config")
+    except Exception as e:
+        print(f"[-] Failed to fetch camera config: {str(e)}")
+        raise
 
-@app.get("/stream/{camera_id}")
-async def stream_no_helmet_service(youtube_url: str, camera_id: int):
-    # Print model class names for verification
-    print(f"Loaded model classes: {model.names}")
-    
-    camera_config = fetch_camera_config(camera_id)
-    if not camera_config:
-        raise ValueError("Could not fetch camera config")
-
-    stream_url = get_stream_url(youtube_url)
     cap = cv2.VideoCapture(stream_url)
-
     if not cap.isOpened():
-        raise ValueError(f"❌ Cannot open stream from {stream_url}")
+        print(f"[-] Cannot open stream: {stream_url}")
+        cap.release()
+        raise ValueError(f"Cannot open stream: {stream_url}")
 
     vehicle_violations = {}
-    frame_buffer = deque(maxlen=30)
+    frame_buffer = deque(maxlen=30)  # Buffer 30 khung hình
     recording_tasks = {}
+    reconnect_attempts = 0
 
     try:
         while True:
             ret, frame = cap.read()
-            if not ret:
-                print("Failed to read frame, reconnecting...")
+            if not ret or frame is None or frame.size == 0:
+                print(f"[-] Cannot read frame, retrying (attempt {reconnect_attempts + 1}/{RECONNECT_ATTEMPTS})...")
                 cap.release()
+                reconnect_attempts += 1
+                if reconnect_attempts >= RECONNECT_ATTEMPTS:
+                    raise RuntimeError(f"Max reconnect attempts reached: {RECONNECT_ATTEMPTS}")
+                time.sleep(RECONNECT_DELAY)
                 cap = cv2.VideoCapture(stream_url)
+                if not cap.isOpened():
+                    print(f"[-] Failed to reconnect to stream: {stream_url}")
+                    continue
+                reconnect_attempts = 0
                 continue
 
             frame_annotated = frame.copy()
             frame_for_video = frame.copy()
             h, w, _ = frame.shape
 
-            results = model.track(source=frame, persist=True, conf=0.4, iou=0.4, tracker="bytetrack.yaml")[0]
+            # YOLO tracking
+            try:
+                results = model.track(source=frame, persist=True, conf=0.4, iou=0.4, tracker="bytetrack.yaml")[0]
+            except Exception as e:
+                print(f"[-] YOLO tracking error: {str(e)}")
+                frame_buffer.append(frame_for_video.copy())
+                ret, jpeg = cv2.imencode(".jpg", frame_annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                if ret and jpeg is not None:
+                    yield (b"--frame\r\n" + b"Content-Type: image/jpeg\r\n\r\n" + jpeg.tobytes() + b"\r\n")
+                continue
+
             if results.boxes is None or results.boxes.id is None:
                 frame_buffer.append(frame_for_video.copy())
-                yield (
-                    b"--frame\r\n"
-                    b"Content-Type: image/jpeg\r\n\r\n" + cv2.imencode('.jpg', frame_annotated, [cv2.IMWRITE_JPEG_QUALITY, 85])[1].tobytes() + b"\r\n"
-                )
+                ret, jpeg = cv2.imencode(".jpg", frame_annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                if ret and jpeg is not None:
+                    yield (b"--frame\r\n" + b"Content-Type: image/jpeg\r\n\r\n" + jpeg.tobytes() + b"\r\n")
                 continue
 
             active_track_ids = set()
@@ -133,7 +161,7 @@ async def stream_no_helmet_service(youtube_url: str, camera_id: int):
                 elif class_name == "number_plate":
                     plate_boxes.append(results.boxes[i])
 
-            license_plate_text = extract_license_plate(frame, plate_boxes)
+            license_plate_text = "Unknown"  # Placeholder since EasyOCR is disabled
 
             for x1, y1, x2, y2, track_id in rider_boxes:
                 head_height = int((y2 - y1) / 3 * ROI_SCALE)
@@ -144,7 +172,7 @@ async def stream_no_helmet_service(youtube_url: str, camera_id: int):
                 head_y2 = min(h, head_y1 + head_height)
 
                 no_helmet = False
-                if head_x2 > head_x1 and head_y2 > head_y1:
+                if head_x2 > head_x1 and head_y2 > head_y1 and (head_x2 - head_x1) >= MIN_HEAD_SIZE and (head_y2 - head_y1) >= MIN_HEAD_SIZE:
                     for box in results.boxes:
                         cls_id = int(box.cls)
                         if class_names.get(cls_id, model.names[cls_id]) in ["with_helmet", "without_helmet"]:
@@ -156,9 +184,9 @@ async def stream_no_helmet_service(youtube_url: str, camera_id: int):
                                     no_helmet = True
                                 break
 
-                if no_helmet and track_id not in vehicle_violations:
-                    vehicle_violations[track_id] = "NO_HELMET"
-                    print(f"NO HELMET VIOLATION: Rider {track_id}, Plate: {license_plate_text}")
+                if no_helmet and track_id not in vehicle_violations and track_id not in recording_tasks:
+                    vehicle_violations[track_id] = {"status": "NO_HELMET", "last_seen": time.time()}
+                    print(f"[+] NO HELMET VIOLATION: Rider {track_id}, Plate: {license_plate_text}")
 
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     snapshot_filename = f"no_helmet_{track_id}_{timestamp}.jpg"
@@ -167,29 +195,15 @@ async def stream_no_helmet_service(youtube_url: str, camera_id: int):
 
                     video_filename = f"no_helmet_{track_id}_{timestamp}.mp4"
                     video_filepath = os.path.join(VIOLATIONS_DIR, video_filename)
-                    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
                     writer = cv2.VideoWriter(video_filepath, fourcc, FRAME_RATE, (w, h))
                     for buf_frame in frame_buffer:
                         writer.write(buf_frame)
                     recording_tasks[track_id] = {
-                        'writer': writer,
-                        'frames_remaining': 30,
-                        'file_path': video_filepath
+                        "writer": writer,
+                        "frames_remaining": 30,
+                        "file_path": video_filepath
                     }
-
-                    # Ensure video is written before sending
-                    if track_id in recording_tasks:
-                        task = recording_tasks[track_id]
-                        while task['frames_remaining'] > 0:
-                            ret, frame = cap.read()
-                            if not ret:
-                                continue
-                            frame_for_video = frame.copy()
-                            task['writer'].write(frame_for_video)
-                            task['frames_remaining'] -= 1
-                            frame_buffer.append(frame_for_video.copy())
-                        task['writer'].release()
-                        del recording_tasks[track_id]
 
                     violation_data = {
                         "camera": {"id": camera_id},
@@ -208,26 +222,11 @@ async def stream_no_helmet_service(youtube_url: str, camera_id: int):
                     }
 
                     try:
-                        with open(snapshot_filepath, "rb") as img_file, open(video_filepath, "rb") as vid_file:
-                            files = {
-                                "imageFile": (snapshot_filename, img_file, "image/jpeg"),
-                                "videoFile": (video_filename, vid_file, "video/mp4")
-                            }
-                            data = {"Violation": json.dumps(violation_data)}
-                            response = requests.post(
-                                "http://localhost:8081/api/violations",
-                                files=files,
-                                data=data
-                            )
-                            response.raise_for_status()
-                            print(f"Violation saved to API: {response.json()}")
-                            print(f"Successfully sent image: {snapshot_filename} and video: {video_filename}")
-                    except requests.exceptions.HTTPError as http_err:
-                        print(f"HTTP error when saving violation to API: {http_err}")
+                        asyncio.run(send_violation_async(violation_data, snapshot_filepath, video_filepath))
                     except Exception as e:
-                        print(f"Error saving violation to API: {e}")
+                        print(f"[-] Error running send_violation_async: {str(e)}")
 
-                color = (0, 0, 255) if vehicle_violations.get(track_id, False) else (0, 255, 0)
+                color = (0, 0, 255) if vehicle_violations.get(track_id, {}).get("status") else (0, 255, 0)
                 label = f"ID:{track_id} {class_name} Plate: {license_plate_text} {'NO HELMET' if no_helmet else 'OK'}"
                 cv2.rectangle(frame_annotated, (x1, y1), (x2, y2), color, 2)
                 cv2.putText(frame_annotated, label, (x1, y1 - 10),
@@ -239,31 +238,28 @@ async def stream_no_helmet_service(youtube_url: str, camera_id: int):
 
             for track_id in list(recording_tasks.keys()):
                 task = recording_tasks[track_id]
-                if task['frames_remaining'] > 0:
-                    task['writer'].write(frame_for_video)
-                    task['frames_remaining'] -= 1
+                if task["frames_remaining"] > 0:
+                    task["writer"].write(frame_for_video)
+                    task["frames_remaining"] -= 1
                 else:
-                    task['writer'].release()
+                    task["writer"].release()
                     del recording_tasks[track_id]
 
             for track_id in list(vehicle_violations.keys()):
-                if track_id not in active_track_ids:
+                if track_id not in active_track_ids and time.time() - vehicle_violations[track_id]["last_seen"] > 60:
                     vehicle_violations.pop(track_id, None)
 
-            _, jpeg = cv2.imencode('.jpg', frame_annotated, [cv2.IMWRITE_JPEG_QUALITY, 85])
-            yield (
-                b"--frame\r\n"
-                b"Content-Type: image/jpeg\r\n\r\n" + jpeg.tobytes() + b"\r\n"
-            )
+            ret, jpeg = cv2.imencode(".jpg", frame_annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
+            if ret and jpeg is not None:
+                yield (b"--frame\r\n" + b"Content-Type: image/jpeg\r\n\r\n" + jpeg.tobytes() + b"\r\n")
+            else:
+                print(f"[-] Failed to encode frame to JPEG")
 
     except Exception as e:
-        print(f"Error in stream_no_helmet_service: {e}")
+        print(f"[-] Error in stream_no_helmet_service: {str(e)}")
         traceback.print_exc()
     finally:
         cap.release()
         for task in recording_tasks.values():
-            task['writer'].release()
-
-# if __name__ == "__main__":
-#     import uvicorn
-#     uvicorn.run(app, host="0.0.0.0", port=8000)
+            task["writer"].release()
+        print(f"[+] Closed stream for camera {camera_id}")
