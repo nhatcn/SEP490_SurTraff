@@ -1,3 +1,4 @@
+
 import os
 import cv2
 import numpy as np
@@ -9,80 +10,74 @@ from collections import deque
 from ultralytics import YOLO
 import requests
 import easyocr
-import torch
-import torchvision.transforms as transforms
+from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
+from filterpy.kalman import KalmanFilter
+from utils.yt_stream import get_stream_url
 
 # Constants
-VIOLATIONS_DIR = "violations"
+VIOLATIONS_DIR = "overspeed_violations"
 os.makedirs(VIOLATIONS_DIR, exist_ok=True)
 FRAME_RATE = 30  # FPS
 STANDARD_WIDTH = 640
 STANDARD_HEIGHT = 480
-ROI_SCALE = 1.5  # Scale for head region
-MIN_HEAD_SIZE = 20  # Minimum head size (pixels)
+SPEED_LIMIT = 60  # km/h, adjust as needed
+MIN_VEHICLE_SIZE = 50  # Minimum vehicle bounding box size (pixels)
+DISTANCE_REF = 10  # Reference real-world distance (meters) for calibration
+PIXEL_REF = 100  # Corresponding pixel distance for DISTANCE_REF
 
-# Load models
-try:
-    model_vehicle = YOLO("yolov8m.pt")
-    model_license_plate = YOLO("best90.pt")
-except Exception as e:
-    print(f"Error loading YOLO models: {e}")
-    exit(1)
+# Load YOLOv8m model
+model = YOLO("yolov8m.pt")  # Pre-trained YOLOv8m model
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-print(f"Using device: {device}")
+# Define class names mapping
+class_names = {
+    2: "car",
+    3: "motorbike",
+    5: "bus",
+    7: "truck",
+    # Add number_plate if your model is fine-tuned to detect it
+}
 
-# Define ResNetBarlowTwins class
-class ResNetBarlowTwins(torch.nn.Module):
-    def __init__(self, num_classes=2):
-        super(ResNetBarlowTwins, self).__init__()
-        self.resnet = torchvision.models.resnet18(weights=None)
-        self.feature_dim = self.resnet.fc.in_features
-        self.resnet.fc = torch.nn.Identity()
-        self.projector = torch.nn.Sequential(
-            torch.nn.Linear(self.feature_dim, 2048),
-            torch.nn.BatchNorm1d(2048),
-            torch.nn.ReLU(inplace=True),
-            torch.nn.Linear(2048, 2048)
-        )
-        self.fc = torch.nn.Linear(self.feature_dim, num_classes)
+# Initialize EasyOCR
+ocr_reader = easyocr.Reader(['en'], gpu=False)
 
-    def forward(self, x, return_features=False):
-        features = self.resnet(x)
-        if return_features:
-            return features
-        proj = self.projector(features)
-        logits = self.fc(features)
-        return logits, proj
+# Initialize FastAPI
+app = FastAPI()
 
-# Load helmet detection model
-try:
-    model_helmet = ResNetBarlowTwins(num_classes=2).to(device)
-    model_helmet.load_state_dict(torch.load(r"D:\DATN\frontend.18.7\SEP490_SurTraff\backend\model_barlow_fixmatch.pth", map_location=device))
-    model_helmet.eval()
-    print("Loaded PyTorch helmet classifier model successfully")
-except Exception as e:
-    print(f"Error loading helmet classifier model: {e}")
-    model_helmet = None
+def initialize_kalman_filter():
+    """Initialize Kalman Filter for tracking position and velocity."""
+    kf = KalmanFilter(dim_x=4, dim_z=2)  # State: [x, y, vx, vy], Measurement: [x, y]
+    kf.F = np.array([[1, 0, 1, 0],  # State transition matrix
+                     [0, 1, 0, 1],
+                     [0, 0, 1, 0],
+                     [0, 0, 0, 1]])
+    kf.H = np.array([[1, 0, 0, 0],  # Measurement function
+                     [0, 1, 0, 0]])
+    kf.P *= 1000.0  # Initial covariance
+    kf.R = np.array([[5, 0], [0, 5]])  # Measurement noise
+    kf.Q = np.eye(4) * 0.1  # Process noise
+    return kf
 
-try:
-    ocr_reader = easyocr.Reader(['en'], gpu=torch.cuda.is_available())
-except Exception as e:
-    print(f"Error initializing EasyOCR: {e}")
-    exit(1)
+def fetch_camera_config(cid: int, retries=3, delay=1):
+    """Fetch camera configuration from Spring Boot API."""
+    url = f"http://localhost:8081/api/cameras/{cid}"
+    for attempt in range(retries):
+        try:
+            res = requests.get(url)
+            res.raise_for_status()
+            config = res.json()
+            return config
+        except Exception as e:
+            print(f"Retry {attempt+1}/{retries}: Error fetching camera config: {e}")
+            time.sleep(delay)
+    raise ValueError("Failed to fetch camera config after retries")
 
-def extract_license_plate(frame, boxes, vehicle_box):
-    """
-    Extract license plate text
-    """
-    x1_v, y1_v, x2_v, y2_v = vehicle_box
-    cx_v, cy_v = (x1_v + x2_v) / 2, (y1_v + y2_v) / 2
+def extract_license_plate(frame, boxes):
+    """Extract license plate text using EasyOCR."""
     license_plate_text = "Unknown"
-    
     for box in boxes:
-        x1, y1, x2, y2 = map(int, box.xyxy[0])
-        cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
-        if (abs(cx - cx_v) < (x2_v - x1_v) / 1.5 and abs(cy - cy_v) < (y2_v - y1_v) / 1.5):
+        if class_names.get(int(box.cls), model.names[int(box.cls)]) == "number_plate":
+            x1, y1, x2, y2 = map(int, box.xyxy[0])
             plate_roi = frame[y1:y2, x1:x2]
             if plate_roi.size > 0:
                 try:
@@ -97,131 +92,118 @@ def extract_license_plate(frame, boxes, vehicle_box):
             break
     return license_plate_text
 
-def preprocess_head_roi(roi, target_size=(224, 224)):
-    """
-    Preprocess head ROI for PyTorch ResNet input
-    """
-    if roi.size == 0 or roi.shape[0] < MIN_HEAD_SIZE or roi.shape[1] < MIN_HEAD_SIZE:
-        return None
-    roi = cv2.cvtColor(roi, cv2.COLOR_BGR2RGB)
-    roi = cv2.resize(roi, target_size)
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-    ])
-    roi_tensor = transform(roi).unsqueeze(0)
-    return roi_tensor
+def calculate_speed(prev_pos, curr_pos, frame_time, pixel_to_meter):
+    """Calculate speed in km/h based on pixel displacement."""
+    if prev_pos is None or curr_pos is None:
+        return 0.0
+    dx = curr_pos[0] - prev_pos[0]
+    dy = curr_pos[1] - prev_pos[1]
+    pixel_distance = np.sqrt(dx**2 + dy**2)
+    meters_per_second = (pixel_distance * pixel_to_meter) / frame_time
+    km_per_hour = meters_per_second * 3.6  # Convert m/s to km/h
+    return km_per_hour
 
-def process_local_video(video_path: str, camera_id: int):
-    """
-    Process a local video file for helmet violation detection
-    """
-    if not os.path.exists(video_path):
-        raise ValueError(f"❌ Video file does not exist: {video_path}")
+@app.get("/stream/{camera_id}")
+async def stream_overspeed_service(youtube_url: str, camera_id: int):
+    """Stream video and detect overspeed violations."""
+    # Print model class names for verification
+    print(f"Loaded model classes: {model.names}")
+    
+    camera_config = fetch_camera_config(camera_id)
+    if not camera_config:
+        raise ValueError("Could not fetch camera config")
 
-    cap = cv2.VideoCapture(video_path)
+    stream_url = get_stream_url(youtube_url)
+    cap = cv2.VideoCapture(stream_url)
+
     if not cap.isOpened():
-        raise ValueError(f"❌ Cannot open video file {video_path}")
-
-    # Initialize OpenCV window
-    cv2.namedWindow("Video", cv2.WINDOW_NORMAL)
+        raise ValueError(f"❌ Cannot open stream from {stream_url}")
 
     vehicle_violations = {}
     frame_buffer = deque(maxlen=30)
     recording_tasks = {}
-    frame_count = 0
+    kalman_filters = {}
+    speed_history = {}
+    pixel_to_meter = DISTANCE_REF / PIXEL_REF  # Conversion factor
+    frame_time = 1.0 / FRAME_RATE
 
     try:
         while True:
             ret, frame = cap.read()
             if not ret:
-                print("End of video file")
-                break
-
-            frame_count += 1
-            print(f"\n[Frame {frame_count}] Processing at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                print("Failed to read frame, reconnecting...")
+                cap.release()
+                cap = cv2.VideoCapture(stream_url)
+                continue
 
             frame_annotated = frame.copy()
             frame_for_video = frame.copy()
             h, w, _ = frame.shape
 
-            # Resize frame to standard size
-            frame = cv2.resize(frame, (STANDARD_WIDTH, STANDARD_HEIGHT))
-            frame_annotated = cv2.resize(frame_annotated, (STANDARD_WIDTH, STANDARD_HEIGHT))
-            frame_for_video = cv2.resize(frame_for_video, (STANDARD_WIDTH, STANDARD_HEIGHT))
-
-            plate_results = model_license_plate(frame, conf=0.4, iou=0.4)[0]
-            plate_boxes = plate_results.boxes if plate_results.boxes is not None else []
-
-            results = model_vehicle.track(source=frame, persist=True, conf=0.3, iou=0.4, tracker="bytetrack.yaml")[0]
+            results = model.track(source=frame, persist=True, conf=0.5, iou=0.5, tracker="bytetrack.yaml")[0]
             if results.boxes is None or results.boxes.id is None:
-                print("No motorbikes detected in this frame")
                 frame_buffer.append(frame_for_video.copy())
-                cv2.imshow("Video", frame_annotated)
-                cv2.waitKey(1)
+                yield (
+                    b"--frame\r\n"
+                    b"Content-Type: image/jpeg\r\n\r\n" + cv2.imencode('.jpg', frame_annotated, [cv2.IMWRITE_JPEG_QUALITY, 85])[1].tobytes() + b"\r\n"
+                )
                 continue
 
             active_track_ids = set()
-            motorbike_detected = False
+            vehicle_boxes = []
+            plate_boxes = []
+
             for i in range(len(results.boxes)):
                 cls_id = int(results.boxes.cls[i])
-                class_name = model_vehicle.names[cls_id]
-                if class_name != 'motorbike':  # Only process motorbikes
+                class_name = class_names.get(cls_id, model.names[cls_id])
+                if class_name not in class_names.values():
                     continue
 
-                motorbike_detected = True
                 x1, y1, x2, y2 = map(int, results.boxes.xyxy[i])
-                cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
                 track_id = int(results.boxes.id[i])
                 active_track_ids.add(track_id)
 
-                license_plate_text = extract_license_plate(frame, plate_boxes, (x1, y1, x2, y2))
-                head_height = int((y2 - y1) / 3 * ROI_SCALE)
-                head_width = int((x2 - x1) * ROI_SCALE)
-                head_x1 = max(0, int(x1 - (head_width - (x2 - x1)) / 2))
-                head_y1 = max(0, y1)
-                head_x2 = min(STANDARD_WIDTH, head_x1 + head_width)
-                head_y2 = min(STANDARD_HEIGHT, head_y1 + head_height)
+                if (x2 - x1) < MIN_VEHICLE_SIZE or (y2 - y1) < MIN_VEHICLE_SIZE:
+                    continue
 
-                no_helmet = False
-                if head_x2 > head_x1 and head_y2 > head_y1 and model_helmet:
-                    head_roi = frame[head_y1:head_y2, head_x1:head_x2]
-                    head_input = preprocess_head_roi(head_roi)
-                    if head_input is not None:
-                        try:
-                            with torch.no_grad():
-                                head_input = head_input.to(device)
-                                logits, _ = model_helmet(head_input)
-                                probabilities = torch.softmax(logits, dim=1)
-                                no_helmet = probabilities[0][0].item() > 0.5
-                        except Exception as e:
-                            print(f"Error in helmet prediction for track ID {track_id}: {e}")
+                vehicle_boxes.append((x1, y1, x2, y2, track_id, class_name))
+                if class_name == "number_plate":
+                    plate_boxes.append(results.boxes[i])
 
-                status = "NO HELMET" if no_helmet else "HELMET OK"
-                print(f"Vehicle ID: {track_id}, Type: {class_name}, Plate: {license_plate_text}, Status: {status}")
+            license_plate_text = extract_license_plate(frame, plate_boxes)
 
-                # Draw bounding box and label
-                color = (0, 0, 255) if no_helmet else (0, 255, 0)
-                cv2.rectangle(frame_annotated, (x1, y1), (x2, y2), color, 2)
-                label = f"ID:{track_id} {class_name} Plate: {license_plate_text} {status}"
-                cv2.putText(frame_annotated, label, (x1, y1 - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
-                if head_x2 > head_x1 and head_y2 > head_y1:
-                    cv2.rectangle(frame_annotated, (head_x1, head_y1), (head_x2, head_y2), color, 1)
+            for x1, y1, x2, y2, track_id, class_name in vehicle_boxes:
+                if track_id not in kalman_filters:
+                    kalman_filters[track_id] = initialize_kalman_filter()
+                    speed_history[track_id] = deque(maxlen=10)
 
-                if no_helmet and track_id not in vehicle_violations:
-                    vehicle_violations[track_id] = "NO_HELMET"
-                    print(f"VIOLATION DETECTED: Vehicle {track_id} (motorbike), Plate: {license_plate_text}, No Helmet")
+                kf = kalman_filters[track_id]
+                center_x, center_y = (x1 + x2) / 2, (y1 + y2) / 2
+
+                kf.predict()
+                kf.update(np.array([[center_x], [center_y]]))
+
+                smoothed_pos = kf.x[:2].flatten()
+                prev_pos = speed_history[track_id][-1] if speed_history[track_id] else None
+                speed = calculate_speed(prev_pos, smoothed_pos, frame_time, pixel_to_meter)
+                speed_history[track_id].append(smoothed_pos)
+
+                avg_speed = np.mean([calculate_speed(speed_history[track_id][i-1], speed_history[track_id][i], frame_time, pixel_to_meter) 
+                                     for i in range(1, len(speed_history[track_id]))]) if len(speed_history[track_id]) > 1 else speed
+
+                if avg_speed > SPEED_LIMIT and track_id not in vehicle_violations:
+                    vehicle_violations[track_id] = "OVERSPEED"
+                    print(f"OVERSPEED VIOLATION: Vehicle {track_id}, Plate: {license_plate_text}, Speed: {avg_speed:.2f} km/h")
 
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    snapshot_filename = f"no_helmet_{track_id}_{timestamp}.jpg"
+                    snapshot_filename = f"overspeed_{track_id}_{timestamp}.jpg"
                     snapshot_filepath = os.path.join(VIOLATIONS_DIR, snapshot_filename)
                     cv2.imwrite(snapshot_filepath, frame_annotated, [cv2.IMWRITE_JPEG_QUALITY, 95])
 
-                    video_filename = f"no_helmet_{track_id}_{timestamp}.mp4"
+                    video_filename = f"overspeed_{track_id}_{timestamp}.mp4"
                     video_filepath = os.path.join(VIOLATIONS_DIR, video_filename)
                     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-                    writer = cv2.VideoWriter(video_filepath, fourcc, FRAME_RATE, (STANDARD_WIDTH, STANDARD_HEIGHT))
+                    writer = cv2.VideoWriter(video_filepath, fourcc, FRAME_RATE, (w, h))
                     for buf_frame in frame_buffer:
                         writer.write(buf_frame)
                     recording_tasks[track_id] = {
@@ -230,19 +212,32 @@ def process_local_video(video_path: str, camera_id: int):
                         'file_path': video_filepath
                     }
 
-                    # Call API POST /api/violations
+                    # Ensure video is written before sending
+                    if track_id in recording_tasks:
+                        task = recording_tasks[track_id]
+                        while task['frames_remaining'] > 0:
+                            ret, frame = cap.read()
+                            if not ret:
+                                continue
+                            frame_for_video = frame.copy()
+                            task['writer'].write(frame_for_video)
+                            task['frames_remaining'] -= 1
+                            frame_buffer.append(frame_for_video.copy())
+                        task['writer'].release()
+                        del recording_tasks[track_id]
+
                     violation_data = {
                         "camera": {"id": camera_id},
                         "vehicle": {"licensePlate": license_plate_text},
-                        "vehicleType": {"id": 1},  # Assume ID 1 for motorbike
+                        "vehicleType": {"id": 1},  # Assuming ID 1 for vehicle
                         "createdAt": datetime.now().isoformat(),
                         "status": "PENDING",
                         "violationDetails": [
                             {
-                                "violationTypeId": 1,  # Assume ID 1 for NO_HELMET
+                                "violationTypeId": 2,  # Assuming ID 2 for OVERSPEED
                                 "location": "Unknown",
                                 "violationTime": datetime.now().isoformat(),
-                                "additionalNotes": f"Track ID: {track_id}"
+                                "additionalNotes": f"Track ID: {track_id}, Speed: {avg_speed:.2f} km/h"
                             }
                         ]
                     }
@@ -257,21 +252,21 @@ def process_local_video(video_path: str, camera_id: int):
                             response = requests.post(
                                 "http://localhost:8081/api/violations",
                                 files=files,
-                                data=data,
-                                timeout=5
+                                data=data
                             )
                             response.raise_for_status()
                             print(f"Violation saved to API: {response.json()}")
-                    except requests.exceptions.RequestException as e:
+                            print(f"Successfully sent image: {snapshot_filename} and video: {video_filename}")
+                    except requests.exceptions.HTTPError as http_err:
+                        print(f"HTTP error when saving violation to API: {http_err}")
+                    except Exception as e:
                         print(f"Error saving violation to API: {e}")
-                        # Log violation locally as a fallback
-                        log_file = os.path.join(VIOLATIONS_DIR, f"violation_{track_id}_{timestamp}.json")
-                        with open(log_file, 'w') as f:
-                            json.dump(violation_data, f, indent=4)
-                        print(f"Violation logged locally as fallback: {log_file}")
 
-            if not motorbike_detected:
-                print("No motorbikes detected in this frame")
+                color = (0, 0, 255) if vehicle_violations.get(track_id, False) else (0, 255, 0)
+                label = f"ID:{track_id} {class_name} Plate: {license_plate_text} Speed: {avg_speed:.2f} km/h"
+                cv2.rectangle(frame_annotated, (x1, y1), (x2, y2), color, 2)
+                cv2.putText(frame_annotated, label, (x1, y1 - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
 
             frame_buffer.append(frame_for_video.copy())
 
@@ -287,21 +282,23 @@ def process_local_video(video_path: str, camera_id: int):
             for track_id in list(vehicle_violations.keys()):
                 if track_id not in active_track_ids:
                     vehicle_violations.pop(track_id, None)
+                    kalman_filters.pop(track_id, None)
+                    speed_history.pop(track_id, None)
 
-            cv2.imshow("Video", frame_annotated)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
+            _, jpeg = cv2.imencode('.jpg', frame_annotated, [cv2.IMWRITE_JPEG_QUALITY, 85])
+            yield (
+                b"--frame\r\n"
+                b"Content-Type: image/jpeg\r\n\r\n" + jpeg.tobytes() + b"\r\n"
+            )
 
     except Exception as e:
-        print(f"Error in process_local_video: {e}")
+        print(f"Error in stream_overspeed_service: {e}")
         traceback.print_exc()
     finally:
         cap.release()
         for task in recording_tasks.values():
             task['writer'].release()
-        cv2.destroyAllWindows()
 
 if __name__ == "__main__":
-    video_path = "abc.mp4"  # Replace with your actual video file path
-    camera_id = 1  # Replace with your camera ID if needed
-    process_local_video(video_path, camera_id)
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
