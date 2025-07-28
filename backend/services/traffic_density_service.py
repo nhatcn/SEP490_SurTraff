@@ -1,6 +1,9 @@
 import cv2
 import numpy as np
 import os
+import json
+import aiohttp
+import asyncio
 from ultralytics import YOLO
 from datetime import datetime
 from database import SessionLocal
@@ -33,6 +36,24 @@ LANE_POLYGONS = [
 
 # Chỉ detect các class này (COCO: car=2, motorcycle=3, bus=5, truck=7)
 ALLOWED_CLASSES = [2, 3, 5, 7]
+
+async def send_violation_async(violation_data, snapshot_filepath):
+    """
+    Gửi dữ liệu vi phạm đến API bất đồng bộ (gửi ảnh)
+    """
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=60)) as session:
+            with open(snapshot_filepath, "rb") as img_file:
+                form = aiohttp.FormData()
+                form.add_field("Violation", json.dumps(violation_data))
+                form.add_field("imageFile", img_file, filename=os.path.basename(snapshot_filepath), content_type="image/jpeg")
+                async with session.post("http://localhost:8081/api/violations", data=form) as response:
+                    if response.status == 200:
+                        print(f"[+] Violation saved to API: {await response.json()}")
+                    else:
+                        print(f"[-] HTTP error when saving violation to API: {response.status}")
+    except Exception as e:
+        print(f"[-] Error saving violation to API: {str(e)}")
 
 def analyze_traffic_video(stream_url, camera_id, db=None):
     print(f"[INFO] Start analyze_traffic_video for camera {camera_id} - {stream_url}")
@@ -124,6 +145,27 @@ def analyze_traffic_video(stream_url, camera_id, db=None):
                                 filepath = os.path.join(VIOLATIONS_DIR, filename)
                                 cv2.imwrite(filepath, annotated_frame)
                                 try:
+                                    # Gửi API
+                                    violation_data = {
+                                        "camera": {"id": camera_id},
+                                        "vehicle": {"licensePlate": "Unknown"},
+                                        "vehicleType": {"id": 0},
+                                        "createdAt": datetime.now().isoformat(),
+                                        "status": "PENDING",
+                                        "violationDetails": [
+                                            {
+                                                "violationTypeId": 6,  # 6: stopped in zone
+                                                "location": "Unknown",
+                                                "violationTime": datetime.now().isoformat(),
+                                                "additionalNotes": f"Track ID: {track_id}"
+                                            }
+                                        ]
+                                    }
+                                    try:
+                                        asyncio.run(send_violation_async(violation_data, filepath))
+                                    except Exception as e:
+                                        print(f"[-] Error running send_violation_async: {str(e)}")
+                                    # Nếu vẫn muốn lưu DB local thì giữ lại đoạn dưới, còn không thì bỏ
                                     violation = ViolationCreate(
                                         camera_id=camera_id,
                                         violation_type_id=6,
