@@ -1,11 +1,14 @@
+import os
 import cv2
 import numpy as np
-import os
-from ultralytics import YOLO
+import json
+import time
 from datetime import datetime
-from database import SessionLocal
-from models.model import Violation
-from schemas.violation_schema import ViolationCreate
+from ultralytics import YOLO
+from utils.yt_stream import get_stream_url
+
+import aiohttp
+import asyncio
 
 MODEL_POTHOLE = "best1.pt"
 MODEL_ANIMAL = "yolov8m.pt"  # hoặc model động vật custom của bạn
@@ -14,13 +17,27 @@ VIOLATIONS_DIR = "VIOLATIONS"
 # COCO animal class_id
 ANIMAL_CLASSES = [15, 16, 17, 18, 19, 20, 21, 22, 23, 24]  # dog, horse, sheep, cow, elephant, bear, zebra, giraffe, cat, bird
 
-def detect_potholes_in_video(stream_url, camera_id, db=None):
-    from utils.yt_stream import get_stream_url
-    if db is None:
-        db = SessionLocal()
-    os.makedirs(VIOLATIONS_DIR, exist_ok=True)
+os.makedirs(VIOLATIONS_DIR, exist_ok=True)
 
-    # Convert YouTube link nếu cần
+async def send_violation_async(violation_data, snapshot_filepath):
+    """
+    Gửi dữ liệu vi phạm đến API bất đồng bộ (gửi ảnh)
+    """
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=60)) as session:
+            with open(snapshot_filepath, "rb") as img_file:
+                form = aiohttp.FormData()
+                form.add_field("Violation", json.dumps(violation_data))
+                form.add_field("imageFile", img_file, filename=os.path.basename(snapshot_filepath), content_type="image/jpeg")
+                async with session.post("http://localhost:8081/api/violations", data=form) as response:
+                    if response.status == 200:
+                        print(f"[+] Violation saved to API: {await response.json()}")
+                    else:
+                        print(f"[-] HTTP error when saving violation to API: {response.status}")
+    except Exception as e:
+        print(f"[-] Error saving violation to API: {str(e)}")
+
+def detect_potholes_in_video(stream_url, camera_id):
     if "youtube.com" in stream_url or "youtu.be" in stream_url:
         try:
             stream_url = get_stream_url(stream_url)
@@ -68,31 +85,26 @@ def detect_potholes_in_video(stream_url, camera_id, db=None):
                         cv2.imwrite(filepath, annotated_frame)
                         pothole_saved.add(pothole_key)
 
-                        # Ghi DB
+                        # Gửi API
+                        violation_data = {
+                            "camera": {"id": camera_id},
+                            "vehicle": {"licensePlate": "Unknown"},
+                            "vehicleType": {"id": 0},
+                            "createdAt": datetime.now().isoformat(),
+                            "status": "PENDING",
+                            "violationDetails": [
+                                {
+                                    "violationTypeId": 7,  # 7: pothole
+                                    "location": "Unknown",
+                                    "violationTime": datetime.now().isoformat(),
+                                    "additionalNotes": f"Frame: {frame_idx}"
+                                }
+                            ]
+                        }
                         try:
-                            violation = ViolationCreate(
-                                camera_id=camera_id,
-                                violation_type_id=7,  # 7: pothole
-                                license_plate="Unknown",
-                                vehicle_color="Unknown",
-                                vehicle_brand="Unknown",
-                                image_url=filepath,
-                                violation_time=datetime.now()
-                            )
-                            db_violation = Violation(
-                                camera_id=violation.camera_id,
-                                violation_type_id=violation.violation_type_id,
-                                license_plate=violation.license_plate,
-                                vehicle_color=violation.vehicle_color,
-                                vehicle_brand=violation.vehicle_brand,
-                                image_url=violation.image_url,
-                                violation_time=violation.violation_time
-                            )
-                            db.add(db_violation)
-                            db.commit()
+                            asyncio.run(send_violation_async(violation_data, filepath))
                         except Exception as e:
-                            print(f"[ERROR] Error saving pothole violation to database: {e}")
-                            db.rollback()
+                            print(f"[-] Error running send_violation_async: {str(e)}")
 
             # --- Animal detection ---
             results_animal = model_animal(frame)
@@ -117,31 +129,26 @@ def detect_potholes_in_video(stream_url, camera_id, db=None):
                         cv2.imwrite(filepath, annotated_frame)
                         animal_saved.add(animal_key)
 
-                        # Ghi DB
+                        # Gửi API
+                        violation_data = {
+                            "camera": {"id": camera_id},
+                            "vehicle": {"licensePlate": "Unknown"},
+                            "vehicleType": {"id": 0},
+                            "createdAt": datetime.now().isoformat(),
+                            "status": "PENDING",
+                            "violationDetails": [
+                                {
+                                    "violationTypeId": 8,  # 8: animal
+                                    "location": "Unknown",
+                                    "violationTime": datetime.now().isoformat(),
+                                    "additionalNotes": f"Frame: {frame_idx}, Class: {class_name}"
+                                }
+                            ]
+                        }
                         try:
-                            violation = ViolationCreate(
-                                camera_id=camera_id,
-                                violation_type_id=8,  # 8: animal
-                                license_plate="Unknown",
-                                vehicle_color="Unknown",
-                                vehicle_brand=class_name,
-                                image_url=filepath,
-                                violation_time=datetime.now()
-                            )
-                            db_violation = Violation(
-                                camera_id=violation.camera_id,
-                                violation_type_id=violation.violation_type_id,
-                                license_plate=violation.license_plate,
-                                vehicle_color=violation.vehicle_color,
-                                vehicle_brand=violation.vehicle_brand,
-                                image_url=violation.image_url,
-                                violation_time=violation.violation_time
-                            )
-                            db.add(db_violation)
-                            db.commit()
+                            asyncio.run(send_violation_async(violation_data, filepath))
                         except Exception as e:
-                            print(f"[ERROR] Error saving animal violation to database: {e}")
-                            db.rollback()
+                            print(f"[-] Error running send_violation_async: {str(e)}")
 
             _, jpeg = cv2.imencode('.jpg', frame)
             yield (
@@ -151,4 +158,3 @@ def detect_potholes_in_video(stream_url, camera_id, db=None):
             frame_idx += 1
     finally:
         cap.release()
-        db.close()
