@@ -28,6 +28,10 @@ import ViolationStatistics from '../Pages/Violations/ViolationStatistics';
 import UserTrafficMap from '../Pages/UserMap/UserTrafficMap';
 import AccidentDetails from '../Pages/Dashboard/Accident/AccidentDetails';
 import ViewAccidentDetails from '../Pages/Dashboard/Accident/ViewAccidentDetailsUser';
+import AddVehicle from '../Pages/Vehicle/AddVehicle';
+import EditVehicle from '../Pages/Vehicle/EditVehicle';
+import ViolationCustomerList from '../Pages/Violations/ViolationCustomerList';
+import VehicleCustomerList from '../Pages/Violations/VehicleCustomerList';
 
 
 
@@ -61,6 +65,10 @@ const RoutesConfig = () => {
       <Route path="/home" element={<CustomerHome />} />
       <Route path="/myprofile" element={<CustomerProfile />} />
       <Route path="/usermap" element={<UserTrafficMap />} />
+      <Route path="/addv" element={<AddVehicle />} />
+      <Route path="/editv" element={<EditVehicle />} />
+      <Route path="/v" element={<ViolationCustomerList />} />
+      <Route path="/vehiclelistuser" element={<VehicleCustomerList />} />
     </Routes>
   );
 };
