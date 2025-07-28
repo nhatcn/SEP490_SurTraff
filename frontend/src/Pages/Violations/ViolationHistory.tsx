@@ -1,160 +1,434 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import Sidebar from "../../components/Layout/Sidebar";
-import axios from "axios";
-import { format } from "date-fns";
-import { toast } from "react-toastify";
-import ExportViolationsPDF from "./ExportViolationsPDF";
-import { AlertDialog } from "./AlertDialog";
+"use client"
 
-interface ViolationType {
-  id: number;
-  typeName: string;
+import React, { useEffect, useState, useCallback, useMemo } from "react"
+import { useParams, useNavigate } from "react-router-dom" // Import useNavigate
+import { motion, AnimatePresence } from "framer-motion"
+import { Search, Camera, Clock, Calendar, AlertTriangle, Car, CheckCircle, XCircle, ArrowLeft } from "lucide-react" // Import ArrowLeft
+import { Loader2 } from "lucide-react" // Import Loader2
+import { format } from "date-fns" // Import format
+
+// Define ViolationsDTO interface
+interface ViolationsDTO {
+  id: number
+  camera?: {
+    id: number
+    name: string
+    location: string
+    streamUrl?: string
+    thumbnail?: string
+    zoneId?: number
+    latitude?: number
+    longitude?: number
+  }
+  vehicleType?: {
+    id: number
+    typeName: string
+  }
+  vehicle?: {
+    id: number
+    name?: string
+    licensePlate: string
+    userId?: number
+    vehicleTypeId?: number
+    color?: string
+    brand?: string
+  }
+  createdAt?: string
+  violationDetails?: Array<{
+    id: number
+    violationId?: number
+    violationTypeId?: number
+    violationType: {
+      id: number
+      typeName: string
+      description?: string
+    }
+    imageUrl?: string
+    videoUrl?: string
+    location?: string
+    violationTime?: string
+    speed?: number
+    additionalNotes?: string
+    createdAt?: string
+    licensePlate?: string
+  }>
+  status?: "Request" | "Approve" | "Reject" | "Pending" // Explicitly define possible statuses
 }
 
-interface Vehicle {
-  id: number;
-  licensePlate: string | null;
-}
-
-interface ViolationDetail {
-  id: number;
-  violationType: ViolationType | null;
-  violationTime: string | null;
-  imageUrl?: string | null; // Tùy chọn, không có trong API hiện tại
-}
-
-interface Violation {
-  id: number;
-  vehicle: Vehicle | null;
-  violationDetails: ViolationDetail[];
+interface VehicleDTO {
+  id: number
+  name: string
+  licensePlate: string
+  userId: number
+  vehicleTypeId: number
+  color: string
+  brand: string
 }
 
 interface PaginationInfo {
-  currentPage: number;
-  totalPages: number;
-  totalItems: number;
-  itemsPerPage: number;
+  currentPage: number
+  totalPages: number
+  totalItems: number
+  itemsPerPage: number
 }
 
-const API_URL = "http://localhost:8080/api";
-const ITEMS_PER_PAGE = 10;
+interface ViolationType {
+  id: number
+  typeName: string
+  description?: string
+}
+
+// NOTE: In a real application, this API_URL should be an environment variable.
+// For this example, it's hardcoded as per the original request.
+const API_URL = "http://localhost:8081"
+const ITEMS_PER_PAGE = 10
 
 const LoadingSpinner: React.FC = () => (
-  <div className="flex justify-center items-center h-full">
-    <div className="animate-spin h-8 w-8 border-2 border-green-600 border-t-transparent rounded-full"></div>
-  </div>
-);
+  <motion.div
+    style={{
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      height: "100%",
+      padding: "2rem",
+    }}
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    transition={{ duration: 0.5 }}
+  >
+    <motion.div
+      style={{
+        width: "0.5rem",
+        height: "0.5rem",
+        backgroundColor: "#3B82F6",
+        borderRadius: "50%",
+        marginRight: "0.5rem",
+      }}
+      animate={{ opacity: [0.4, 1, 0.4] }}
+      transition={{ duration: 1.5, repeat: Number.POSITIVE_INFINITY, delay: 0 }}
+    />
+    <motion.div
+      style={{
+        width: "0.5rem",
+        height: "0.5rem",
+        backgroundColor: "#3B82F6",
+        borderRadius: "50%",
+        marginRight: "0.5rem",
+      }}
+      animate={{ opacity: [0.4, 1, 0.4] }}
+      transition={{ duration: 1.5, repeat: Number.POSITIVE_INFINITY, delay: 0.2 }}
+    />
+    <motion.div
+      style={{
+        width: "0.5rem",
+        height: "0.5rem",
+        backgroundColor: "#3B82F6",
+        borderRadius: "50%",
+      }}
+      animate={{ opacity: [0.4, 1, 0.4] }}
+      transition={{ duration: 1.5, repeat: Number.POSITIVE_INFINITY, delay: 0.4 }}
+    />
+  </motion.div>
+)
 
-const ErrorMessage: React.FC<{ message: string; onRetry?: () => void }> = ({
-  message,
-  onRetry,
-}) => (
-  <div className="text-center bg-red-100 p-6 rounded-lg">
-    <p className="text-red-600 mb-4">{message}</p>
+const ErrorMessage: React.FC<{ message: string; onRetry?: () => void }> = ({ message, onRetry }) => (
+  <motion.div
+    style={{
+      textAlign: "center",
+      background: "linear-gradient(to right, #FEF2F2, #FFF1F2)",
+      padding: "1.5rem",
+      borderRadius: "1rem",
+      border: "1px solid #FECACA",
+      boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+    }}
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.5 }}
+  >
+    <div
+      style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.75rem", marginBottom: "1rem" }}
+    >
+      <AlertTriangle style={{ color: "#EF4444", width: "1.25rem", height: "1.25rem" }} />
+      <p style={{ color: "#B91C1C", fontSize: "0.875rem", fontWeight: 500 }}>{message}</p>
+    </div>
     {onRetry && (
-      <button
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
         onClick={onRetry}
-        className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+        style={{
+          padding: "0.5rem 1rem",
+          background: "linear-gradient(to right, #EF4444, #DC2626)",
+          color: "white",
+          borderRadius: "0.75rem",
+          fontWeight: 600,
+          boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+          transition: "all 0.3s ease",
+          position: "relative",
+          overflow: "hidden",
+        }}
       >
-        Thử lại
-      </button>
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: "linear-gradient(to right, #DC2626, #B91C1C)",
+            opacity: 0,
+            transition: "opacity 0.3s ease",
+          }}
+          className="hover:opacity-100"
+        />
+        <span style={{ position: "relative", zIndex: 10 }}>Retry</span>
+      </motion.button>
     )}
-  </div>
-);
+  </motion.div>
+)
 
 const EmptyState: React.FC = () => (
-  <div className="text-center py-12">
-    <div className="text-gray-400 text-6xl mb-4">📷</div>
-    <h3 className="text-lg font-medium text-gray-900 mb-2">Chưa có vi phạm nào</h3>
-    <p className="text-gray-500">Danh sách vi phạm sẽ hiển thị tại đây.</p>
-  </div>
-);
+  <motion.div
+    style={{
+      textAlign: "center",
+      padding: "3rem 0",
+      color: "#6B7280",
+    }}
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.5 }}
+  >
+    <Camera style={{ color: "#9CA3AF", width: "3rem", height: "3rem", margin: "0 auto 1rem" }} />
+    <h3 style={{ fontSize: "1.125rem", fontWeight: 600, color: "#1F2937", marginBottom: "0.5rem" }}>
+      No Violations Found
+    </h3>
+    <p style={{ color: "#6B7280", fontSize: "0.875rem" }}>The list of violations will appear here.</p>
+  </motion.div>
+)
 
 const Pagination: React.FC<{
-  currentPage: number;
-  totalPages: number;
-  onPageChange: (page: number) => void;
+  currentPage: number
+  totalPages: number
+  onPageChange: (page: number) => void
 }> = ({ currentPage, totalPages, onPageChange }) => {
-  if (totalPages <= 1) return null;
-
+  if (totalPages <= 1) return null
   const getPageNumbers = () => {
-    const pages = [];
-    const showPages = 5;
-    let start = Math.max(1, currentPage - Math.floor(showPages / 2));
-    let end = Math.min(totalPages, start + showPages - 1);
+    const pages = []
+    const showPages = 5
+    let start = Math.max(1, currentPage - Math.floor(showPages / 2))
+    const end = Math.min(totalPages, start + showPages - 1)
     if (end - start + 1 < showPages) {
-      start = Math.max(1, end - showPages + 1);
+      start = Math.max(1, end - showPages + 1)
     }
     for (let i = start; i <= end; i++) {
-      pages.push(i);
+      pages.push(i)
     }
-    return pages;
-  };
-
+    return pages
+  }
   return (
-    <div className="flex items-center justify-between px-4 py-3 bg-white border-t border-gray-200">
-      <div className="flex items-center space-x-2">
-        <button
+    <motion.div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "0.75rem 1rem",
+        backgroundColor: "rgba(255, 255, 255, 0.8)",
+        borderTop: "1px solid rgba(229, 231, 235, 0.7)",
+      }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{
+            padding: "0.5rem 0.75rem",
+            fontSize: "0.875rem",
+            fontWeight: 500,
+            color: "#374151",
+            backgroundColor: "white",
+            border: "2px solid #E5E7EB",
+            borderRadius: "0.75rem",
+            opacity: currentPage === 1 ? 0.5 : 1,
+            cursor: currentPage === 1 ? "not-allowed" : "pointer",
+            transition: "all 0.3s ease",
+          }}
         >
-          Trước
-        </button>
+          Previous
+        </motion.button>
         {getPageNumbers().map((page) => (
-          <button
+          <motion.button
             key={page}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             onClick={() => onPageChange(page)}
-            className={`px-3 py-2 text-sm font-medium rounded-md ${
-              page === currentPage
-                ? "bg-green-500 text-white border-green-500"
-                : "text-gray-700 bg-white border-gray-300 hover:bg-gray-50"
-            }`}
+            style={{
+              padding: "0.5rem 0.75rem",
+              fontSize: "0.875rem",
+              fontWeight: 500,
+              borderRadius: "0.75rem",
+              color: page === currentPage ? "white" : "#374151",
+              background: page === currentPage ? "linear-gradient(to right, #3B82F6, #8B5CF6)" : "white",
+              border: "2px solid #E5E7EB",
+              transition: "all 0.3s ease",
+            }}
           >
             {page}
-          </button>
+          </motion.button>
         ))}
-        <button
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{
+            padding: "0.5rem 0.75rem",
+            fontSize: "0.875rem",
+            fontWeight: 500,
+            color: "#374151",
+            backgroundColor: "white",
+            border: "2px solid #E5E7EB",
+            borderRadius: "0.75rem",
+            opacity: currentPage === totalPages ? 0.5 : 1,
+            cursor: currentPage === totalPages ? "not-allowed" : "pointer",
+            transition: "all 0.3s ease",
+          }}
         >
-          Sau
-        </button>
+          Next
+        </motion.button>
       </div>
-      <p className="text-sm text-gray-700">
-        Trang {currentPage} / {totalPages}
+      <p style={{ fontSize: "0.875rem", color: "#6B7280" }}>
+        Page {currentPage} of {totalPages}
       </p>
-    </div>
-  );
-};
+    </motion.div>
+  )
+}
 
 const SearchAndFilter: React.FC<{
-  searchTerm: string;
-  onSearchChange: (value: string) => void;
-  filterType: string;
-  onFilterChange: (value: string) => void;
-  violationTypes: ViolationType[];
-}> = ({ searchTerm, onSearchChange, filterType, onFilterChange, violationTypes }) => {
+  searchTerm: string
+  onSearchChange: (value: string) => void
+  filterType: string
+  onFilterChange: (value: string) => void
+  violationTypes: ViolationType[]
+  selectedLicensePlate: string | null
+  onVehicleSelect: (licensePlate: string) => void
+  vehicles: VehicleDTO[]
+}> = ({
+  searchTerm,
+  onSearchChange,
+  filterType,
+  onFilterChange,
+  violationTypes,
+  selectedLicensePlate,
+  onVehicleSelect,
+  vehicles,
+}) => {
   return (
-    <div className="mb-6 flex flex-col sm:flex-row gap-4">
-      <div className="flex-1">
-        <input
-          type="text"
-          placeholder="Tìm kiếm theo biển số xe..."
-          value={searchTerm}
-          onChange={(e) => onSearchChange(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent"
-        />
+    <motion.div
+      style={{
+        marginBottom: "1.5rem",
+        display: "flex",
+        flexDirection: "column",
+        gap: "1rem",
+        alignItems: "flex-start",
+      }}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+    >
+      <div style={{ flex: 1, width: "100%" }}>
+        <label
+          style={{
+            display: "block",
+            fontSize: "0.875rem",
+            fontWeight: 600,
+            color: "#374151",
+            marginBottom: "0.5rem",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <Search style={{ width: "1rem", height: "1rem", color: "#3B82F6" }} />
+            <span>Search License Plate</span>
+          </div>
+        </label>
+        <div style={{ position: "relative" }}>
+          <Search
+            style={{
+              position: "absolute",
+              left: "0.75rem",
+              top: "50%",
+              transform: "translateY(-50%)",
+              color: "#9CA3AF",
+              width: "1rem",
+              height: "1rem",
+            }}
+          />
+          <input
+            type="text"
+            placeholder="Search by license plate..."
+            value={searchTerm}
+            onChange={(e) => onSearchChange(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "0.75rem 1rem 0.75rem 2.5rem",
+              border: "2px solid #E5E7EB",
+              borderRadius: "0.75rem",
+              fontSize: "0.875rem",
+              backgroundColor: "rgba(243, 244, 246, 0.5)",
+              transition: "all 0.3s ease",
+              fontFamily: "monospace",
+              outline: "none",
+            }}
+            onFocus={(e) => {
+              e.target.style.borderColor = "#3B82F6"
+              e.target.style.boxShadow = "0 0 0 4px rgba(59, 130, 246, 0.1)"
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = "#E5E7EB"
+              e.target.style.boxShadow = "none"
+            }}
+          />
+        </div>
       </div>
-      <div className="sm:w-48">
+      <div style={{ width: "100%", maxWidth: "12rem" }}>
+        <label
+          style={{
+            display: "block",
+            fontSize: "0.875rem",
+            fontWeight: 600,
+            color: "#374151",
+            marginBottom: "0.5rem",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <AlertTriangle style={{ width: "1rem", height: "1rem", color: "#F59E0B" }} />
+            <span>Violation Type</span>
+          </div>
+        </label>
         <select
           value={filterType}
           onChange={(e) => onFilterChange(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent"
+          style={{
+            width: "100%",
+            padding: "0.75rem 1rem",
+            border: "2px solid #E5E7EB",
+            borderRadius: "0.75rem",
+            fontSize: "0.875rem",
+            backgroundColor: "rgba(243, 244, 246, 0.7)",
+            transition: "all 0.3s ease",
+            outline: "none",
+          }}
+          onFocus={(e) => {
+            e.target.style.borderColor = "#F59E0B"
+            e.target.style.boxShadow = "0 0 0 4px rgba(245, 158, 11, 0.2)"
+          }}
+          onBlur={(e) => {
+            e.target.style.borderColor = "#E5E7EB"
+            e.target.style.boxShadow = "none"
+          }}
         >
-          <option value="">Tất cả loại vi phạm</option>
+          <option value="">All Violation Types</option>
           {violationTypes.map((type) => (
             <option key={type.id} value={type.typeName}>
               {type.typeName}
@@ -162,218 +436,731 @@ const SearchAndFilter: React.FC<{
           ))}
         </select>
       </div>
-    </div>
-  );
-};
+      <div style={{ width: "100%", maxWidth: "12rem" }}>
+        <label
+          style={{
+            display: "block",
+            fontSize: "0.875rem",
+            fontWeight: 600,
+            color: "#374151",
+            marginBottom: "0.5rem",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <Car style={{ width: "1rem", height: "1rem", color: "#6366F1" }} />
+            <span>Select Vehicle</span>
+          </div>
+        </label>
+        <select
+          value={selectedLicensePlate || ""}
+          onChange={(e) => onVehicleSelect(e.target.value)}
+          style={{
+            width: "100%",
+            padding: "0.75rem 1rem",
+            border: "2px solid #E5E7EB",
+            borderRadius: "0.75rem",
+            fontSize: "0.875rem",
+            backgroundColor: "rgba(243, 244, 246, 0.7)",
+            transition: "all 0.3s ease",
+            outline: "none",
+          }}
+          onFocus={(e) => {
+            e.target.style.borderColor = "#6366F1"
+            e.target.style.boxShadow = "0 0 0 4px rgba(99, 102, 241, 0.2)"
+          }}
+          onBlur={(e) => {
+            e.target.style.borderColor = "#E5E7EB"
+            e.target.style.boxShadow = "none"
+          }}
+        >
+          <option value="">Select a vehicle</option>
+          {vehicles.map((vehicle) => (
+            <option key={vehicle.id} value={vehicle.licensePlate}>
+              {vehicle.name} ({vehicle.licensePlate})
+            </option>
+          ))}
+        </select>
+      </div>
+    </motion.div>
+  )
+}
 
 const ViolationRow: React.FC<{
-  violation: Violation;
-  onView: (id: number) => void;
-  onDelete: (id: number) => void;
-}> = React.memo(({ violation, onView, onDelete }) => {
-  const detail = violation.violationDetails?.[0] || null;
+  violation: ViolationsDTO
+  onStatusUpdate: (violationId: number, newStatus: "Approve" | "Reject" | "Request") => void
+}> = React.memo(({ violation, onStatusUpdate }) => {
+  const detail = violation.violationDetails?.[0] || null
+  const [currentStatus, setCurrentStatus] = useState<"Request" | "Approve" | "Reject" | "Pending">(
+    violation.status || "Pending",
+  )
+  const [isUpdating, setIsUpdating] = useState(false)
 
-  const formatDate = useCallback((dateString: string | null) => {
-    if (!dateString) return "N/A";
-    try {
-      return format(new Date(dateString), "dd/MM/yyyy HH:mm:ss");
-    } catch {
-      return "N/A";
+  useEffect(() => {
+    setCurrentStatus(violation.status || "Pending")
+  }, [violation.status])
+
+  const getStatusColor = (status: string | null | undefined) => {
+    const statusMap: { [key: string]: { bg: string; text: string; icon: React.ReactNode } } = {
+      Pending: {
+        bg: "bg-gray-100",
+        text: "text-gray-500",
+        icon: <div style={{ width: "0.5rem", height: "0.5rem", backgroundColor: "#9CA3AF", borderRadius: "50%" }} />,
+      },
+      Request: {
+        bg: "bg-yellow-100",
+        text: "text-yellow-700",
+        icon: (
+          <div
+            style={{
+              width: "0.5rem",
+              height: "0.5rem",
+              backgroundColor: "#F59E0B",
+              borderRadius: "50%",
+              animation: "pulse 2s infinite",
+            }}
+          />
+        ),
+      },
+      Approve: {
+        bg: "bg-green-100",
+        text: "text-green-700",
+        icon: <div style={{ width: "0.5rem", height: "0.5rem", backgroundColor: "#10B981", borderRadius: "50%" }} />,
+      },
+      Reject: {
+        bg: "bg-red-100",
+        text: "text-red-700",
+        icon: <div style={{ width: "0.5rem", height: "0.5rem", backgroundColor: "#EF4444", borderRadius: "50%" }} />,
+      },
     }
-  }, []);
+    return (
+      statusMap[status || "Pending"] || {
+        bg: "bg-gray-100",
+        text: "text-gray-500",
+        icon: <div style={{ width: "0.5rem", height: "0.5rem", backgroundColor: "#9CA3AF", borderRadius: "50%" }} />,
+      }
+    )
+  }
+
+  const handleActionButtonClick = useCallback(async () => {
+    if (isUpdating) return
+
+    setIsUpdating(true)
+    // Simulate API call
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+
+    let newStatus: "Approve" | "Reject" | "Request" = "Request"
+    if (currentStatus === "Request" || currentStatus === "Pending") {
+      // Simulate success/failure
+      if (Math.random() > 0.5) {
+        newStatus = "Approve"
+      } else {
+        newStatus = "Reject"
+      }
+    } else if (currentStatus === "Approve" || currentStatus === "Reject") {
+      newStatus = "Request" // Allow re-request
+    }
+
+    setCurrentStatus(newStatus)
+    onStatusUpdate(violation.id, newStatus)
+    setIsUpdating(false)
+  }, [currentStatus, isUpdating, onStatusUpdate, violation.id])
+
+  const getActionButtonProps = () => {
+    let text = "Request Action"
+    let bgColor = "linear-gradient(to right, #3B82F6, #8B5CF6)"
+    let hoverBgColor = "linear-gradient(to right, #2563EB, #7C3AED)"
+    let icon = <AlertTriangle style={{ width: "1rem", height: "1rem" }} />
+
+    if (isUpdating) {
+      text = "Updating..."
+      bgColor = "linear-gradient(to right, #9CA3AF, #6B7280)"
+      hoverBgColor = "linear-gradient(to right, #6B7280, #4B5563)"
+      icon = (
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
+        >
+          <Loader2 size={16} />
+        </motion.div>
+      )
+    } else {
+      switch (currentStatus) {
+        case "Approve":
+          text = "Approved"
+          bgColor = "linear-gradient(to right, #10B981, #059669)"
+          hoverBgColor = "linear-gradient(to right, #059669, #047857)"
+          icon = <CheckCircle style={{ width: "1rem", height: "1rem" }} />
+          break
+        case "Reject":
+          text = "Rejected"
+          bgColor = "linear-gradient(to right, #EF4444, #DC2626)"
+          hoverBgColor = "linear-gradient(to right, #DC2626, #B91C1C)"
+          icon = <XCircle style={{ width: "1rem", height: "1rem" }} />
+          break
+        case "Request":
+        case "Pending":
+        default:
+          text = "Request Action"
+          bgColor = "linear-gradient(to right, #3B82F6, #8B5CF6)"
+          hoverBgColor = "linear-gradient(to right, #2563EB, #7C3AED)"
+          icon = <AlertTriangle style={{ width: "1rem", height: "1rem" }} />
+          break
+      }
+    }
+
+    return { text, bgColor, hoverBgColor, icon, disabled: isUpdating }
+  }
+
+  const formatDate = useCallback((dateString: string | null | undefined) => {
+    if (!dateString) return <span style={{ color: "#9CA3AF", fontStyle: "italic" }}>N/A</span>
+    try {
+      const date = new Date(dateString)
+      const isToday = date.toDateString() === new Date().toDateString()
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <div style={{ padding: "0.25rem", backgroundColor: "#EDE9FE", borderRadius: "0.5rem" }}>
+              <Clock style={{ width: "0.875rem", height: "0.875rem", color: "#8B5CF6" }} />
+            </div>
+            <span
+              style={{
+                fontWeight: 700,
+                color: "#6D28D9",
+                backgroundColor: "#F5F3FF",
+                padding: "0.25rem 0.5rem",
+                borderRadius: "0.5rem",
+              }}
+            >
+              {format(new Date(dateString), "HH:mm:ss")}
+            </span>
+          </div>
+          <div
+            style={{
+              fontSize: "0.875rem",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.25rem",
+              color: isToday ? "#059669" : "#6B7280",
+              fontWeight: isToday ? 600 : 400,
+            }}
+          >
+            <Calendar style={{ width: "0.75rem", height: "0.75rem" }} />
+            <span>{format(new Date(dateString), "dd/MM/yyyy")}</span>
+            {isToday && (
+              <span
+                style={{
+                  marginLeft: "0.5rem",
+                  fontSize: "0.75rem",
+                  background: "linear-gradient(to right, #10B981, #059669)",
+                  color: "white",
+                  padding: "0.25rem 0.5rem",
+                  borderRadius: "9999px",
+                  animation: "pulse 2s infinite",
+                }}
+              >
+                Today
+              </span>
+            )}
+          </div>
+        </div>
+      )
+    } catch {
+      return <span style={{ color: "#9CA3AF", fontStyle: "italic" }}>N/A</span>
+    }
+  }, [])
+
+  const { text, bgColor, hoverBgColor, icon, disabled } = getActionButtonProps()
 
   return (
-    <tr className="border-t hover:bg-gray-50 transition-colors">
-      <td className="p-3">
-        {detail?.imageUrl ? (
-          <div className="relative">
-            <img
-              src={detail.imageUrl}
-              alt="Vi phạm"
-              className="h-16 w-24 object-cover rounded shadow-sm"
-              loading="lazy"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.style.display = "none";
-                target.nextElementSibling?.classList.remove("hidden");
+    <motion.tr
+      style={{
+        borderTop: "1px solid #E5E7EB",
+        transition: "background-color 0.2s ease",
+      }}
+      className="hover:bg-gray-50"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+    >
+      <td style={{ padding: "0.75rem" }}>
+        <div style={{ position: "relative" }}>
+          {detail?.imageUrl ? (
+            <div
+              style={{
+                position: "relative",
+                overflow: "hidden",
+                borderRadius: "0.75rem",
+                boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                background: "linear-gradient(to bottom right, #F9FAFB, #E5E7EB)",
+                transition: "all 0.3s ease",
               }}
-            />
-            <div className="hidden h-16 w-24 bg-gray-100 rounded flex items-center justify-center">
-              <span className="text-gray-400 text-xs">Lỗi ảnh</span>
+              className="group"
+            >
+              <img
+                src={detail.imageUrl || "/placeholder.svg"}
+                alt="Violation"
+                style={{
+                  height: "4rem",
+                  width: "6rem",
+                  objectFit: "cover",
+                  transition: "transform 0.3s ease",
+                }}
+                className="group-hover:scale-110"
+                loading="lazy"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement
+                  target.style.display = "none"
+                  target.nextElementSibling?.classList.remove("hidden")
+                }}
+              />
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  background: "linear-gradient(to top, rgba(0,0,0,0.3), transparent)",
+                  opacity: 0,
+                  transition: "opacity 0.3s ease",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+                className="group-hover:opacity-100"
+              >
+                <div style={{ backgroundColor: "rgba(255,255,255,0.9)", borderRadius: "9999px", padding: "0.5rem" }}>
+                  <Camera style={{ color: "#374151", width: "1rem", height: "1rem" }} />
+                </div>
+              </div>
+              <div
+                style={{
+                  display: "none",
+                  height: "4rem",
+                  width: "6rem",
+                  background: "linear-gradient(to bottom right, #F3F4F6, #E5E7EB)",
+                  borderRadius: "0.75rem",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+                className="hidden"
+              >
+                <Camera style={{ color: "#9CA3AF", width: "1.25rem", height: "1.25rem" }} />
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="h-16 w-24 bg-gray-100 rounded flex items-center justify-center">
-            <span className="text-gray-400 text-xs">Không có ảnh</span>
+          ) : (
+            <div
+              style={{
+                height: "4rem",
+                width: "6rem",
+                background: "linear-gradient(to bottom right, #F3F4F6, #E5E7EB)",
+                borderRadius: "0.75rem",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                transition: "all 0.3s ease",
+              }}
+              className="group"
+            >
+              <Camera
+                style={{
+                  color: "#9CA3AF",
+                  width: "1.25rem",
+                  height: "1.25rem",
+                  transition: "color 0.3s ease",
+                }}
+                className="group-hover:text-gray-500"
+              />
+            </div>
+          )}
+        </div>
+      </td>
+      <td style={{ padding: "0.75rem" }}>
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            padding: "0.5rem 1rem",
+            borderRadius: "0.75rem",
+            fontSize: "0.875rem",
+            fontWeight: 600,
+            background: "linear-gradient(to right, rgba(59,130,246,0.1), rgba(139,92,246,0.1))",
+            color: "#3B82F6",
+            border: "1px solid #BFDBFE",
+            boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
+            transition: "all 0.3s ease",
+          }}
+        >
+          <div
+            style={{
+              width: "0.5rem",
+              height: "0.5rem",
+              backgroundColor: "#3B82F6",
+              borderRadius: "50%",
+              marginRight: "0.5rem",
+              animation: "pulse 2s infinite",
+            }}
+          />
+          {detail?.violationType?.typeName || "Not Specified"}
+        </span>
+        {detail?.speed && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              fontSize: "0.875rem",
+              color: "#B91C1C",
+              fontWeight: 500,
+              backgroundColor: "#FEF2F2",
+              padding: "0.25rem 0.75rem",
+              borderRadius: "0.5rem",
+              marginTop: "0.5rem",
+            }}
+          >
+            <span style={{ marginRight: "0.25rem" }}>🚀</span>
+            {detail.speed} km/h
           </div>
         )}
       </td>
-      <td className="p-3">
-        <span className="font-medium text-gray-900">
-          {detail?.violationType?.typeName || "Chưa xác định"}
-        </span>
-      </td>
-      <td className="p-3 text-sm text-gray-600">{formatDate(detail?.violationTime)}</td>
-      <td className="p-3">
-        <div className="flex space-x-2">
-          <button
-            className="px-3 py-1 text-sm rounded bg-green-500 text-white hover:bg-green-600 transition-colors focus:ring-2 focus:ring-green-500 focus:ring-offset-1"
-            onClick={() => onView(violation.id)}
-          >
-            Xem chi tiết
-          </button>
-          <button
-            className="px-3 py-1 text-sm rounded bg-red-500 text-white hover:bg-red-600 transition-colors focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
-            onClick={() => onDelete(violation.id)}
-          >
-            Xóa
-          </button>
+      <td style={{ padding: "0.75rem" }}>
+        <div className="group">
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
+            <div style={{ padding: "0.25rem", backgroundColor: "#D1FAE5", borderRadius: "0.5rem" }}>
+              <Car style={{ width: "0.875rem", height: "0.875rem", color: "#059669" }} />
+            </div>
+            <span
+              style={{
+                fontFamily: "monospace",
+                fontSize: "1.125rem",
+                fontWeight: 700,
+                color: "#1F2937",
+                background: "linear-gradient(to right, #D1FAE5, #A7F3D0)",
+                padding: "0.25rem 0.75rem",
+                borderRadius: "0.5rem",
+                border: "1px solid #6EE7B7",
+                transition: "color 0.2s ease",
+              }}
+              className="group-hover:text-green-600"
+            >
+              {violation.vehicle?.licensePlate || "N/A"}
+            </span>
+          </div>
+          {violation.vehicle?.brand && (
+            <div
+              style={{
+                fontSize: "0.875rem",
+                color: "#6B7280",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.25rem",
+                backgroundColor: "#F3F4F6",
+                padding: "0.25rem 0.5rem",
+                borderRadius: "0.5rem",
+              }}
+            >
+              <span style={{ fontWeight: 500 }}>{violation.vehicle.brand}</span>
+              {violation.vehicle.color && (
+                <>
+                  <span>•</span>
+                  <span style={{ textTransform: "capitalize" }}>{violation.vehicle.color}</span>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </td>
-    </tr>
-  );
-});
+      <td style={{ padding: "0.75rem", fontSize: "0.875rem", color: "#6B7280" }}>
+        {formatDate(detail?.violationTime)}
+      </td>
+      <td style={{ padding: "0.75rem" }}>
+        <div
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            padding: "0.25rem 0.75rem",
+            borderRadius: "0.5rem",
+            fontWeight: 500,
+          }}
+        >
+          {(() => {
+            const { bg, text, icon } = getStatusColor(violation.status)
+            return (
+              <div
+                className={`${bg} ${text}`}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  padding: "0.25rem 0.75rem",
+                  borderRadius: "0.5rem",
+                }}
+              >
+                {icon}
+                <span style={{ marginLeft: "0.5rem", textTransform: "capitalize" }}>
+                  {violation.status || "Pending"}
+                </span>
+              </div>
+            )
+          })()}
+        </div>
+      </td>
+      <td style={{ padding: "0.75rem" }}>
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={handleActionButtonClick}
+          disabled={disabled}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            padding: "0.5rem 1rem",
+            background: bgColor,
+            color: "white",
+            borderRadius: "0.75rem",
+            fontWeight: 600,
+            boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+            transition: "all 0.3s ease",
+            position: "relative",
+            overflow: "hidden",
+            opacity: disabled ? 0.7 : 1,
+            cursor: disabled ? "not-allowed" : "pointer",
+          }}
+        >
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: hoverBgColor,
+              opacity: 0,
+              transition: "opacity 0.3s ease",
+            }}
+            className="group-hover:opacity-100"
+          />
+          <div style={{ position: "relative", zIndex: 10, display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            {icon}
+            <span>{text}</span>
+          </div>
+        </motion.button>
+      </td>
+    </motion.tr>
+  )
+})
 
-ViolationRow.displayName = "ViolationRow";
+ViolationRow.displayName = "ViolationRow"
 
 export default function ViolationHistory() {
-  const { plate } = useParams<{ plate: string }>();
-  const [violations, setViolations] = useState<Violation[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [openDialog, setOpenDialog] = useState(false);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterType, setFilterType] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const navigate = useNavigate();
+  const { plate } = useParams<{ plate: string }>() // Initial plate from URL, will be overridden by selection
+  const navigate = useNavigate() // Initialize useNavigate
+  const [violations, setViolations] = useState<ViolationsDTO[]>([])
+  const [allVehicles, setAllVehicles] = useState<VehicleDTO[]>([])
+  const [selectedLicensePlate, setSelectedLicensePlate] = useState<string | null>(plate || null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [filterType, setFilterType] = useState("")
+  const [currentPage, setCurrentPage] = useState(1)
+  const [refreshKey, setRefreshKey] = useState(0) // Used to trigger re-fetch
 
+  // Get unique violation types from current violations
   const violationTypes = useMemo(() => {
-    const types = new Map<string, ViolationType>();
+    const types = new Map<string, ViolationType>()
     violations.forEach((violation) => {
       violation.violationDetails?.forEach((detail) => {
-        if (detail.violationType) {
-          types.set(detail.violationType.typeName, detail.violationType);
+        if (detail?.violationType) {
+          types.set(detail.violationType.typeName, detail.violationType)
         }
-      });
-    });
-    return Array.from(types.values());
-  }, [violations]);
+      })
+    })
+    return Array.from(types.values())
+  }, [violations])
 
+  // Filter violations based on search term and type filter
   const filteredViolations = useMemo(() => {
     return violations.filter((violation) => {
       const matchesSearch =
-        !searchTerm ||
-        violation.vehicle?.licensePlate?.toLowerCase().includes(searchTerm.toLowerCase());
+        !searchTerm || violation.vehicle?.licensePlate?.toLowerCase().includes(searchTerm.toLowerCase())
       const matchesFilter =
-        !filterType ||
-        violation.violationDetails?.some(
-          (detail) => detail.violationType?.typeName === filterType
-        );
-      return matchesSearch && matchesFilter;
-    });
-  }, [violations, searchTerm, filterType]);
+        !filterType || violation.violationDetails?.some((detail) => detail?.violationType?.typeName === filterType)
+      return matchesSearch && matchesFilter
+    })
+  }, [violations, searchTerm, filterType])
 
+  // Pagination logic
   const paginationInfo = useMemo((): PaginationInfo => {
-    const totalItems = filteredViolations.length;
-    const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+    const totalItems = filteredViolations.length
+    const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE)
     return {
       currentPage,
       totalPages,
       totalItems,
       itemsPerPage: ITEMS_PER_PAGE,
-    };
-  }, [filteredViolations.length, currentPage]);
+    }
+  }, [filteredViolations.length, currentPage])
 
+  // Get violations for current page
   const paginatedViolations = useMemo(() => {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const endIndex = startIndex + ITEMS_PER_PAGE;
-    return filteredViolations.slice(startIndex, endIndex);
-  }, [filteredViolations, currentPage]);
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+    const endIndex = startIndex + ITEMS_PER_PAGE
+    return filteredViolations.slice(startIndex, endIndex)
+  }, [filteredViolations, currentPage])
 
+  // Load all vehicles for the user
+  const loadAllVehicles = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/vehicle/user/3`) // Hardcoded userId 3
+      if (!response.ok) {
+        throw new Error("Failed to load vehicles.")
+      }
+      const data: VehicleDTO[] = await response.json()
+      setAllVehicles(data)
+      // If no vehicle is selected yet (e.g., first load), select the first one
+      if (!selectedLicensePlate && data.length > 0) {
+        setSelectedLicensePlate(data[0].licensePlate)
+      }
+    } catch (err: any) {
+      console.error("Error loading vehicles:", err)
+      setError(err.message || "Failed to load vehicles for selection.")
+    }
+  }, [selectedLicensePlate])
+
+  // Load violations for the selected license plate
   const loadViolations = useCallback(async () => {
-    if (!plate) {
-      setError("Biển số không hợp lệ.");
-      setLoading(false);
-      return;
+    if (!selectedLicensePlate) {
+      setViolations([])
+      setLoading(false)
+      return
     }
     try {
-      setLoading(true);
-      setError(null);
-      const response = await axios.get(`${API_URL}/api/violations?plate=${plate}`);
-      const data = Array.isArray(response.data) ? response.data : [response.data].filter(Boolean);
-      setViolations(data);
-    } catch (err) {
-      console.error("Lỗi API:", err);
-      setError("Không thể tải danh sách vi phạm. Vui lòng thử lại.");
-    } finally {
-      setLoading(false);
-    }
-  }, [plate, refreshKey]);
-
-  useEffect(() => {
-    loadViolations();
-  }, [loadViolations]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, filterType]);
-
-  const handleDelete = useCallback(
-    async (id: number) => {
-      try {
-        await axios.delete(`${API_URL}/api/violations/${id}`);
-        setViolations((prev) => prev.filter((v) => v.id !== id));
-        setOpenDialog(false);
-        toast.success("Xóa vi phạm thành công!");
-        const newTotal = filteredViolations.length - 1;
-        const newTotalPages = Math.ceil(newTotal / ITEMS_PER_PAGE);
-        if (currentPage > newTotalPages && newTotalPages > 0) {
-          setCurrentPage(newTotalPages);
+      setLoading(true)
+      setError(null)
+      const response = await fetch(`${API_URL}/api/violations/history/${selectedLicensePlate}`)
+      if (!response.ok) {
+        if (response.status === 404) {
+          setViolations([]) // No violations found for this plate
+          setError("No violations found for this vehicle.")
+        } else {
+          throw new Error(`HTTP error! Status: ${response.status}`)
         }
-      } catch (err) {
-        console.error("Xóa thất bại:", err);
-        toast.error("Không thể xóa vi phạm. Vui lòng thử lại.");
+      } else {
+        const data = await response.json()
+        const violationsArray = Array.isArray(data) ? data : [data].filter(Boolean)
+        setViolations(
+          violationsArray.map((item: any) => ({
+            ...item,
+            violationDetails: item.violationDetails || [],
+          })),
+        )
       }
-    },
-    [filteredViolations.length, currentPage]
-  );
+    } catch (err: any) {
+      console.error("API Error:", err)
+      setError(err.message || "Failed to load violations. Please try again.")
+    } finally {
+      setLoading(false)
+    }
+  }, [selectedLicensePlate, refreshKey])
 
-  const handleView = useCallback(
-    (id: number) => {
-      navigate(`/violations/${id}`);
-    },
-    [navigate]
-  );
+  // Initial load of vehicles and then violations
+  useEffect(() => {
+    loadAllVehicles()
+  }, [loadAllVehicles])
 
-  const handleDeleteClick = useCallback((id: number) => {
-    setSelectedId(id);
-    setOpenDialog(true);
-  }, []);
+  // Load violations whenever selectedLicensePlate changes or refreshKey updates
+  useEffect(() => {
+    loadViolations()
+  }, [loadViolations, selectedLicensePlate]) // Add selectedLicensePlate to dependency array
 
+  // Reset page to 1 when search or filter changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, filterType, selectedLicensePlate])
+
+  // Handle status update from ViolationRow
+  const handleStatusUpdate = useCallback((violationId: number, newStatus: "Approve" | "Reject" | "Request") => {
+    setViolations((prev) => prev.map((v) => (v.id === violationId ? { ...v, status: newStatus } : v)))
+  }, [])
+
+  // Handle retry button click
   const handleRetry = useCallback(() => {
-    setRefreshKey((prev) => prev + 1);
-  }, []);
+    setRefreshKey((prev) => prev + 1)
+  }, [])
 
   return (
-    <div className="flex h-screen bg-gray-50 font-inter">
-      <Sidebar />
-      <div className="flex flex-col flex-grow overflow-hidden">
-        <h1 className="px-6 py-4 text-xl font-semibold text-white bg-gradient-to-r from-green-500 to-teal-500 shadow-md">
-          Lịch sử vi phạm - {plate || "N/A"}
-        </h1>
-        <div className="flex-grow p-6 overflow-auto">
-          <div className="max-w-full">
-            <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div className="flex items-center space-x-4">
-                <ExportViolationsPDF
-                  violations={filteredViolations}
-                  
-                />
-                <div className="text-sm text-gray-600">
-                  Tổng cộng: <span className="font-semibold">{filteredViolations.length}</span> vi phạm
-                </div>
+    <div
+      style={{
+        display: "flex",
+        height: "100vh",
+        background: "linear-gradient(to bottom right, #F1F5F9, #DBEAFE, #E0E7FF)",
+        fontFamily: "'Inter', sans-serif",
+        overflow: "hidden",
+      }}
+    >
+      {/* Removed Sidebar component */}
+      <div style={{ flexGrow: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <motion.div
+          style={{
+            padding: "1rem 1.5rem",
+            background: "linear-gradient(to right, #3B82F6, #8B5CF6)",
+            color: "white",
+            boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+            display: "flex", // Added flex for alignment
+            alignItems: "center", // Added for vertical alignment
+            gap: "1rem", // Added gap between back button and title
+          }}
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          {/* Back Button */}
+          <button
+            onClick={() => navigate("/vehiclelistuser")} // Navigate to the vehicle list route
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              padding: "0.5rem 1rem",
+              backgroundColor: "rgba(255,255,255,0.2)",
+              borderRadius: "0.75rem",
+              color: "white",
+              fontWeight: 500,
+              transition: "background-color 0.3s ease",
+              cursor: "pointer",
+              border: "none",
+            }}
+            className="hover:bg-white/30"
+          >
+            <ArrowLeft size={18} />
+            <span>Back</span>
+          </button>
+          <h1 style={{ fontSize: "1.25rem", fontWeight: 600 }}>
+            Violation History - {selectedLicensePlate || "Select a Vehicle"}
+          </h1>
+        </motion.div>
+        <div style={{ flexGrow: 1, padding: "1.5rem", overflowY: "auto" }}>
+          <motion.div
+            style={{
+              maxWidth: "100%",
+              background: "rgba(255, 255, 255, 0.8)",
+              backdropFilter: "blur(8px)",
+              borderRadius: "1.5rem",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+              border: "1px solid rgba(255,255,255,0.2)",
+              padding: "2rem",
+              transition: "box-shadow 0.3s ease",
+            }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="hover:shadow-xl"
+          >
+            <div
+              style={{
+                marginBottom: "1.5rem",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "flex-start",
+                gap: "1rem",
+              }}
+            >
+              <div style={{ fontSize: "0.875rem", color: "#6B7280" }}>
+                Total: <span style={{ fontWeight: 600 }}>{filteredViolations.length}</span> violations
               </div>
             </div>
             <SearchAndFilter
@@ -382,64 +1169,128 @@ export default function ViolationHistory() {
               filterType={filterType}
               onFilterChange={setFilterType}
               violationTypes={violationTypes}
+              selectedLicensePlate={selectedLicensePlate}
+              onVehicleSelect={setSelectedLicensePlate}
+              vehicles={allVehicles}
             />
-            {loading ? (
-              <LoadingSpinner />
-            ) : error ? (
-              <ErrorMessage message={error} onRetry={handleRetry} />
-            ) : filteredViolations.length === 0 ? (
-              <EmptyState />
-            ) : (
-              <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gradient-to-r from-green-500 to-teal-500 text-white">
-                      <tr>
-                        <th className="px-3 py-4 text-left text-xs font-medium uppercase tracking-wider">
-                          Hình ảnh
-                        </th>
-                        <th className="px-3 py-4 text-left text-xs font-medium uppercase tracking-wider">
-                          Loại vi phạm
-                        </th>
-                        <th className="px-3 py-4 text-left text-xs font-medium uppercase tracking-wider">
-                          Thời gian
-                        </th>
-                        <th className="px-3 py-4 text-left text-xs font-medium uppercase tracking-wider">
-                          Hành động
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {paginatedViolations.map((violation) => (
-                        <ViolationRow
-                          key={violation.id}
-                          violation={violation}
-                          onView={handleView}
-                          onDelete={handleDeleteClick}
-                        />
-                      ))}
-                    </tbody>
-                  </table>
+            <AnimatePresence>
+              {loading ? (
+                <LoadingSpinner />
+              ) : error ? (
+                <ErrorMessage message={error} onRetry={handleRetry} />
+              ) : filteredViolations.length === 0 ? (
+                <EmptyState />
+              ) : (
+                <div
+                  style={{
+                    background: "rgba(255,255,255,0.8)",
+                    borderRadius: "1rem",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+                    border: "1px solid rgba(229,231,235,0.7)",
+                    overflow: "hidden",
+                  }}
+                >
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ minWidth: "100%", borderCollapse: "collapse" }}>
+                      <thead
+                        style={{
+                          background: "linear-gradient(to right, #3B82F6, #8B5CF6)",
+                          color: "white",
+                        }}
+                      >
+                        <tr>
+                          <th
+                            style={{
+                              padding: "1rem 0.75rem",
+                              textAlign: "left",
+                              fontSize: "0.75rem",
+                              fontWeight: 500,
+                              textTransform: "uppercase",
+                              letterSpacing: "0.05em",
+                            }}
+                          >
+                            Image
+                          </th>
+                          <th
+                            style={{
+                              padding: "1rem 0.75rem",
+                              textAlign: "left",
+                              fontSize: "0.75rem",
+                              fontWeight: 500,
+                              textTransform: "uppercase",
+                              letterSpacing: "0.05em",
+                            }}
+                          >
+                            Violation Type
+                          </th>
+                          <th
+                            style={{
+                              padding: "1rem 0.75rem",
+                              textAlign: "left",
+                              fontSize: "0.75rem",
+                              fontWeight: 500,
+                              textTransform: "uppercase",
+                              letterSpacing: "0.05em",
+                            }}
+                          >
+                            License Plate
+                          </th>
+                          <th
+                            style={{
+                              padding: "1rem 0.75rem",
+                              textAlign: "left",
+                              fontSize: "0.75rem",
+                              fontWeight: 500,
+                              textTransform: "uppercase",
+                              letterSpacing: "0.05em",
+                            }}
+                          >
+                            Time
+                          </th>
+                          <th
+                            style={{
+                              padding: "1rem 0.75rem",
+                              textAlign: "left",
+                              fontSize: "0.75rem",
+                              fontWeight: 500,
+                              textTransform: "uppercase",
+                              letterSpacing: "0.05em",
+                            }}
+                          >
+                            Status
+                          </th>
+                          <th
+                            style={{
+                              padding: "1rem 0.75rem",
+                              textAlign: "left",
+                              fontSize: "0.75rem",
+                              fontWeight: 500,
+                              textTransform: "uppercase",
+                              letterSpacing: "0.05em",
+                            }}
+                          >
+                            Action
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody style={{ background: "rgba(255,255,255,0.8)" }}>
+                        {paginatedViolations.map((violation) => (
+                          <ViolationRow key={violation.id} violation={violation} onStatusUpdate={handleStatusUpdate} />
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <Pagination
+                    currentPage={paginationInfo.currentPage}
+                    totalPages={paginationInfo.totalPages}
+                    onPageChange={setCurrentPage}
+                  />
                 </div>
-                <Pagination
-                  currentPage={paginationInfo.currentPage}
-                  totalPages={paginationInfo.totalPages}
-                  onPageChange={setCurrentPage}
-                />
-              </div>
-            )}
-          </div>
-          <AlertDialog
-            open={openDialog}
-            onOpenChange={setOpenDialog}
-            onConfirm={() => {
-              if (selectedId !== null) handleDelete(selectedId);
-            }}
-            title="Xác nhận xóa"
-            description="Bạn có chắc muốn xóa vi phạm này? Hành động này không thể hoàn tác."
-          />
+              )}
+            </AnimatePresence>
+          </motion.div>
         </div>
       </div>
     </div>
-  );
+  )
 }
