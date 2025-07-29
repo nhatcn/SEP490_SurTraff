@@ -246,7 +246,7 @@ export default function UserTrafficMap() {
                 })}
 
                 {accidentData
-                  .filter((acc) => acc.status?.toLowerCase() === "approve")
+                  .filter((acc) => acc.status?.toLowerCase() === "approved")
                   .map((acc) => (
                     <Marker key={`accident-${acc.id}`} position={[acc.latitude, acc.longitude]} icon={accidentIcon}>
                       <Tooltip direction="top" offset={[0, -30]} opacity={1} className="custom-tooltip">
