@@ -17,6 +17,7 @@ export const useCameraForm = () => {
   const [zones, setZones] = useState<Zone[]>([]);
   const [activeZoneType, setActiveZoneType] = useState<string | null>(null);
   const [thumbnailUrl, setThumbnailUrl] = useState("");
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null); // Lưu file thay vì URL
   const [laneDirections, setLaneDirections] = useState<LaneDirection[]>([]);
   const [lightZoneMappings, setLightZoneMappings] = useState<LightZoneMapping[]>([]);
   
@@ -110,17 +111,26 @@ export const useCameraForm = () => {
         throw new Error(errorMessage);
       }
 
-      // Convert the image response to a blob and create object URL
+      // Convert the image response to a blob and create File object
       const blob = await response.blob();
+      
+      // Create File object with proper name and type
+      const timestamp = new Date().getTime();
+      const fileName = `thumbnail_${timestamp}.jpg`;
+      const file = new File([blob], fileName, { type: blob.type || 'image/jpeg' });
+      
+      // Create object URL for preview
       const imageUrl = URL.createObjectURL(blob);
       
-      setThumbnailUrl(imageUrl);
+      setThumbnailFile(file); // Lưu file để gửi
+      setThumbnailUrl(imageUrl); // Lưu URL để hiển thị preview
       setThumbnailError(null);
     } catch (error: unknown) {
       console.error("Thumbnail extraction error:", error);
       const errorMessage = error instanceof Error ? error.message : String(error);
       setThumbnailError(errorMessage);
       setThumbnailUrl(""); // Clear thumbnail on error
+      setThumbnailFile(null); // Clear file on error
     } finally {
       setIsExtractingThumbnail(false);
     }
@@ -133,6 +143,7 @@ export const useCameraForm = () => {
       URL.revokeObjectURL(thumbnailUrl);
     }
     setThumbnailUrl("");
+    setThumbnailFile(null); // Clear file when URL changes
     setThumbnailError(null);
   };
 
@@ -142,7 +153,7 @@ export const useCameraForm = () => {
       return;
     }
 
-    if (!thumbnailUrl) {
+    if (!thumbnailFile) {
       alert("Please extract a thumbnail from the stream URL first.");
       return;
     }
@@ -153,15 +164,15 @@ export const useCameraForm = () => {
     }
 
     try {
-      const setupData = {
+      // Create setup DTO object
+      const setupDTO = {
         cameraName: name,
         cameraUrl: streamUrl,
         latitude: location.lat,
         longitude: location.lng,
         location: locationAddress,
-        thumbnail: thumbnailUrl,
         maxSpeed: speedLimit,
-        violationTypeId: violationTypeId, // Send ID instead of string
+        violationTypeId: violationTypeId,
         
         zones: zones.map(z => ({
           id: parseInt(z.id),
@@ -179,12 +190,25 @@ export const useCameraForm = () => {
         }))
       };
 
-      console.log('Sending camera setup data:', setupData);
+      // Create FormData for multipart upload
+      const formData = new FormData();
+      
+      // Add setupDTO as JSON blob with application/json content type
+      const setupDTOBlob = new Blob([JSON.stringify(setupDTO)], {
+        type: 'application/json'
+      });
+      formData.append('setupDTO', setupDTOBlob);
+      
+      // Add thumbnail file
+      formData.append('thumbnailFile', thumbnailFile, thumbnailFile.name);
+
+      console.log('Sending camera setup data:', setupDTO);
+      console.log('Thumbnail file:', thumbnailFile.name, thumbnailFile.size, 'bytes');
 
       const response = await fetch("http://localhost:8081/api/cameras/setup", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(setupData)
+        // Don't set Content-Type header, let browser set it with boundary for multipart
+        body: formData
       });
 
       if (!response.ok) {
@@ -228,6 +252,8 @@ export const useCameraForm = () => {
     setActiveZoneType,
     thumbnailUrl,
     setThumbnailUrl,
+    thumbnailFile, // Export thumbnail file
+    setThumbnailFile, // Export setter for thumbnail file
     laneDirections,
     setLaneDirections,
     lightZoneMappings,

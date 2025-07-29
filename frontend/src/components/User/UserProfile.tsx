@@ -29,6 +29,8 @@ import {
   AlertTriangle,
   LogIn,
   Home,
+  Phone,
+  MapPin,
 } from "lucide-react"
 import { getCookie } from "../../utils/cookieUltil"
 
@@ -41,7 +43,9 @@ interface UserData {
   avatar: string
   roleId: number
   roleName: string
-  name: string
+  fullName: string
+  phoneNumber?: string | null
+  address?: string | null
 }
 
 interface VehicleData {
@@ -65,6 +69,8 @@ interface UpdateUserForm {
   name: string
   userName: string
   email: string
+  phoneNumber: string
+  address: string
   roleId: number
   avatar?: File | null
 }
@@ -97,6 +103,8 @@ export default function UserProfile() {
     name: "",
     userName: "",
     email: "",
+    phoneNumber: "",
+    address: "",
     roleId: 1,
     avatar: null,
   })
@@ -120,10 +128,12 @@ export default function UserProfile() {
   useEffect(() => {
     if (user) {
       setUpdateForm({
-        name: user.name,
-        userName: user.userName,
+        name: user.fullName || "",
+        userName: user.userName || "",
         email: user.email || "",
-        roleId: user.roleId,
+        phoneNumber: user.phoneNumber || "",
+        address: user.address || "",
+        roleId: user.roleId || 1,
         avatar: null,
       })
     }
@@ -201,6 +211,11 @@ export default function UserProfile() {
       newErrors.email = "Please enter a valid email address"
     }
 
+    // Optional validation for phone
+    if (updateForm.phoneNumber.trim() && !/^[\d\+\-\(\)\s]+$/.test(updateForm.phoneNumber)) {
+      newErrors.phoneNumber = "Please enter a valid phone number"
+    }
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -216,9 +231,12 @@ export default function UserProfile() {
       formData.append("fullName", updateForm.name) 
       formData.append("userName", updateForm.userName)
       formData.append("email", updateForm.email)
+      formData.append("phone", updateForm.phoneNumber)
+      formData.append("address", updateForm.address)
       formData.append("roleId", updateForm.roleId.toString())
 
-      if (updateForm.avatar) {
+      // Only append avatar if a new file was selected
+      if (updateForm.avatar instanceof File) {
         formData.append("avatarFile", updateForm.avatar) 
       }
 
@@ -248,10 +266,12 @@ export default function UserProfile() {
   const cancelProfileEdit = () => {
     if (user) {
       setUpdateForm({
-        name: user.name,
-        userName: user.userName,
+        name: user.fullName || "",
+        userName: user.userName || "",
         email: user.email || "",
-        roleId: user.roleId,
+        phoneNumber: user.phoneNumber || "",
+        address: user.address || "",
+        roleId: user.roleId || 1,
         avatar: null,
       })
     }
@@ -491,7 +511,7 @@ export default function UserProfile() {
               >
                 <img
                   src={avatarPreview || user.avatar || "/api/placeholder/96/96"}
-                  alt={user.name}
+                 
                   className="w-full h-full object-cover"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement
@@ -516,7 +536,7 @@ export default function UserProfile() {
 
             {/* User Info */}
             <div className="ml-4 flex-1">
-              <h1 className="text-2xl font-bold text-white">{user.name}</h1>
+              <h1 className="text-2xl font-bold text-white">{user.fullName}</h1>
               <p className="text-gray-100 mb-2">@{user.userName}</p>
               <div className="flex items-center gap-3">
                 <span
@@ -579,7 +599,7 @@ export default function UserProfile() {
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Full Name</label>
-                  <div className="text-sm font-medium text-gray-900 bg-gray-50 rounded-lg p-3">{user.name}</div>
+                  <div className="text-sm font-medium text-gray-900 bg-gray-50 rounded-lg p-3">{user.fullName}</div>
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Username</label>
@@ -593,9 +613,20 @@ export default function UserProfile() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">User ID</label>
-                  <div className="text-sm font-medium text-gray-900 bg-gray-50 rounded-lg p-3">#{user.userId}</div>
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Phone Number</label>
+                  <div className="text-sm font-medium text-gray-900 bg-gray-50 rounded-lg p-3 flex items-center gap-2">
+                    <Phone className="w-4 h-4 text-gray-400" />
+                    {user.phoneNumber || "Not provided"}
+                  </div>
                 </div>
+                <div className="md:col-span-2 space-y-2">
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Address</label>
+                  <div className="text-sm font-medium text-gray-900 bg-gray-50 rounded-lg p-3 flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-gray-400" />
+                    {user.address || "Not provided"}
+                  </div>
+                </div>
+                
               </div>
             ) : (
               <div className="space-y-4">
@@ -629,7 +660,7 @@ export default function UserProfile() {
                   </div>
 
                   {/* Email */}
-                  <div className="md:col-span-2 space-y-2">
+                  <div className="space-y-2">
                     <label className="text-xs font-medium text-gray-700 uppercase tracking-wider">Email Address</label>
                     <input
                       type="email"
@@ -640,6 +671,32 @@ export default function UserProfile() {
                       placeholder="Enter email address"
                     />
                     {errors.email && <p className="text-red-500 text-xs font-medium">{errors.email}</p>}
+                  </div>
+
+                  {/* Phone */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-gray-700 uppercase tracking-wider">Phone Number</label>
+                    <input
+                      type="tel"
+                      value={updateForm.phoneNumber}
+                      onChange={(e) => setUpdateForm((prev) => ({ ...prev, phone: e.target.value }))}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 text-sm ${errors.phone ? "border-red-500 bg-red-50" : "border-gray-200 bg-white"
+                        }`}
+                      placeholder="Enter phone number"
+                    />
+                    {errors.phone && <p className="text-red-500 text-xs font-medium">{errors.phone}</p>}
+                  </div>
+
+                  {/* Address */}
+                  <div className="md:col-span-2 space-y-2">
+                    <label className="text-xs font-medium text-gray-700 uppercase tracking-wider">Address</label>
+                    <textarea
+                      value={updateForm.address}
+                      onChange={(e) => setUpdateForm((prev) => ({ ...prev, address: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-200 bg-white rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 text-sm resize-none"
+                      placeholder="Enter your address"
+                      rows={3}
+                    />
                   </div>
                 </div>
 
