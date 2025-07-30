@@ -1,258 +1,354 @@
+import os
 import cv2
-import numpy as np
-from ultralytics import YOLO
+import math
 import time
-# For actual YouTube stream URL extraction, you might need a library like yt-dlp.
-# Example: pip install yt-dlp
+import requests
+import json
+import numpy as np
+from datetime import datetime
+from collections import deque, defaultdict
+from ultralytics import YOLO
+import traceback
+from utils.yt_stream import get_stream_url
 
-# Helper function to put text with a background for better visibility
-def put_text_with_background(img, text, org, font=cv2.FONT_HERSHEY_SIMPLEX,
-                             font_scale=0.5, text_color=(255, 255, 255),
-                             bg_color=(0, 0, 0), thickness=1):
-    """
-    Puts text on an image with a background rectangle for better visibility.
-    """
-    (w, h), _ = cv2.getTextSize(text, font, font_scale, thickness)
+# Constants
+VIOLATIONS_DIR = "violations"
+os.makedirs(VIOLATIONS_DIR, exist_ok=True)
+
+# Helper function for text with background
+def put_text_with_background(img, text, org, font_scale, color, thickness=1, bg_color=(0, 0, 0)):
+    (text_width, text_height), baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)
     x, y = org
-    overlay = img.copy()
-    cv2.rectangle(overlay, (x, y - h - 3), (x + w, y + 3), bg_color, -1)
-    alpha = 0.6
-    cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0, img)
-    cv2.putText(img, text, (x, y), font, font_scale, text_color, thickness, cv2.LINE_AA)
+    # Ensure coordinates are within image bounds
+    x = max(0, x)
+    # y is the baseline for put_text_with_background, so ensure it's below the top edge for text to be visible
+    y = max(text_height + baseline, y)
+    x_end = min(img.shape[1], x + text_width)
+    y_end = min(img.shape[0], y + baseline)
+    
+    # Draw background rectangle
+    cv2.rectangle(img, (x, y - text_height - baseline), (x_end, y_end), bg_color, -1)
+    # Put text
+    cv2.putText(img, text, (x, y - baseline), cv2.FONT_HERSHEY_SIMPLEX, font_scale, color, thickness)
 
-# Placeholder for getting stream URL from a YouTube link
-def get_stream_url(youtube_url: str) -> str:
-    """
-    In a real application, you'd typically use a library like yt-dlp to extract the direct
-    video stream URL from a YouTube link, as OpenCV's VideoCapture often cannot directly
-    open YouTube URLs.
-
-    For demonstration purposes, this function simply returns the input URL.
-    You would need to implement the actual stream URL extraction here.
-
-    Example with yt-dlp (requires installation: pip install yt-dlp):
-    import yt_dlp
-    try:
-        ydl_opts = {'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best', 'quiet': True, 'noplaylist': True}
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(youtube_url, download=False)
-            # Find a suitable stream URL, e.g., a direct MP4 link
-            for f in info.get('formats', []):
-                if 'url' in f and 'ext' in f and f['ext'] == 'mp4':
-                    return f['url']
-            return info.get('url', youtube_url) # Fallback if no specific mp4 stream found
-    except Exception as e:
-        print(f"Error extracting stream URL with yt-dlp: {e}")
-    """
-    print(f"Attempting to open stream for: {youtube_url}. Note: Direct YouTube URLs often require a library like yt-dlp to extract the actual video stream URL.")
-    return youtube_url # This will likely fail for direct YouTube URLs without yt-dlp
-
-# Updated function signature to accept camera_id and db
-def stream_violation_wrongway_video_service(youtube_url: str, camera_id: int = None, db: any = None):
-    """
-    Streams video frames with traffic sign and vehicle detection, and wrong-way violation checks.
-
-    Args:
-        youtube_url (str): The URL of the YouTube video stream.
-        camera_id (int, optional): An ID for the camera/stream, useful for logging or database. Defaults to None.
-        db (any, optional): A database connection object, if needed for logging violations. Defaults to None.
-    """
-    # --- Configuration ---
-    # Model paths. IMPORTANT: Local paths like "D:\..." will not work in a cloud environment.
-    # You would need to host these models (e.g., on cloud storage) and provide their URLs,
-    # or use pre-trained models that ultralytics can download automatically.
-    model_sign_path = "trafficsign.pt" # Placeholder for your custom sign detection model
-    model_vehicle_name = "yolov8m.pt" # YOLOv8 medium model for vehicle detection
-
-    try:
-        # Load YOLO models
-        model_sign = YOLO(model_sign_path)
-        model_vehicle = YOLO(model_vehicle_name)
-    except Exception as e:
-        print(f"❌ Error loading models: {e}")
-        print("Please check model paths and ensure 'ultralytics' is installed and models are accessible.")
-        return # Exit if models cannot be loaded
-
+def stream_violation_wrongway_video_service1(youtube_url: str, camera_id: int):
     stream_url = get_stream_url(youtube_url)
     cap = cv2.VideoCapture(stream_url)
 
-    if not cap.isOpened():
-        print(f"❌ Cannot open stream from URL: {stream_url}. Please ensure the URL is a direct video stream or use yt-dlp.")
-        raise ValueError("Cannot open stream")
+    # Load models
+    model_sign_path = "trafficsign.pt"
+    model_vehicle_path = "yolov8m.pt"
+    try:
+        model_sign = YOLO(model_sign_path)
+        model_vehicle = YOLO(model_vehicle_path)
+    except Exception as e:
+        print(f"❌ Error loading models: {e}")
+        yield b"Error: Could not load AI models."
+        return
 
-    # Get original video dimensions from the stream
+    # Fetch camera configuration from API
+    def fetch_camera_config(cid: int, retries=3, delay=1):
+        url = f"http://localhost:8081/api/cameras/{cid}"
+        for attempt in range(retries):
+            try:
+                res = requests.get(url)
+                res.raise_for_status()
+                return res.json()
+            except Exception as e:
+                print(f"Retry {attempt+1}/{retries}: Error fetching camera config: {e}")
+                time.sleep(delay)
+        raise ValueError("Failed to fetch camera config after retries")
+
+    try:
+        camera_config = fetch_camera_config(camera_id)
+    except ValueError as e:
+        print(f"❌ Error fetching camera config: {e}")
+        yield b"Error: Could not fetch camera configuration."
+        return
+
+    if not camera_config:
+        print("❌ No camera config found.")
+        yield b"Error: No camera configuration found."
+        return
+
+    zones_data = camera_config.get("zones", [])
+
+    # Get stream URL (user is responsible for this part)
+    stream_url = get_stream_url(youtube_url)
+    cap = cv2.VideoCapture(stream_url)
+    if not cap.isOpened():
+        print(f"❌ Cannot open stream from {stream_url}. Please ensure the URL is valid and accessible.")
+        yield b"Error: Cannot open video stream. Please check the stream URL."
+        return
+
     original_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     original_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    width, height = 640, 640 # Fixed processing resolution for consistency with user's original code
 
-    # Target processing dimensions (fixed for consistent processing)
-    width, height = 640, 640
+    # Function to convert percentage coordinates to pixel coordinates
+    def convert_percentage_to_frame(percentage_coords_str, frame_width, frame_height):
+        converted_coords = []
+        try:
+            percentage_coords = json.loads(percentage_coords_str) # Parse JSON string
+            for x_percent, y_percent in percentage_coords:
+                x_pixel = int(round((x_percent / 100.0) * frame_width))
+                y_pixel = int(round((y_percent / 100.0) * frame_height))
+                x_pixel = max(0, min(frame_width - 1, x_pixel))
+                y_pixel = max(0, min(frame_height - 1, y_pixel))
+                converted_coords.append([x_pixel, y_pixel])
+        except json.JSONDecodeError as e:
+            print(f"Error decoding coordinates JSON: {e} for string: {percentage_coords_str}")
+            return np.array([], dtype=np.int32).reshape(0, 2) # Return empty array on error
+        return np.array(converted_coords, dtype=np.int32)
 
-    # Calculate scaling factors for coordinates from original to target processing size
-    scale_x = width / original_width
-    scale_y = height / original_height
+    # Define zone colors (BGR format)
+    MOTORCYCLE_ZONE_COLOR = (255, 0, 0) # Blue
+    CAR_TRUCK_ZONE_COLOR = (0, 255, 0)  # Green
+    DEFAULT_ZONE_COLOR = (128, 128, 128) # Grey
 
-    # Constants for sign thumbnail display
-    OBJECT_SIZE = 64 # Size of the traffic sign thumbnail
-    MARGIN = 10      # Margin between elements
-    estimated_text_area_height = 25 # Estimated height for text below thumbnail
-
-    # Original zone data and display colors (from your second snippet)
-    # Each tuple contains (list_of_points_for_polygon, BGR_color_for_drawing)
-    original_zones_data = [
-        ([(744, 404), (212, 1016), (540, 1044), (832, 428)], (0, 255, 0)),  # Zone 1 - Green (e.g., allowed for motorcycles)
-        ([(828, 424), (560, 1016), (932, 1028), (936, 428)], (0, 0, 255)),    # Zone 2 - Red (e.g., allowed for cars/trucks)
-        ([(956, 440), (1016, 1024), (1372, 1004), (1060, 444)], (0, 0, 255)), # Zone 3 - Red (e.g., allowed for cars/trucks)
-        ([(1064, 448), (1376, 1024), (1688, 984), (1164, 444)], (0, 255, 0)), # Zone 4 - Green (e.g., allowed for motorcycles)
-    ]
-
-    # Define allowed vehicles in each zone based on their index in original_zones_data
-    zone_allowed_vehicles = {
-        0: ['motorcycle'],  # Zone 1 allows motorcycles
-        1: ['car', 'truck'], # Zone 2 allows cars and trucks
-        2: ['car', 'truck'], # Zone 3 allows cars and trucks
-        3: ['motorcycle'],  # Zone 4 allows motorcycles
+    # Process zones from API
+    lane_zones = {}
+    zone_allowed_vehicles_mapping = {
+        164: ['motorcycle'], # Lane Zone 1
+        165: ['car', 'truck'], # Lane Zone 2
+        166: ['car', 'truck'], # Lane Zone 3
+        167: ['motorcycle'] # Lane Zone 4
     }
+    for z in zones_data:
+        if z["zoneType"] == "lane":
+            frame_coords = convert_percentage_to_frame(z["coordinates"], width, height)
+            if frame_coords.size > 0: # Only add if coordinates were successfully converted
+                allowed_vehicles = zone_allowed_vehicles_mapping.get(z["id"], [])
+                zone_color = DEFAULT_ZONE_COLOR
+                # Assign blue if it's primarily a motorcycle zone (only motorcycle allowed)
+                if 'motorcycle' in allowed_vehicles and 'car' not in allowed_vehicles and 'truck' not in allowed_vehicles:
+                    zone_color = MOTORCYCLE_ZONE_COLOR
+                # Assign green if it allows cars or trucks (even if it also allows motorcycles)
+                elif 'car' in allowed_vehicles or 'truck' in allowed_vehicles:
+                    zone_color = CAR_TRUCK_ZONE_COLOR
 
-    # Vehicle classes we are interested in for detection and violation checks
-    target_vehicle_classes = ['car', 'motorcycle', 'truck']
+                lane_zones[z["id"]] = {
+                    "name": z["name"],
+                    "polygon": frame_coords,
+                    "allowed_vehicles": allowed_vehicles,
+                    "color": zone_color # Store the determined color
+                }
+                print(f"Loaded Lane Zone {z['id']} ({z['name']}) with {len(frame_coords)} points. Allowed: {lane_zones[z['id']]['allowed_vehicles']}, Color: {zone_color}")
+            else:
+                print(f"Skipping Lane Zone {z['id']} due to invalid coordinates: {z['coordinates']}")
+        # Add other zone types if needed for sign detection zones, etc.
+        # For now, the wrongway service only uses 'lane' zones for vehicle checks.
 
-    # Scale zones once before the main processing loop to the target processing dimensions
-    scaled_zones = []
-    for zone_points, color in original_zones_data:
-        scaled_points = []
-        for x, y in zone_points:
-            scaled_x = int(x * scale_x)
-            scaled_y = int(y * scale_y)
-            scaled_points.append((scaled_x, scaled_y))
-        scaled_zones.append((scaled_points, color))
+    # Constants for tracking and display
+    # Removed DIRECTION_THRESHOLD as it's no longer used for 'wrong way' detection
+    object_tracks = defaultdict(lambda: deque(maxlen=5)) # Still track for potential future use or other analytics
+    OBJECT_SIZE, MARGIN = 64, 10
+    target_vehicle_classes = ['car', 'motorcycle', 'truck', 'bus'] # Added 'bus' as it's a common vehicle type
 
-    print(f"Starting stream processing for camera ID: {camera_id}. Original video dimensions: {original_width}x{original_height}, Processing frames at: {width}x{height}")
+    print(f"🔴 Starting camera {camera_id}, original resolution: {original_width}x{original_height}, processing at {width}x{height}")
+
+    # Use a dictionary to store violation status per track_id, including a flag if it's been recorded
+    # Simplified to only track 'is_wrong_way' based on the new definition
+    vehicle_violation_status = defaultdict(lambda: {"is_wrong_way": False, "recorded_wrong_way": False})
 
     try:
         while True:
             ret, frame = cap.read()
             if not ret:
-                print("Stream ended or cannot read frame. Attempting to re-open stream...")
+                print("⚠️ Failed to read frame, attempting to reconnect...")
                 cap.release()
-                time.sleep(1) # Wait a bit before retrying to open the stream
+                time.sleep(1) # Wait a bit before retrying
                 cap = cv2.VideoCapture(stream_url)
                 if not cap.isOpened():
-                    print("Failed to re-open stream. Exiting processing loop.")
-                    break # Exit loop if stream cannot be re-opened
+                    print("❌ Failed to reconnect to stream. Exiting.")
+                    break
                 continue
 
-            # Resize the frame for consistent processing
             resized_frame = cv2.resize(frame, (width, height))
             annotated_frame = resized_frame.copy()
-
-            # Draw the defined zones on the annotated frame with transparency
             alpha = 0.4
-            for zone_points, color in scaled_zones:
+
+            # Draw zones on the annotated frame
+            for zone_id, zone_data in lane_zones.items():
+                if zone_data["polygon"].size == 0: continue # Skip if polygon is empty
                 overlay = annotated_frame.copy()
-                pts = np.array(zone_points, np.int32)
-                pts = pts.reshape((-1, 1, 2)) # Reshape for cv2.fillPoly and cv2.polylines
+                pts = zone_data["polygon"].reshape((-1, 1, 2))
+                color = zone_data["color"] # Use the stored color
                 cv2.fillPoly(overlay, [pts], color)
                 cv2.addWeighted(overlay, alpha, annotated_frame, 1 - alpha, 0, annotated_frame)
-                cv2.polylines(annotated_frame, [pts], isClosed=True, color=color, thickness=2)
+                cv2.polylines(annotated_frame, [pts], True, color, 2)
+                # User requested NOT to display zone names/numbers, so this part is commented out
+                # if len(zone_data["polygon"]) > 0:
+                #     cx_zone, cy_zone = np.mean(zone_data["polygon"], axis=0).astype(int)
+                #     put_text_with_background(annotated_frame, f"Zone {zone_data['name']}", (cx_zone, cy_zone), 0.5, (255, 255, 255))
 
-            # --- Traffic Sign Detection ---
-            results_sign = model_sign(resized_frame, conf=0.1) # Run inference on the resized frame
-            boxes_sign = results_sign[0].boxes # Get detected bounding boxes for signs
+            # Traffic Sign Detection
+            results_sign = model_sign(resized_frame, conf=0.1)
+            boxes_sign = results_sign[0].boxes
+            
+            # Variables for horizontal sign display
+            sign_display_y_fixed = MARGIN # Fixed Y position for the row of signs (top of the frame)
+            current_sign_x = width - MARGIN # Start from the right edge, move left for each sign
 
-            current_display_y = MARGIN # Starting Y position for sign thumbnails on the top right
-            for idx, box in enumerate(boxes_sign):
+            for i, box in enumerate(boxes_sign):
                 cls_id = int(box.cls)
                 label = model_sign.names[cls_id]
-                x1, y1, x2, y2 = map(int, box.xyxy[0]) # Bounding box coordinates
-
-                # Ensure coordinates are within frame boundaries
-                x1, y1 = max(0, x1), max(0, y1)
-                x2, y2 = min(width, x2), min(height, y2)
-
-                if x2 <= x1 or y2 <= y1: # Skip invalid boxes
+                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                x1, y1, x2, y2 = max(0, x1), max(0, y1), min(width, x2), min(height, y2)
+                if x2 <= x1 or y2 <= y1:
                     continue
-
-                cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 165, 255), 2) # Draw orange rectangle for sign
-                crop = resized_frame[y1:y2, x1:x2] # Crop the sign region
-
-                if crop.size == 0: # Skip if crop is empty
+                
+                crop = resized_frame[y1:y2, x1:x2]
+                if crop.size == 0:
                     continue
+                thumb = cv2.resize(crop, (OBJECT_SIZE, OBJECT_SIZE))
 
-                crop_resized = cv2.resize(crop, (OBJECT_SIZE, OBJECT_SIZE)) # Resize for thumbnail
-                thumbnail_x = width - OBJECT_SIZE - MARGIN # X position for thumbnail
-                thumbnail_y = current_display_y # Y position for thumbnail
+                # Calculate x position for the current sign thumbnail
+                x_thumb = current_sign_x - OBJECT_SIZE
+                
+                # Check if the sign thumbnail would go off-screen to the left
+                # Estimate text height for this check (a reasonable estimate for font_scale=0.6)
+                estimated_text_height = 25 
+                if x_thumb < MARGIN or (sign_display_y_fixed + OBJECT_SIZE + MARGIN + estimated_text_height) > height:
+                    break # Stop displaying signs if no more space horizontally or vertically
 
-                # Check if there's enough space for the next thumbnail + text
-                if thumbnail_y + OBJECT_SIZE + MARGIN + estimated_text_area_height > height:
-                    break # Stop displaying if out of vertical space
+                # Place the thumbnail
+                annotated_frame[sign_display_y_fixed : sign_display_y_fixed + OBJECT_SIZE, 
+                                x_thumb : x_thumb + OBJECT_SIZE] = thumb
+                
+                # Draw bounding box around the sign thumbnail
+                cv2.rectangle(annotated_frame, (x_thumb, sign_display_y_fixed), 
+                              (x_thumb + OBJECT_SIZE, sign_display_y_fixed + OBJECT_SIZE), (0, 165, 255), 2)
 
-                # Place the thumbnail on the annotated frame
-                annotated_frame[thumbnail_y:thumbnail_y + OBJECT_SIZE, thumbnail_x:thumbnail_x + OBJECT_SIZE] = crop_resized
+                # Position text below the thumbnail. org is the baseline for put_text_with_background.
+                text_org_x = x_thumb
+                text_org_y = sign_display_y_fixed + OBJECT_SIZE + MARGIN 
+                
+                put_text_with_background(annotated_frame, label, (text_org_x, text_org_y), font_scale=0.6, color=(255, 255, 255))
+                
+                # Update x for the next sign (move further left, including margin)
+                current_sign_x = x_thumb - MARGIN 
 
-                # Add text label below the thumbnail
-                text_org_y = thumbnail_y + OBJECT_SIZE + MARGIN
-                put_text_with_background(annotated_frame, label, (thumbnail_x, text_org_y),
-                                         font_scale=0.6, text_color=(255,255,255), bg_color=(0,0,0), thickness=2)
-
-                current_display_y += OBJECT_SIZE + MARGIN + estimated_text_area_height + MARGIN # Update Y for next thumbnail
-
-            # --- Vehicle Detection and Violation Check ---
-            results_vehicle = model_vehicle(resized_frame, conf=0.3) # Run inference for vehicles
-            for result in results_vehicle:
-                for box in result.boxes:
-                    cls_id = int(box.cls[0])
+            # Vehicle Detection and Tracking
+            results_vehicle = model_vehicle.track(source=resized_frame, persist=True, conf=0.3, iou=0.5, tracker="bytetrack.yaml")[0]
+            current_frame_track_ids = set()
+            if results_vehicle.boxes is not None and results_vehicle.boxes.id is not None:
+                for i in range(len(results_vehicle.boxes)):
+                    cls_id = int(results_vehicle.boxes.cls[i])
                     cls_name = model_vehicle.names[cls_id]
-
-                    if cls_name not in target_vehicle_classes: # Only process target vehicle classes
+                    if cls_name not in target_vehicle_classes:
                         continue
+                    x1, y1, x2, y2 = map(int, results_vehicle.boxes.xyxy[i])
+                    cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+                    track_id = int(results_vehicle.boxes.id[i])
+                    current_frame_track_ids.add(track_id)
+                    object_tracks[track_id].append((cx, cy))
 
-                    x1, y1, x2, y2 = map(int, box.xyxy[0]) # Bounding box coordinates
-                    x1, y1 = max(0, x1), max(0, y1)
-                    x2, y2 = min(width, x2), min(height, y2)
+                    # Reset violation flag for this frame
+                    vehicle_violation_status[track_id]["is_wrong_way"] = False
 
-                    if x2 <= x1 or y2 <= y1: # Skip invalid boxes
-                        continue
+                    label = f"ID:{track_id} {cls_name}"
+                    bbox_color = (0, 255, 0) # Default to green (OK)
+                    current_zone_id = 0 # Default to 0 if not in any defined zone
 
-                    label = f"{cls_name} {box.conf[0]:.2f}"
-                    bbox_color = (255, 255, 255) # Default white color for bounding box
-                    is_violation = False
+                    # Check for Wrong Way Violation (vehicle type not allowed in current zone)
+                    found_zone = False
+                    for z_id, z_data in lane_zones.items():
+                        if z_data["polygon"].size == 0: continue # Skip if polygon is empty
+                        if cv2.pointPolygonTest(z_data["polygon"], (cx, cy), False) >= 0:
+                            current_zone_id = z_id
+                            found_zone = True
+                            if cls_name not in z_data["allowed_vehicles"]:
+                                vehicle_violation_status[track_id]["is_wrong_way"] = True # This is the new 'wrong way' definition
+                                bbox_color = (0, 0, 255) # Red for violation
+                                label += f" - WRONG WAY ({z_data['name']})"
+                                print(f"WRONG WAY VIOLATION (Zone): Vehicle {track_id} ({cls_name}) in zone {z_data['name']} (ID: {z_id}) - not allowed.")
+                                # Save violation to database
+                                if not vehicle_violation_status[track_id]['recorded_wrong_way']:
+                                    # db_session = SessionLocal() # Assuming SessionLocal and ViolationCreate are defined elsewhere
+                                    try:
+                                        # violation_data = ViolationCreate(
+                                        #     camera_id=camera_id,
+                                        #     vehicle_type=cls_name,
+                                        #     violation_type="WRONG_WAY", # Use "WRONG_WAY" for this type of violation
+                                        #     timestamp=datetime.now(),
+                                        #     track_id=track_id,
+                                        #     zone_id=current_zone_id,
+                                        #     image_path=os.path.join(VIOLATIONS_DIR, f"violation_wrong_way_{track_id}_{int(time.time())}.jpg")
+                                        # )
+                                        cv2.imwrite(os.path.join(VIOLATIONS_DIR, f"violation_wrong_way_{track_id}_{int(time.time())}.jpg"), annotated_frame)
+                                        # violation_crud.create_violation(db_session, violation_data)
+                                        vehicle_violation_status[track_id]['recorded_wrong_way'] = True
+                                    except Exception as db_e:
+                                        print(f"Error saving WRONG_WAY violation to DB: {db_e}")
+                                        traceback.print_exc()
+                                    # finally:
+                                        # db_session.close()
+                            else:
+                                # Reset recorded flag if no longer a wrong way violation
+                                vehicle_violation_status[track_id]['recorded_wrong_way'] = False
+                            break # Found the zone, no need to check others
 
-                    # Calculate the center of the vehicle's bounding box
-                    vehicle_center_x = (x1 + x2) // 2
-                    vehicle_center_y = (y1 + y2) // 2
+                    # If vehicle is not in any defined lane zone, reset wrong way flag
+                    if not found_zone:
+                        vehicle_violation_status[track_id]['recorded_wrong_way'] = False
 
-                    # Check if the vehicle's center is within any defined zone and if it's a violation
-                    for zone_idx, (zone_points, _) in enumerate(scaled_zones):
-                        pts_for_test = np.array(zone_points, np.int32).reshape((-1, 2))
+                    # Determine final label and color based on the single 'is_wrong_way' flag
+                    if vehicle_violation_status[track_id]["is_wrong_way"]:
+                        bbox_color = (0, 0, 255)
+                        label = f"ID:{track_id} {cls_name} - WRONG WAY"
+                    else:
+                        bbox_color = (0, 255, 0) # Green if no violation
+                        label = f"ID:{track_id} {cls_name} - OK"
 
-                        # Check if the vehicle's center point is inside the current zone
-                        if cv2.pointPolygonTest(pts_for_test, (vehicle_center_x, vehicle_center_y), False) >= 0:
-                            allowed_classes_in_zone = zone_allowed_vehicles.get(zone_idx, [])
-                            if cls_name not in allowed_classes_in_zone:
-                                is_violation = True
-                                bbox_color = (0, 0, 255) # Red color for violation
-                                label += " - VIOLATION" # Append violation text to label
-                                # You can use camera_id and db here to log the violation
-                                # For example:
-                                # if db and camera_id:
-                                #     print(f"VIOLATION detected in camera {camera_id}: {cls_name} in zone {zone_idx}")
-                                #     # db.violations.insert({"camera_id": camera_id, "vehicle_type": cls_name, "zone_id": zone_idx, "timestamp": time.time()})
-                                break # Found a violation, no need to check other zones
+                    # Draw bounding box and label
+                    cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), bbox_color, 2)
+                    put_text_with_background(annotated_frame, label, (x1, y1 - 5), font_scale=0.5, color=bbox_color)
+                    cv2.circle(annotated_frame, (cx, cy), 4, (0, 255, 255), -1)
 
-                    cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), bbox_color, 2) # Draw bounding box
-                    put_text_with_background(annotated_frame, label, (x1, y1 - 5), font_scale=0.5) # Add label
+            # Clean up tracks of objects no longer appearing in the current frame
+            # Iterate over a copy of keys to allow modification during iteration
+            for obj_id in list(object_tracks.keys()):
+                if obj_id not in current_frame_track_ids:
+                    del object_tracks[obj_id]
+                    # Also remove violation status for this track_id
+                    if obj_id in vehicle_violation_status:
+                        del vehicle_violation_status[obj_id]
 
-            # Encode the annotated frame as JPEG bytes
-            _, jpeg = cv2.imencode('.jpg', annotated_frame)
-
-            # Yield the frame in MJPEG format for streaming
+            # Encode and yield the annotated frame
+            _, jpeg = cv2.imencode('.jpg', annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
             yield (
                 b"--frame\r\n"
                 b"Content-Type: image/jpeg\r\n\r\n" + jpeg.tobytes() + b"\r\n"
             )
 
+    except Exception as e:
+        print(f"Error in stream_violation_wrongway_video_service1: {e}")
+        traceback.print_exc()
+        yield b"Error: An unexpected error occurred during streaming."
     finally:
-        # Ensure the video capture object is released when the function exits
         if cap.isOpened():
             cap.release()
-        print("Stream processing finished and resources released.")
+        print("✅ Stream ended.")
+
+def extract_thumbnail_from_stream_url(youtube_url: str) -> bytes:
+    """
+    Trích xuất thumbnail (ảnh JPEG đầu tiên) từ stream YouTube.
+    """
+    stream_url = get_stream_url(youtube_url)
+    cap = cv2.VideoCapture(stream_url)
+    if not cap.isOpened():
+        raise ValueError("Không thể mở stream từ URL.")
+    frame = None
+    for _ in range(10):
+        ret, temp_frame = cap.read()
+        if ret and temp_frame is not None:
+            frame = temp_frame
+            break
+    cap.release()
+    if frame is None:
+        raise ValueError("Không thể đọc frame từ stream sau nhiều lần thử.")
+    ret, buffer = cv2.imencode(".jpg", frame)
+    if not ret:
+        raise ValueError("Lỗi khi encode frame thành JPEG.")
+    return buffer.tobytes()
