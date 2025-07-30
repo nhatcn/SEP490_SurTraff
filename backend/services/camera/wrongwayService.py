@@ -140,7 +140,6 @@ def stream_violation_wrongway_video_service1(youtube_url: str, camera_id: int):
         # For now, the wrongway service only uses 'lane' zones for vehicle checks.
 
     # Constants for tracking and display
-    # Removed DIRECTION_THRESHOLD as it's no longer used for 'wrong way' detection
     object_tracks = defaultdict(lambda: deque(maxlen=5)) # Still track for potential future use or other analytics
     OBJECT_SIZE, MARGIN = 64, 10
     target_vehicle_classes = ['car', 'motorcycle', 'truck', 'bus'] # Added 'bus' as it's a common vehicle type
@@ -148,7 +147,6 @@ def stream_violation_wrongway_video_service1(youtube_url: str, camera_id: int):
     print(f"🔴 Starting camera {camera_id}, original resolution: {original_width}x{original_height}, processing at {width}x{height}")
 
     # Use a dictionary to store violation status per track_id, including a flag if it's been recorded
-    # Simplified to only track 'is_wrong_way' based on the new definition
     vehicle_violation_status = defaultdict(lambda: {"is_wrong_way": False, "recorded_wrong_way": False})
 
     try:
@@ -263,10 +261,11 @@ def stream_violation_wrongway_video_service1(youtube_url: str, camera_id: int):
                                 bbox_color = (0, 0, 255) # Red for violation
                                 label += f" - WRONG WAY ({z_data['name']})"
                                 print(f"WRONG WAY VIOLATION (Zone): Vehicle {track_id} ({cls_name}) in zone {z_data['name']} (ID: {z_id}) - not allowed.")
-                                # Save violation to database
+                                # Save violation to database (only if not already recorded for this track_id)
                                 if not vehicle_violation_status[track_id]['recorded_wrong_way']:
                                     # db_session = SessionLocal() # Assuming SessionLocal and ViolationCreate are defined elsewhere
                                     try:
+                                        # Removed cv2.imwrite line here
                                         # violation_data = ViolationCreate(
                                         #     camera_id=camera_id,
                                         #     vehicle_type=cls_name,
@@ -276,7 +275,6 @@ def stream_violation_wrongway_video_service1(youtube_url: str, camera_id: int):
                                         #     zone_id=current_zone_id,
                                         #     image_path=os.path.join(VIOLATIONS_DIR, f"violation_wrong_way_{track_id}_{int(time.time())}.jpg")
                                         # )
-                                        cv2.imwrite(os.path.join(VIOLATIONS_DIR, f"violation_wrong_way_{track_id}_{int(time.time())}.jpg"), annotated_frame)
                                         # violation_crud.create_violation(db_session, violation_data)
                                         vehicle_violation_status[track_id]['recorded_wrong_way'] = True
                                     except Exception as db_e:
