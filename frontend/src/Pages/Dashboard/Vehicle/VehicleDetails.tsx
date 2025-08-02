@@ -228,7 +228,7 @@ const VehicleDetail = () => {
   if (!vehicle && id !== '0') {
     return (
       <div className="flex h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-        <Sidebar />
+        <Sidebar defaultActiveItem="vehicles"/>
         <div className="flex flex-col flex-grow">
           <Header title="Vehicle Detail" />
           <div className="flex items-center justify-center h-full">
@@ -270,7 +270,7 @@ const VehicleDetail = () => {
         >
           {/* Back Button */}
           <motion.button
-            onClick={() => navigate('/vehicle')}
+            onClick={() => navigate('/vehicles')}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             className="mb-6 flex items-center space-x-2 text-gray-600 hover:text-emerald-600 transition-colors"

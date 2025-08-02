@@ -50,7 +50,7 @@ const AccidentStatistics: React.FC = () => {
 
   return (
     <div className="flex h-screen">
-      <Sidebar />
+      <Sidebar defaultActiveItem="statistics"/>
       <div className="flex flex-col flex-1">
         <Header title="Accident Statistics Dashboard" />
         <div className="flex-1 overflow-y-auto">

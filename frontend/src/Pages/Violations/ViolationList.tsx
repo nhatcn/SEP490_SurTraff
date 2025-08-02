@@ -501,7 +501,7 @@ export default function ViolationList() {
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 overflow-hidden">
-      <Sidebar />
+      <Sidebar defaultActiveItem="violations"/>
       <div className="flex flex-col flex-grow overflow-hidden">
         <Header title="Traffic Violation List" />
         <div className="flex-grow p-6 overflow-y-auto">

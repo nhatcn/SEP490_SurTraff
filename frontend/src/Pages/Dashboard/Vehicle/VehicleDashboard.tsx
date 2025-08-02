@@ -18,7 +18,7 @@ interface VehicleType {
 export default function VehicleDashboard() {
   return (
     <div className="flex h-screen">
-      <Sidebar defaultActiveItem="vehicle"/>
+      <Sidebar defaultActiveItem="vehicles"/>
       <div className="flex flex-col flex-grow overflow-hidden">
         <Header title="Vehicle Dashboard" />
         
