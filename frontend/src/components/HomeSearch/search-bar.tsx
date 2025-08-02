@@ -35,7 +35,7 @@ export function SearchBar({ onSearch, initialSearchQuery = "", isSearching }: Se
       setIsLoadingVehicles(true)
       try {
         // Using a fixed userId of 7 as per the requirement
-        const response = await fetch("http://localhost:8081/api/vehicle/user/7")
+        const response = await fetch("http://localhost:8081/api/vehicle/user/9")
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`)
         }

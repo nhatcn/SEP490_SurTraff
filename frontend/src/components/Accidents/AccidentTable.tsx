@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom"
 import DeleteButton from "../Button/DeleteButton"
 import ViewButton from "../Button/ViewButton"
 import ConfirmDialog from "../UI/PopUp/ConfirmDialog"
-import GenericTable, { type TableColumn, type FilterConfig } from "../Table/GenericTable" // Removed TableAction as we're handling actions manually
+import GenericTable, { type TableColumn, type FilterConfig } from "../Table/GenericTable"
 
 interface CameraType {
   id: number
@@ -31,9 +31,15 @@ export default function AccidentTable() {
   const [accidents, setAccidents] = useState<AccidentType[]>([])
   const [cameras, setCameras] = useState<CameraType[]>([])
   const [statusOptions, setStatusOptions] = useState<{ value: string; label: string }[]>([])
+  const [locationOptions, setLocationOptions] = useState<{ value: string; label: string }[]>([])
+  const [cameraOptions, setCameraOptions] = useState<{ value: string; label: string }[]>([])
+
   const [filterValues, setFilterValues] = useState<Record<string, any>>({
     status: "",
+    cameraId: "",
+    location: "",
   })
+
   const [modalDeleteId, setModalDeleteId] = useState<number | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
@@ -41,29 +47,41 @@ export default function AccidentTable() {
 
   const navigate = useNavigate()
 
-  // Function to fetch accident data
   const fetchAccidentData = useCallback(() => {
     fetch("http://localhost:8081/api/accident")
       .then((res) => res.json())
       .then((data: AccidentType[]) => {
         setAccidents(data)
-        // Extract unique statuses
+
         const uniqueStatuses = Array.from(new Set(data.map((acc) => acc.status)))
-        const options = uniqueStatuses.map((status) => ({
+        const statusOpts = uniqueStatuses.map((status) => ({
           value: status,
           label: status,
         }))
-        setStatusOptions(options)
+        setStatusOptions(statusOpts)
+
+        const uniqueLocations = Array.from(new Set(data.map((acc) => acc.location)))
+        const locationOpts = uniqueLocations.map((loc) => ({
+          value: loc,
+          label: loc,
+        }))
+        setLocationOptions(locationOpts)
       })
       .catch(console.error)
   }, [])
 
   useEffect(() => {
     fetchAccidentData()
-    // Fetch camera data
     fetch("http://localhost:8000/api/cameras")
       .then((res) => res.json())
-      .then(setCameras)
+      .then((cameraData: CameraType[]) => {
+        setCameras(cameraData)
+        const camOpts = cameraData.map((cam) => ({
+          value: cam.id.toString(), // 👈 convert number to string
+          label: cam.name,
+        }))
+        setCameraOptions(camOpts)
+      })
       .catch(console.error)
   }, [fetchAccidentData])
 
@@ -77,6 +95,8 @@ export default function AccidentTable() {
   const resetFilters = () => {
     setFilterValues({
       status: "",
+      cameraId: "",
+      location: "",
     })
   }
 
@@ -87,11 +107,25 @@ export default function AccidentTable() {
       type: "select",
       options: statusOptions,
     },
+    {
+      key: "cameraId",
+      label: "Camera",
+      type: "select",
+      options: cameraOptions,
+    },
+    {
+      key: "location",
+      label: "Location",
+      type: "select",
+      options: locationOptions,
+    },
   ]
 
   const filteredAccidents = accidents.filter((acc) => {
     const matchStatus = !filterValues.status || acc.status === filterValues.status
-    return matchStatus
+    const matchCamera = !filterValues.cameraId || acc.cameraId === Number(filterValues.cameraId)
+    const matchLocation = !filterValues.location || acc.location === filterValues.location
+    return matchStatus && matchCamera && matchLocation
   })
 
   const handleDelete = async () => {
@@ -103,7 +137,7 @@ export default function AccidentTable() {
       })
       if (res.ok) {
         alert("Deleted successfully.")
-        fetchAccidentData() // Re-fetch data after successful deletion
+        fetchAccidentData()
       } else {
         alert("Failed to delete accident.")
       }
@@ -125,7 +159,7 @@ export default function AccidentTable() {
       })
       if (res.ok) {
         alert("Accident processed successfully.")
-        fetchAccidentData() // Re-fetch data to update status
+        fetchAccidentData()
       } else {
         alert("Failed to process accident.")
       }
@@ -146,7 +180,7 @@ export default function AccidentTable() {
       })
       if (res.ok) {
         alert("Accident rejected successfully.")
-        fetchAccidentData() // Re-fetch data to update status
+        fetchAccidentData()
       } else {
         alert("Failed to reject accident.")
       }
@@ -172,7 +206,7 @@ export default function AccidentTable() {
     },
     { key: "status", title: "Status" },
     {
-      key: "actions", // Custom key for actions column
+      key: "actions",
       title: "Actions",
       render: (value, record) => {
         if (record.status === "Requested") {
@@ -213,7 +247,6 @@ export default function AccidentTable() {
         filteredData={filteredAccidents}
         columns={columns}
         rowKey="id"
-        // actions={actions} // Removed static actions prop
         emptyMessage="No accident data available"
         filters={filters}
         filterValues={filterValues}

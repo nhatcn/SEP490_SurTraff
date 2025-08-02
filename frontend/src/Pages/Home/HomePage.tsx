@@ -120,7 +120,7 @@ export default function CustomerHome() {
     setHasSearched(true)
 
     try {
-      const response = await fetch("http://localhost:8081/api/accident/user/7")
+      const response = await fetch("http://localhost:8081/api/accident/user/9")
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
