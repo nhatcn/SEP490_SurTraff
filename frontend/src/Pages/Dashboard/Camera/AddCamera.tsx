@@ -89,6 +89,7 @@ function LocationPicker({
   );
 }
 
+// Remove unused component
 export default function AddCamera() {
   const [mapRef, setMapRef] = useState<L.Map | null>(null);
 
@@ -151,7 +152,7 @@ export default function AddCamera() {
       <div className="flex flex-col flex-grow overflow-auto">
         <Header title="Add New Camera" />
 
-        <div className="p-6 max-w-7xl mx-auto w-full">
+        <div className="p-6 max-w-8xl mx-auto w-full">
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-2xl font-semibold mb-6">Camera Details</h2>
 
@@ -383,14 +384,38 @@ export default function AddCamera() {
               <div className="mb-6">
                 <h3 className="text-xl font-semibold mb-4">Camera Thumbnail & Zones</h3>
 
-                <ZoneCanvas
-                  zones={cameraForm.zones}
-                  setZones={cameraForm.setZones}
-                  thumbnailUrl={cameraForm.thumbnailUrl}
-                  nextZoneId={nextZoneId}
-                  setNextZoneId={setNextZoneId}
-                  onDeleteZone={cameraForm.handleDeleteZone}
-                />
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Fixed ZoneCanvas */}
+                  <div className="sticky top-4">
+                    <ZoneCanvas
+                      zones={cameraForm.zones}
+                      setZones={cameraForm.setZones}
+                      thumbnailUrl={cameraForm.thumbnailUrl}
+                      nextZoneId={nextZoneId}
+                      setNextZoneId={setNextZoneId}
+                      onDeleteZone={cameraForm.handleDeleteZone}
+                    />
+                  </div>
+
+                  {/* Configuration sections */}
+                  <div className="space-y-6">
+                    {cameraForm.zones.length > 0 && (
+                      <>
+                        <LaneDirectionConfig
+                          zones={cameraForm.zones}
+                          laneDirections={cameraForm.laneDirections}
+                          setLaneDirections={cameraForm.setLaneDirections}
+                        />
+
+                        <LightZoneMappingConfig
+                          zones={cameraForm.zones}
+                          lightZoneMappings={cameraForm.lightZoneMappings}
+                          setLightZoneMappings={cameraForm.setLightZoneMappings}
+                        />
+                      </>
+                    )}
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="mb-6">
@@ -406,27 +431,6 @@ export default function AddCamera() {
               </div>
             )}
 
-            {/* Lane Direction and Light Zone Mappings - Only show if zones exist */}
-            {cameraForm.zones.length > 0 && (
-              <>
-                <div className="mb-6">
-                  <LaneDirectionConfig
-                    zones={cameraForm.zones}
-                    laneDirections={cameraForm.laneDirections}
-                    setLaneDirections={cameraForm.setLaneDirections}
-                  />
-                </div>
-
-                <div className="mb-6">
-                  <LightZoneMappingConfig
-                    zones={cameraForm.zones}
-                    lightZoneMappings={cameraForm.lightZoneMappings}
-                    setLightZoneMappings={cameraForm.setLightZoneMappings}
-                  />
-                </div>
-              </>
-            )}
-
             <div className="mt-8 flex justify-end space-x-4">
               <button
                 onClick={() => cameraForm.navigate("/cameras")}
@@ -440,7 +444,6 @@ export default function AddCamera() {
               >
                 Add Camera
               </button>
-   
             </div>
           </div>
         </div>

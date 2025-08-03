@@ -10,7 +10,7 @@ interface User {
   userId: number;
   avatar: string;
   userName: string;
-  name: string;
+  fullName: string;
   email: string;
   status: boolean;
   role: string;
@@ -55,7 +55,6 @@ export default function TableUser() {
     confirmButtonColor: 'bg-red-500 hover:bg-red-600'
   });
 
-
   const API_BASE_URL = 'http://localhost:8081/api';
   const token = localStorage.getItem("token");
   const authHeader = {
@@ -65,17 +64,26 @@ export default function TableUser() {
     },
   };
 
+  // Helper function để sắp xếp users theo userName
+  const sortUsersByUserName = (userList: User[]) => {
+    return [...userList].sort((a, b) => {
+      const userNameA = (a.userName || '').toLowerCase();
+      const userNameB = (b.userName || '').toLowerCase();
+      return userNameA.localeCompare(userNameB);
+    });
+  };
+
   const applyFilters = (userList: User[]) => {
     let filtered = userList;
 
     if (filters.search) {
       const searchTerm = filters.search.toLowerCase();
       filtered = filtered.filter(user => {
-        const name = user.name || '';
+        const fullName = user.fullName || '';
         const userName = user.userName || '';
         const email = user.email || '';
 
-        return name.toLowerCase().includes(searchTerm) ||
+        return fullName.toLowerCase().includes(searchTerm) ||
           userName.toLowerCase().includes(searchTerm) ||
           email.toLowerCase().includes(searchTerm);
       });
@@ -93,7 +101,8 @@ export default function TableUser() {
       }
     }
 
-    return filtered;
+    // Sắp xếp theo userName sau khi filter
+    return sortUsersByUserName(filtered);
   };
 
   const getPaginatedData = (data: User[]) => {
@@ -107,10 +116,8 @@ export default function TableUser() {
   useEffect(() => {
     const filtered = applyFilters(users);
     setFilteredUsers(filtered);
- 
     setCurrentPage(1);
   }, [users, filters]);
-
 
   const handleFilterChange = (type: string, value: string) => {
     setFilters(prev => ({
@@ -182,7 +189,7 @@ export default function TableUser() {
     setConfirmDialog({
       isOpen: true,
       title: "Delete User",
-      message: `Are you sure you want to delete user "${userToDelete.name}"?`,
+      message: `Are you sure you want to delete user "${userToDelete.fullName}"?`,
       onConfirm: () => confirmDeleteUser(userId),
       confirmButtonText: 'Delete',
       confirmButtonColor: 'bg-red-500 hover:bg-red-600'
@@ -221,7 +228,7 @@ export default function TableUser() {
     setConfirmDialog({
       isOpen: true,
       title: "Change User Role",
-      message: `Are you sure you want to change ${userToUpdate.name}'s role to ${newRole}?`,
+      message: `Are you sure you want to change ${userToUpdate.fullName}'s role to ${newRole}?`,
       onConfirm: () => confirmRoleChange(userId, newRole),
       confirmButtonText: 'Change Role',
       confirmButtonColor: 'bg-blue-500 hover:bg-blue-600'
@@ -268,7 +275,19 @@ export default function TableUser() {
     }
   };
 
-  // Giữ nguyên các useEffect fetch data
+  // Helper function để get role badge color
+  const getRoleBadgeColor = (role: string) => {
+    const colors = {
+      'Admin': 'bg-red-100 text-red-800 border-red-200',
+      'Moderator': 'bg-purple-100 text-purple-800 border-purple-200',
+      'Editor': 'bg-blue-100 text-blue-800 border-blue-200',
+      'User': 'bg-gray-100 text-gray-800 border-gray-200',
+      'Viewer': 'bg-green-100 text-green-800 border-green-200'
+    };
+    return colors[role as keyof typeof colors] || 'bg-gray-100 text-gray-800 border-gray-200';
+  };
+
+  // Fetch roles useEffect
   useEffect(() => {
     const fetchRoles = async () => {
       try {
@@ -295,6 +314,7 @@ export default function TableUser() {
     fetchRoles();
   }, []);
 
+  // Fetch users useEffect
   useEffect(() => {
     const fetchUsers = async () => {
       try {
@@ -329,7 +349,7 @@ export default function TableUser() {
             userId: user.userId,
             avatar: user.avatar || '',
             userName: user.userName || '',
-            name: user.name || '',
+            fullName: user.fullName || '',
             email: user.email || '',
             status: user.status,
             role: roleName,
@@ -337,7 +357,9 @@ export default function TableUser() {
           } as User;
         });
 
-        setUsers(usersWithRoles);
+        // Sắp xếp mặc định theo userName ngay khi fetch data
+        const sortedUsers = sortUsersByUserName(usersWithRoles);
+        setUsers(sortedUsers);
         setLoading(false);
       } catch (err) {
         console.error(err);
@@ -351,91 +373,124 @@ export default function TableUser() {
     }
   }, [roleObjects]);
 
-  // Định nghĩa columns cho GenericTable
+  // Định nghĩa columns cho GenericTable với styling hiện đại
   const columns: TableColumn<User>[] = [
     {
       key: 'avatar',
-      title: 'AVATAR',
+      title: 'PROFILE',
       render: (value, record) => (
-        <img
-          src={value || `https://ui-avatars.com/api/?name=${record.userName || "U"}&background=random`}
-          alt={record.userName}
-          className="h-9 w-9 rounded-full object-cover"
-        />
-      )
-    },
-    {
-      key: 'userName',
-      title: 'Username',
-      render: (value) => (
-        <span className="text-sm font-medium text-gray-900">{value || "(unknown)"}</span>
-      )
-    },
-    {
-      key: 'name',
-      title: 'Name',
-      render: (value) => (
-        <span className="text-sm text-gray-900">{value}</span>
+        <div className="flex items-center space-x-4">
+          <div className="relative">
+            <img
+              src={value || `https://ui-avatars.com/api/?name=${record.userName || "U"}&background=4F46E5&color=fff&bold=true`}
+              alt={record.userName}
+              className="h-12 w-12 rounded-full object-cover ring-2 ring-white shadow-lg"
+            />
+            <div className={`absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-2 border-white ${record.status ? 'bg-green-400' : 'bg-gray-400'}`}></div>
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-gray-900 truncate">
+              {record.fullName || "(unknown)"}
+            </p>
+            <p className="text-sm text-gray-500 truncate">
+              @{record.userName || "unknown"}
+            </p>
+          </div>
+        </div>
       )
     },
     {
       key: 'email',
-      title: 'Email',
-      render: (value) => (
-        <span className="text-sm text-gray-900">{value}</span>
+      title: 'CONTACT',
+      render: (value, record) => (
+        <div className="space-y-1">
+          <div className="flex items-center space-x-2">
+            <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
+            </svg>
+            <span className="text-sm text-gray-900">{value}</span>
+          </div>
+        </div>
       )
     },
     {
       key: 'role',
-      title: 'Role',
+      title: 'ROLE',
       render: (value, record) => (
-        <select
-          className="block w-full py-1.5 pl-3 pr-8 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          value={value}
-          onChange={(e) => handleRoleChange(record.userId, e.target.value)}
-        >
-          {roles.map((role) => (
-            <option key={role} value={role}>{role}</option>
-          ))}
-        </select>
+        <div className="space-y-3">
+
+          <div className="relative">
+            <select
+              className="appearance-none block w-full py-2.5 pl-4 pr-10 text-sm border border-gray-200 rounded-xl bg-white hover:border-blue-300 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 cursor-pointer shadow-sm"
+              value={value}
+              onChange={(e) => handleRoleChange(record.userId, e.target.value)}
+            >
+              {roles.map((role) => (
+                <option key={role} value={role} className="py-2">{role}</option>
+              ))}
+            </select>
+            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+              <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
+        </div>
       )
     },
     {
       key: 'status',
-      title: 'Status',
+      title: 'STATUS',
       render: (value, record, index) => (
-        <div className="flex items-center">
+        <div className="flex flex-col items-start space-y-2">
+          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+            value 
+              ? 'bg-green-100 text-green-800 border border-green-200' 
+              : 'bg-red-100 text-red-800 border border-red-200'
+          }`}>
+            <div className={`h-2 w-2 rounded-full mr-2 ${value ? 'bg-green-400' : 'bg-red-400'}`}></div>
+            {value ? 'Active' : 'Inactive'}
+          </span>
           <button
             type="button"
-            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${value ? 'bg-green-500' : 'bg-gray-300'}`}
+            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-all duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+              value ? 'bg-gradient-to-r from-green-400 to-green-500 shadow-lg' : 'bg-gray-300'
+            }`}
             role="switch"
             onClick={() => toggleUserActive(record.userId, value, index)}
           >
-            <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${value ? 'translate-x-5' : 'translate-x-0'}`}></span>
+            <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition-all duration-300 ease-in-out ${
+              value ? 'translate-x-5 shadow-lg' : 'translate-x-0'
+            }`}>
+              {value && (
+                <svg className="h-3 w-3 text-green-600 absolute top-1 left-1" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              )}
+            </span>
           </button>
-          <span className="ml-2 text-sm">
-            {value === true ? 'Active' : 'Inactive'}
-          </span>
         </div>
       )
     }
   ];
 
-const actions: TableAction<User>[] = [
-  {
-    key: 'delete',
-    label: 'Delete Product',
-    icon: (
-      <DeleteButton
-        onClick={() => {}}
-        size="md"
-        variant="icon"
-        className="text-red-500 hover:text-red-700 hover:bg-red-100"
-      />
-    ),
-    onClick: (record) => handleDeleteUser(record.userId)
-  }
-];
+  const actions: TableAction<User>[] = [
+    {
+      key: 'delete',
+      label: 'Delete User',
+      icon: (
+        <div className="p-2 rounded-lg hover:bg-red-50 transition-colors duration-200 group">
+          <DeleteButton
+            onClick={() => {}}
+            size="md"
+            variant="icon"
+            className="text-red-500 hover:text-red-700 group-hover:scale-110 transition-transform duration-200"
+          />
+        </div>
+      ),
+      onClick: (record) => handleDeleteUser(record.userId)
+    }
+  ];
 
   // Định nghĩa filters cho GenericTable
   const filterConfigs: FilterConfig[] = [
@@ -462,48 +517,47 @@ const actions: TableAction<User>[] = [
     }
   ];
 
- return (
-  <>
-    <GenericTable<User>
-      data={users}
-      filteredData={getPaginatedData(filteredUsers)}
-      columns={columns}
-      rowKey="userId"
-      actions={actions}
-      filters={filterConfigs}
-      filterValues={filters}
-      onFilterChange={handleFilterChange}
-      onResetFilters={resetFilters}
-      loading={loading}
-      error={error}
-      onRetry={() => window.location.reload()}
-      emptyMessage="No users found"
-      pagination={{
-        enabled: true,
-        currentPage,
-        totalPages,
-        pageSize,
-        totalItems: filteredUsers.length,
-        onPageChange: handlePageChange,
-        onPageSizeChange: handlePageSizeChange
-      }}
-    />
+  return (
+    <div className="space-y-6">
+      <GenericTable<User>
+        data={users}
+        filteredData={getPaginatedData(filteredUsers)}
+        columns={columns}
+        rowKey="userId"
+        actions={actions}
+        filters={filterConfigs}
+        filterValues={filters}
+        onFilterChange={handleFilterChange}
+        onResetFilters={resetFilters}
+        loading={loading}
+        error={error}
+        onRetry={() => window.location.reload()}
+        emptyMessage="No users found"
+        pagination={{
+          enabled: true,
+          currentPage,
+          totalPages,
+          pageSize,
+          totalItems: filteredUsers.length,
+          onPageChange: handlePageChange,
+          onPageSizeChange: handlePageSizeChange
+        }}
+      />
 
-    {/* Giữ nguyên ConfirmDialog */}
-    <ConfirmDialog
-      isOpen={confirmDialog.isOpen}
-      title={confirmDialog.title}
-      message={confirmDialog.message}
-      onConfirm={confirmDialog.onConfirm}
-      onCancel={() =>
-        setConfirmDialog((prev) => ({
-          ...prev,
-          isOpen: false,
-        }))
-      }
-      confirmButtonText={confirmDialog.confirmButtonText}
-      confirmButtonColor={confirmDialog.confirmButtonColor}
-    />
-  </>
-);
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() =>
+          setConfirmDialog((prev) => ({
+            ...prev,
+            isOpen: false,
+          }))
+        }
+        confirmButtonText={confirmDialog.confirmButtonText}
+        confirmButtonColor={confirmDialog.confirmButtonColor}
+      />
+    </div>
+  );
 }
