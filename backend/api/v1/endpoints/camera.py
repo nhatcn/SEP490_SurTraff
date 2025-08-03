@@ -28,10 +28,13 @@ from services.camera.wrongwayService import (
     stream_violation_wrongway_video_service1
 )
 
-from services.traffic_density_service import analyze_traffic_video
 from services.pothole_detection_service import detect_potholes_in_video
 from services.camera.red_light_violation_service import (
     stream_violation_video_service1,
+    extract_thumbnail_from_stream_url
+)
+from services.camera.illegalparkingService import (
+    analyze_traffic_video,
     extract_thumbnail_from_stream_url
 )
 from db.session import get_db
