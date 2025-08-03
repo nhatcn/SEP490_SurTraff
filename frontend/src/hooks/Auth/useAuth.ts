@@ -99,7 +99,7 @@ export const useRegister = () => {
     try {
       await axios.post(`${API_BASE_URL}/register`, {
         userName: formData.username,
-        name: formData.fullName,
+        fullName: formData.fullName,
         password: formData.password,
       });
 

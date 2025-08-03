@@ -152,16 +152,12 @@ def stream_video(camera_id: int, db: Session = Depends(get_db)):
             stream_no_helmet_service(camera.stream_url, camera.id),
             media_type="multipart/x-mixed-replace; boundary=frame"
         )   
-    elif camera_id >= 50:
+
+    elif  camera_id == 59:
         return StreamingResponse(
-            stream_violation_wrongway_video_service1(camera.stream_url, camera.id),
+            stream_violation_video_service1(camera.stream_url, camera.id),
             media_type="multipart/x-mixed-replace; boundary=frame"
-        )     
-    # elif camera_id >= 25 and camera_id < 50:
-    #     return StreamingResponse(
-    #         stream_violation_video_service1(camera.stream_url, camera.id),
-    #         media_type="multipart/x-mixed-replace; boundary=frame"
-    #     )
+        )
     else:
         return StreamingResponse(
             analyze_traffic_video(camera.stream_url, camera.id),
