@@ -28,10 +28,13 @@ from services.camera.wrongwayService import (
     stream_violation_wrongway_video_service1
 )
 
-from services.traffic_density_service import analyze_traffic_video
 from services.pothole_detection_service import detect_potholes_in_video
 from services.camera.red_light_violation_service import (
     stream_violation_video_service1,
+    extract_thumbnail_from_stream_url
+)
+from services.camera.illegalparkingService import (
+    analyze_traffic_video,
     extract_thumbnail_from_stream_url
 )
 from db.session import get_db
@@ -151,18 +154,13 @@ def stream_video(camera_id: int, db: Session = Depends(get_db)):
         return StreamingResponse(
             stream_no_helmet_service(camera.stream_url, camera.id),
             media_type="multipart/x-mixed-replace; boundary=frame"
-        ) 
-    elif camera_id >= 50:
-        return StreamingResponse(
-            stream_violation_wrongway_video_service1(camera.stream_url, camera.id),
-            media_type="multipart/x-mixed-replace; boundary=frame"
         )   
 
-    # elif  camera_id == 59:
-    #     return StreamingResponse(
-    #         stream_violation_video_service1(camera.stream_url, camera.id),
-    #         media_type="multipart/x-mixed-replace; boundary=frame"
-    #     )
+    elif  camera_id == 59:
+        return StreamingResponse(
+            stream_violation_video_service1(camera.stream_url, camera.id),
+            media_type="multipart/x-mixed-replace; boundary=frame"
+        )
     else:
         return StreamingResponse(
             analyze_traffic_video(camera.stream_url, camera.id),
