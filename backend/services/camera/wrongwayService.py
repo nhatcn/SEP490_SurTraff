@@ -13,7 +13,6 @@ import tempfile
 import threading
 from concurrent.futures import ThreadPoolExecutor
 import atexit
-
 from utils.yt_stream import get_stream_url # Assuming this utility exists
 
 # Constants
@@ -132,7 +131,10 @@ def stream_violation_wrongway_video_service1(youtube_url: str, camera_id: int):
 
     original_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     original_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    width, height = 640, 640 # Fixed processing resolution for consistency with user's original code
+    
+    # Fixed processing resolution for consistency with user's original code
+    # We will upscale the final output frame back to original_width, original_height
+    processing_width, processing_height = 640, 640 
 
     # Function to convert percentage coordinates to pixel coordinates
     def convert_percentage_to_frame(percentage_coords_str, frame_width, frame_height):
@@ -152,8 +154,8 @@ def stream_violation_wrongway_video_service1(youtube_url: str, camera_id: int):
 
     # Define zone colors (BGR format) - Using distinct colors as requested
     MOTORCYCLE_ZONE_COLOR = (255, 0, 0)    # Blue for motorcycle-only lanes
-    CAR_TRUCK_ZONE_COLOR = (0, 165, 255)   # Orange for car/truck lanes (changed from green for better distinction)
-    DEFAULT_ZONE_COLOR = (128, 128, 128)   # Grey for other or undefined lanes
+    CAR_TRUCK_ZONE_COLOR = (0, 165, 255)  # Orange for car/truck lanes (changed from green for better distinction)
+    DEFAULT_ZONE_COLOR = (128, 128, 128)  # Grey for other or undefined lanes
 
     # This mapping defines which vehicle types are allowed based on the ZONE NAME.
     # This approach avoids hardcoding specific zone IDs, making it more flexible
@@ -171,11 +173,11 @@ def stream_violation_wrongway_video_service1(youtube_url: str, camera_id: int):
     lane_zones = {}
     for z in zones_data:
         if z["zoneType"] == "lane":
-            frame_coords = convert_percentage_to_frame(z["coordinates"], width, height)
+            # Convert coordinates based on the PROCESSING resolution
+            frame_coords = convert_percentage_to_frame(z["coordinates"], processing_width, processing_height)
             if frame_coords.size > 0: # Only add if coordinates were successfully converted
                 # Get allowed vehicles from the mapping based on zone NAME
                 allowed_vehicles = zone_name_to_allowed_vehicles_mapping.get(z["name"], [])
-
                 zone_color = DEFAULT_ZONE_COLOR
                 # Assign blue if it's primarily a motorcycle zone (only motorcycle allowed)
                 if 'motorcycle' in allowed_vehicles and 'car' not in allowed_vehicles and 'truck' not in allowed_vehicles:
@@ -183,7 +185,7 @@ def stream_violation_wrongway_video_service1(youtube_url: str, camera_id: int):
                 # Assign orange if it allows cars or trucks (even if it also allows motorcycles)
                 elif 'car' in allowed_vehicles or 'truck' in allowed_vehicles:
                     zone_color = CAR_TRUCK_ZONE_COLOR
-                
+                                
                 lane_zones[z["id"]] = {
                     "name": z["name"],
                     "polygon": frame_coords,
@@ -200,12 +202,13 @@ def stream_violation_wrongway_video_service1(youtube_url: str, camera_id: int):
     object_tracks = defaultdict(lambda: deque(maxlen=5)) # Still track for potential future use or other analytics
     OBJECT_SIZE, MARGIN = 64, 10
     target_vehicle_classes = ['car', 'motorcycle', 'truck', 'bus'] # Added 'bus' as it's a common vehicle type
-    print(f"🔴 Starting camera {camera_id}, original resolution: {original_width}x{original_height}, processing at {width}x{height}")
+    print(f"🔴 Starting camera {camera_id}, original resolution: {original_width}x{original_height}, processing at {processing_width}x{processing_height}")
 
     # Use a dictionary to store violation status per track_id, including a flag if it's been recorded
     vehicle_violation_status = defaultdict(lambda: {"is_wrong_way": False, "recorded_wrong_way": False})
-    
+        
     # Buffer for 1 second of frames at 30 FPS (assuming typical stream FPS)
+    # This buffer will now store frames at the ORIGINAL resolution
     frame_buffer = deque(maxlen=30) 
     fps = cap.get(cv2.CAP_PROP_FPS) or 30
 
@@ -222,12 +225,12 @@ def stream_violation_wrongway_video_service1(youtube_url: str, camera_id: int):
                     break
                 continue
             
-            resized_frame = cv2.resize(frame, (width, height))
-            annotated_frame = resized_frame.copy()
-            frame_buffer.append(annotated_frame.copy()) # Store annotated frame in buffer
+            # Resize frame for AI processing
+            resized_frame = cv2.resize(frame, (processing_width, processing_height))
+            annotated_frame = resized_frame.copy() # This frame is 640x640 for drawing
 
             alpha = 0.4
-            # Draw zones on the annotated frame
+            # Draw zones on the annotated frame (640x640)
             for zone_id, zone_data in lane_zones.items():
                 if zone_data["polygon"].size == 0: continue # Skip if polygon is empty
                 overlay = annotated_frame.copy()
@@ -238,36 +241,36 @@ def stream_violation_wrongway_video_service1(youtube_url: str, camera_id: int):
                 cv2.polylines(annotated_frame, [pts], True, color, 2)
                 # User requested NOT to display zone names/numbers, so this part is commented out
                 # if len(zone_data["polygon"]) > 0:
-                #     cx_zone, cy_zone = np.mean(zone_data["polygon"], axis=0).astype(int)
-                #     put_text_with_background(annotated_frame, f"Zone {zone_data['name']}", (cx_zone, cy_zone), 0.5, (255, 255, 255))
-            
+                #    cx_zone, cy_zone = np.mean(zone_data["polygon"], axis=0).astype(int)
+                #    put_text_with_background(annotated_frame, f"Zone {zone_data['name']}", (cx_zone, cy_zone), 0.5, (255, 255, 255))
+                        
             # Traffic Sign Detection
             results_sign = model_sign(resized_frame, conf=0.1)
             boxes_sign = results_sign[0].boxes
-            
+                    
             # Variables for horizontal sign display
             sign_display_y_fixed = MARGIN # Fixed Y position for the row of signs (top of the frame)
-            current_sign_x = width - MARGIN # Start from the right edge, move left for each sign
+            current_sign_x = processing_width - MARGIN # Start from the right edge, move left for each sign
             for i, box in enumerate(boxes_sign):
                 cls_id = int(box.cls)
                 label = model_sign.names[cls_id]
                 x1, y1, x2, y2 = map(int, box.xyxy[0])
-                x1, y1, x2, y2 = max(0, x1), max(0, y1), min(width, x2), min(height, y2)
+                x1, y1, x2, y2 = max(0, x1), max(0, y1), min(processing_width, x2), min(processing_height, y2)
                 if x2 <= x1 or y2 <= y1:
                     continue
                 crop = resized_frame[y1:y2, x1:x2]
                 if crop.size == 0:
                     continue
                 thumb = cv2.resize(crop, (OBJECT_SIZE, OBJECT_SIZE))
-                
+                        
                 # Calculate x position for the current sign thumbnail
                 x_thumb = current_sign_x - OBJECT_SIZE
                 # Check if the sign thumbnail would go off-screen to the left
                 # Estimate text height for this check (a reasonable estimate for font_scale=0.6)
                 estimated_text_height = 25
-                if x_thumb < MARGIN or (sign_display_y_fixed + OBJECT_SIZE + MARGIN + estimated_text_height) > height:
+                if x_thumb < MARGIN or (sign_display_y_fixed + OBJECT_SIZE + MARGIN + estimated_text_height) > processing_height:
                     break # Stop displaying signs if no more space horizontally or vertically
-                
+                        
                 # Place the thumbnail
                 annotated_frame[sign_display_y_fixed : sign_display_y_fixed + OBJECT_SIZE,
                                 x_thumb : x_thumb + OBJECT_SIZE] = thumb
@@ -280,7 +283,7 @@ def stream_violation_wrongway_video_service1(youtube_url: str, camera_id: int):
                 put_text_with_background(annotated_frame, label, (text_org_x, text_org_y), font_scale=0.6, color=(255, 255, 255))
                 # Update x for the next sign (move further left, including margin)
                 current_sign_x = x_thumb - MARGIN
-            
+                        
             # Vehicle Detection and Tracking
             results_vehicle = model_vehicle.track(source=resized_frame, persist=True, conf=0.3, iou=0.5, tracker="bytetrack.yaml")[0]
             current_frame_track_ids = set()
@@ -290,19 +293,19 @@ def stream_violation_wrongway_video_service1(youtube_url: str, camera_id: int):
                     cls_name = model_vehicle.names[cls_id]
                     if cls_name not in target_vehicle_classes:
                         continue
-                    
+                                        
                     x1, y1, x2, y2 = map(int, results_vehicle.boxes.xyxy[i])
                     cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
                     track_id = int(results_vehicle.boxes.id[i])
                     current_frame_track_ids.add(track_id)
                     object_tracks[track_id].append((cx, cy))
-                    
+                                        
                     # Reset violation flag for this frame for the current track_id
                     vehicle_violation_status[track_id]["is_wrong_way"] = False
-                    
+                                        
                     label = f"ID:{track_id} {cls_name}"
                     bbox_color = (0, 255, 0) # Default to green (OK)
-                    
+                                        
                     found_zone = False
                     for z_id, z_data in lane_zones.items():
                         if z_data["polygon"].size == 0: continue # Skip if polygon is empty
@@ -321,15 +324,18 @@ def stream_violation_wrongway_video_service1(youtube_url: str, camera_id: int):
                                          tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as temp_video:
                                         image_path = temp_image.name
                                         video_path = temp_video.name
-
-                                        # Save image (current annotated frame)
-                                        cv2.imwrite(image_path, annotated_frame)
-
+                                        
+                                        # Save image (current annotated frame, upscaled to original resolution)
+                                        # Create the final output frame at original resolution for saving and streaming
+                                        final_output_frame_for_save = cv2.resize(annotated_frame, (original_width, original_height))
+                                        cv2.imwrite(image_path, final_output_frame_for_save)
+                                        
                                         # Save video (1s before and after the current frame)
-                                        # Ensure violation_frames are correctly captured from the buffer
-                                        violation_frames = list(frame_buffer)[-int(fps):] + [annotated_frame] + list(frame_buffer)[:int(fps)]
-                                        save_temp_violation_video(violation_frames, fps, video_path, width, height)
-
+                                        # Ensure violation_frames are correctly captured from the buffer (which now stores original resolution frames)
+                                        # The buffer should contain frames at original resolution
+                                        violation_frames = list(frame_buffer)[-int(fps):] + [final_output_frame_for_save] + list(frame_buffer)[:int(fps)]
+                                        save_temp_violation_video(violation_frames, fps, video_path, original_width, original_height)
+                                        
                                         # Prepare violation data for API
                                         violation_data = {
                                             "camera": {"id": camera_id},
@@ -341,21 +347,20 @@ def stream_violation_wrongway_video_service1(youtube_url: str, camera_id: int):
                                                 "licensePlate": f"TRACK_{track_id}"  # Placeholder
                                             }]
                                         }
-
                                         # Send violation asynchronously (non-blocking)
                                         print(f"📤 Sending WRONG_LANE violation for track {track_id} asynchronously...")
                                         send_violation_async(violation_data, image_path, video_path, track_id)
-                                    
+                                        
                                     vehicle_violation_status[track_id]['recorded_wrong_way'] = True
                             else:
                                 # If vehicle is in a correct lane, reset the recorded flag
                                 vehicle_violation_status[track_id]['recorded_wrong_way'] = False
                             break # Found the zone, no need to check others
-                    
+                                
                     # If vehicle is not in any defined lane zone, reset wrong way flag
                     if not found_zone:
                         vehicle_violation_status[track_id]['recorded_wrong_way'] = False
-
+                    
                     # Determine final label and color based on the single 'is_wrong_way' flag
                     if vehicle_violation_status[track_id]["is_wrong_way"]:
                         bbox_color = (0, 0, 255) # Red
@@ -363,12 +368,12 @@ def stream_violation_wrongway_video_service1(youtube_url: str, camera_id: int):
                     else:
                         bbox_color = (0, 255, 0) # Green if no violation
                         label = f"ID:{track_id} {cls_name} - OK"
-                    
+                                        
                     # Draw bounding box and label
                     cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), bbox_color, 2)
                     put_text_with_background(annotated_frame, label, (x1, y1 - 5), font_scale=0.5, color=bbox_color)
                     cv2.circle(annotated_frame, (cx, cy), 4, (0, 255, 255), -1)
-            
+                                        
             # Clean up tracks of objects no longer appearing in the current frame
             # Iterate over a copy of keys to allow modification during iteration
             for obj_id in list(object_tracks.keys()):
@@ -378,13 +383,18 @@ def stream_violation_wrongway_video_service1(youtube_url: str, camera_id: int):
                     if obj_id in vehicle_violation_status:
                         del vehicle_violation_status[obj_id]
             
-            # Encode and yield the annotated frame
-            _, jpeg = cv2.imencode('.jpg', annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+            # Upscale the annotated frame to the original resolution for output
+            final_output_frame = cv2.resize(annotated_frame, (original_width, original_height))
+            
+            # Store the final_output_frame (original resolution) in the buffer
+            frame_buffer.append(final_output_frame.copy()) 
+
+            # Encode and yield the annotated frame (now at original resolution)
+            _, jpeg = cv2.imencode('.jpg', final_output_frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
             yield (
                 b"--frame\r\n"
                 b"Content-Type: image/jpeg\r\n\r\n" + jpeg.tobytes() + b"\r\n"
             )
-
     except Exception as e:
         print(f"Error in stream_violation_wrongway_video_service1: {e}")
         traceback.print_exc()
