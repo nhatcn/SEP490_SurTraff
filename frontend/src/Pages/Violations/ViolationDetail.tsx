@@ -187,6 +187,30 @@ export default function ViolationDetail() {
     }
   };
 
+  const handleUpdateStatus = async (newStatus: string) => {
+    if (!id) return;
+
+    try {
+      setLoading(true);
+      const response = await axios.patch(`${API_URL}/api/violations/${id}/status`, null, {
+        params: { status: newStatus },
+        headers: { Accept: "application/json" },
+      });
+      setViolation(response.data);
+      setFormData((prev) => ({ ...prev, status: response.data.status }));
+      if (newStatus.toUpperCase() === "APPROVE") {
+        toast.success("Violation approved! An email with the violation report has been sent.");
+      } else {
+        toast.success(`Violation status updated to ${newStatus}!`);
+      }
+    } catch (err) {
+      console.error("Error updating status:", err);
+      toast.error("Unable to update status. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleUpdateDetail = async () => {
     if (!id || !detailFormData || !violation?.violationDetails?.[0]?.id) return;
     if (!detailFormData.violationType?.id) {
@@ -242,6 +266,8 @@ export default function ViolationDetail() {
       request: { bg: "bg-yellow-100", text: "text-yellow-700", icon: <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" /> },
       approve: { bg: "bg-green-100", text: "text-green-700", icon: <CheckCircle2 className="text-green-500" size={14} /> },
       reject: { bg: "bg-red-100", text: "text-red-700", icon: <XCircle className="text-red-500" size={14} /> },
+      resolved: { bg: "bg-teal-100", text: "text-teal-700", icon: <CheckCircle2 className="text-teal-500" size={14} /> },
+      dismissed: { bg: "bg-blue-100", text: "text-blue-700", icon: <XCircle className="text-blue-500" size={14} /> },
     };
     return statusMap[status.toLowerCase()] || { bg: "bg-gray-100", text: "text-gray-500", icon: <div className="w-2 h-2 bg-gray-400 rounded-full" /> };
   };
@@ -279,7 +305,7 @@ export default function ViolationDetail() {
   if (loading) {
     return (
       <div className="flex h-screen bg-gradient-to-br from-blue-100 via-gray-50 to-blue-100">
-        <Sidebar defaultActiveItem="violations"/>
+        <Sidebar />
         <div className="flex flex-col flex-grow overflow-hidden">
           <Header title="Violation Detail" />
           <div className="flex items-center justify-center flex-grow">
@@ -580,6 +606,78 @@ export default function ViolationDetail() {
                   </div>
                 )}
               </div>
+
+              {/* Status Update Section */}
+              <motion.div
+                className="mt-6 bg-gradient-to-br from-white/95 to-blue-100/95 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-blue-200/50"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+              >
+                <h3 className="text-xl font-bold bg-gradient-to-r from-blue-800 to-cyan-600 bg-clip-text text-transparent mb-4 flex items-center">
+                  <div className="w-6 h-6 mr-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center animate-pulse-slow">
+                    <svg
+                      className="w-4 h-4 text-white"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                  </div>
+                  Update Violation Status
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-blue-700 font-medium mb-1">Status:</label>
+                    <select
+                      name="status"
+                      value={formData.status || ""}
+                      onChange={handleViolationInputChange}
+                      className="w-full border border-blue-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/70 backdrop-blur-sm transition-all duration-300"
+                      disabled={loading}
+                    >
+                      <option value="PENDING">Pending</option>
+                      <option value="REQUEST">Request</option>
+                      <option value="APPROVE">Approve</option>
+                      <option value="REJECT">Reject</option>
+                      <option value="RESOLVED">Resolved</option>
+                      <option value="DISMISSED">Dismissed</option>
+                    </select>
+                  </div>
+                  <button
+                    onClick={() => handleUpdateStatus(formData.status || "")}
+                    disabled={loading || !formData.status}
+                    className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-blue-500/40 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none relative overflow-hidden group"
+                    aria-label="Update status"
+                  >
+                    <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></span>
+                    {loading ? (
+                      <div className="w-4 h-4 mr-2 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                    ) : (
+                      <svg
+                        className="w-4 h-4 mr-2"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                    )}
+                    Update Status
+                  </button>
+                </div>
+              </motion.div>
             </motion.div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

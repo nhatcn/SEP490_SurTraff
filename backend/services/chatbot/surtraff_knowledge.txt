@@ -1,0 +1,563 @@
+# SurTraff - Smart Traffic Monitoring System Functions
+
+## 1. User Authentication
+- Support login via username and password.
+- Support Google-based authentication.
+- Allow users to recover forgotten passwords via email.
+
+## 2. User Profile Management
+- View current user information.
+- Update personal information such as name, email, and avatar.
+
+## 3. License Plate Recognition
+- Automatically detect and recognize license plates from camera footage.
+- Support both front and rear license plate detection.
+
+## 4. Helmet Detection
+- Identify whether the driver or passenger is wearing a helmet.
+- Support real-time helmet violation alerts.
+
+## 5. Red Light Violation Detection
+- Detect vehicles running red lights using traffic signal input.
+- Record timestamp, location, and vehicle type upon violation.
+
+## 6. Speeding Detection
+- Measure vehicle speed using two-point distance tracking.
+- Detect and log speed limit violations based on road section.
+
+## 7. Illegal Parking Detection
+- Detect vehicles parked in no-parking zones.
+- Automatically notify violation if the vehicle remains over 3 minutes.
+
+## 8. Lane Violation Detection
+- Identify vehicles moving outside permitted lanes.
+- Highlight vehicles using the wrong direction or unauthorized lanes.
+
+## 9. Accident Detection
+- Automatically detect collisions or accidents using motion and object analysis.
+- Trigger emergency alerts and store evidence footage.
+
+## 10. Obstacle Detection
+- Detect road obstacles like fallen trees, potholes, or construction.
+- Alert users and highlight on the system map.
+
+## 11. Camera Management
+- View list of all active surveillance cameras.
+- Add, edit, or remove camera entries by location.
+- Display cameras on an interactive map.
+
+## 12. Vehicle Violation Management
+- View history of violations per vehicle.
+- Search violations using license plate number.
+- Export violation reports as PDF files.
+
+## 13. Dashboard Statistics
+- View charts showing number of violations per day/week/month.
+- Filter by violation type, camera zone, or vehicle type.
+
+## 14. Traffic Density Monitoring
+- Analyze vehicle density on roads using real-time camera feeds.
+- Provide alerts for traffic congestion above defined thresholds.
+
+## 15. Real-time Violation Notifications
+- Notify traffic managers instantly when a violation is detected.
+- Support push notification and in-app alert systems.
+
+## 16. Admin Role Management
+- View and manage all registered users.
+- Assign roles such as admin, supervisor, and operator.
+- Temporarily deactivate or delete accounts.
+
+## 17. Violation Evidence Viewer
+- Preview violation images and videos directly in the interface.
+- Support zoom and playback control for clearer evidence.
+
+## 18. Report Generation
+- Generate monthly reports per district or camera.
+- Support export formats: PDF and Excel.
+
+## 19. Secure Access Control
+- Prevent unauthorized access to sensitive violation data.
+- Log every administrative action for auditing.
+
+## 20. Chatbot Assistant
+- Answer questions related to system functions.
+- Help users navigate the platform and understand violation details.
+
+## 21. Violation Filtering & Search
+- Filter violation list by time, type, or license plate.
+- Combine multiple filters for faster lookup.
+
+## 22. Map Integration
+- Display all cameras and violation hotspots on an interactive map.
+- Support zoom, pan, and location click to view details.
+
+## 23. Multi-language Support
+- Interface available in both Vietnamese and English.
+- Support switching language dynamically.
+
+## 24. Feedback Learning (Smart Chatbot)
+- Learn from user feedback to improve future answers.
+- Update internal knowledge base after every confirmed correction.
+
+## 25. Voice Command Input
+- Allow users to speak commands or questions to the chatbot.
+- Support Vietnamese voice recognition.
+
+# FAQ - Violation Handling in SurTraff System
+
+## 1. How does the system detect traffic violations?
+SurTraff uses AI models such as YOLO and license plate recognition (ANPR) to detect violations like speeding, running red lights, and illegal parking.
+
+## 2. What types of violations can SurTraff detect?
+- Red light running
+- Speed limit violation
+- Helmet violation
+- Illegal parking
+- Wrong-way driving
+- Road obstruction
+- Traffic accidents
+
+## 3. Can the system recognize both car and motorbike license plates?
+Yes. SurTraff supports both 4-digit and 5-digit license plate formats for cars and motorbikes in Vietnam.
+
+## 4. How accurate is violation detection?
+Detection accuracy can reach over 90% under good lighting and proper camera angles. Each detection includes image/video evidence.
+
+## 5. Can I view violation history of a vehicle?
+Yes. You can search by license plate to view all past violations, including timestamps, type, and evidence.
+
+## 6. How often are new violations updated?
+Violations are uploaded and processed in real time or within a few seconds after detection by camera.
+
+## 7. Are the violations stored permanently?
+No. Violation data is stored securely and retained for a configurable period (e.g. 6 months), depending on system settings.
+
+## 8. Can I export a violation report?
+Yes. You can export violation reports in PDF format, including evidence, vehicle info, and timestamps.
+
+## 9. How are speed violations detected?
+Speed is calculated based on the time it takes a vehicle to move between two camera lines, and compared with allowed speed for that road.
+
+## 10. Can I filter violations by type and date?
+Yes. The violation list supports filters for type, date range, and vehicle category.
+
+## 11. What happens when a violation is detected?
+The system saves the image/video, logs the time and type of violation, and notifies admins or operators in real time.
+
+## 12. Does the system detect multiple violations at once?
+Yes. A vehicle can be flagged for multiple violations in a single detection (e.g., speeding and not wearing a helmet).
+
+## 13. Can I appeal a violation?
+SurTraff provides evidence for each case. Appeal handling depends on local traffic authority policies.
+
+## 14. Are night-time violations detectable?
+Yes, if the camera is equipped with infrared or night vision support.
+
+## 15. How does the system detect red light violations?
+The system synchronizes with traffic signal data. When the light is red, any vehicle crossing the detection line is recorded as a violator.
+
+## 16. What if a vehicle stops midway after crossing?
+If the vehicle crosses the red light line during red signal, it is marked as a violation, regardless of whether it stops.
+
+## 17. What about blurry license plates?
+If the plate is unreadable, the system may mark it as “unknown” and flag it for manual review.
+
+## 18. Does the system recognize foreign license plates?
+Currently, SurTraff is optimized for Vietnamese plate formats.
+
+## 19. Can operators manually verify a violation?
+Yes. There is an admin panel to review, confirm, or reject automatic detections if needed.
+
+## 20. Does SurTraff detect people riding without helmets as passengers?
+Yes. The helmet detection module checks both driver and passenger.
+
+## 21. What happens if two vehicles are close together?
+The object tracker assigns IDs to vehicles and maintains separation for individual detection.
+
+## 22. Is the location of violation shown?
+Yes. Each violation is tagged with the camera location and shown on the map.
+
+## 23. Can the chatbot show violation details?
+Yes. You can ask the chatbot for a vehicle’s violation history using the license plate number.
+
+## 24. How long does it take to detect a violation?
+Detection is real-time. Evidence and data are available within 2–5 seconds after the event.
+
+## 25. Can users receive violation alerts?
+Yes. Operators or integrated systems can receive alerts via the admin dashboard, SMS, or email (if configured).
+
+# Real-world Use Cases - SurTraff Smart Traffic System
+
+## 1. Detecting a Red Light Violation
+A motorbike crosses the intersection while the traffic light is red.
+→ The system detects the violation, captures an image, and logs the time, vehicle type, and plate.
+
+## 2. Speed Violation on Highway
+A car passes through two camera points in less than 2 seconds on a 60km/h limit road.
+→ The system calculates the speed, identifies a violation, and stores it with the vehicle plate.
+
+## 3. Helmet Violation Detection
+Two people ride a motorbike without wearing helmets on a city road.
+→ The helmet detection module flags a violation for both passengers and logs the event.
+
+## 4. Illegal Parking in No-Park Zone
+A truck is parked for over 5 minutes in a restricted area.
+→ The system detects the stationary vehicle, verifies the no-parking zone, and triggers a violation.
+
+## 5. Accident Detection on Wet Road
+Two vehicles collide at an intersection on a rainy day.
+→ The system detects unusual object interactions, flags a possible accident, and alerts the control center.
+
+## 6. Obstacle Detection: Fallen Tree
+A camera captures a fallen tree blocking half the road after a storm.
+→ The obstacle detection module identifies the blockage and notifies traffic operators.
+
+## 7. Checking Violation History of a Vehicle
+An admin wants to see all past violations of vehicle 29A-12345.
+→ The system returns a list of all related events including dates, types, and image evidence.
+
+## 8. Exporting Violation Report for Legal Processing
+An officer needs a PDF report of all violations in District 1 for the past month.
+→ The system generates a downloadable PDF including violation stats and evidence.
+
+## 9. Traffic Congestion Alert
+At 7:30 AM, vehicle density exceeds the configured threshold on Xa Lo Ha Noi.
+→ The system alerts traffic managers of a congestion zone via dashboard warning.
+
+## 10. Detecting Lane Violation on Bridge
+A motorbike uses the car-only lane on a bridge.
+→ The system detects improper lane usage and records the vehicle info.
+
+## 11. Manual Verification of a Blurry Plate
+A car's plate is partially unreadable due to rain.
+→ The system marks it for manual review, and an admin verifies the plate later.
+
+## 12. Multi-violation Detection
+A motorbike runs a red light and has no helmet simultaneously.
+→ Both violations are detected in one image, and listed together in the report.
+
+## 13. Viewing Real-time Camera Feed
+An operator opens Camera 12 to monitor current traffic.
+→ The system streams the live footage from the selected camera.
+
+## 14. Adding a New Surveillance Camera
+A new camera is installed at Nguyen Van Linh intersection.
+→ The admin adds it to the system with GPS coordinates and zone name.
+
+## 15. Responding to a Citizen Complaint
+A user reports a frequent illegal parking spot on Phan Dang Luu street.
+→ Admin checks the violation data at that location and sends summary evidence.
+
+## 16. Detecting Wrong-way Driving
+A taxi enters a one-way street from the wrong direction.
+→ The system detects direction violation and triggers an alert with video.
+
+## 17. Reviewing Daily Violation Statistics
+An officer wants to check today's violation counts by type.
+→ The dashboard displays pie charts and trend graphs for quick overview.
+
+## 18. Checking Night-time Helmet Violation
+At 9:00 PM, a camera detects a motorbike with no helmet.
+→ Infrared camera + helmet detection still trigger the violation accurately.
+
+## 19. Admin Deactivating a User
+An old staff account is no longer in use.
+→ The admin deactivates the user, disabling login without deleting data.
+
+## 20. Exporting Monthly Summary for District 3
+At end of the month, District 3 requests a report.
+→ Admin filters by location and time, then exports report with graphs and violation breakdowns.
+
+## 21. Vehicle Evades Detection (blurred plate)
+A speeding vehicle intentionally covers its plate.
+→ The system flags the violation but marks plate as "unreadable", pending investigation.
+
+## 22. Chatbot Assists User with Violation Lookup
+A user asks: “Does vehicle 30A-12345 have any violations?”
+→ The chatbot fetches data from the system and lists any related entries.
+
+## 23. Admin Reviews False Positive
+A bus is flagged for red light violation, but it stopped before line.
+→ Admin checks the footage, confirms no violation, and deletes the log.
+
+## 24. System Maintenance
+An operator wants to temporarily disable a camera for maintenance.
+→ The camera is set to “offline” mode; violations are not logged during this time.
+
+## 25. Updating Camera Location
+A camera was moved 200m to the left.
+→ Admin edits the camera location on the map to reflect new coordinates.
+
+
+# Vietnam Traffic Law
+
+Article 1: Maximum speed in residential areas
+Motorbikes and cars are allowed to travel at a maximum of 50km/h on dual carriageways and 40km/h on two-way roads without a median strip.
+
+Article 2: Running red lights
+Vehicle drivers are not allowed to pass when the red light is on. Running red lights is a violation and can be fined from 600,000 VND to 5,000,000 VND depending on the type of vehicle.
+
+Article 3: Not wearing a helmet
+Motorbike and motorbike riders are required to wear a standard helmet and fasten it properly. Violators are fined from 200,000 VND to 300,000 VND.
+
+Article 4: Stopping or parking in the wrong place
+Car drivers are not allowed to stop or park in places with prohibition signs, on the roadway, or on the sidewalk. Fines from 400,000 VND to 1,000,000 VND.
+
+Article 5: Encroaching on the lane, driving on the wrong side of the road
+Vehicles must drive on the correct side of the road, lane. Encroaching on the lane or driving in the wrong direction will be fined and the driver's license revoked depending on the severity.
+
+Article 6: Not carrying vehicle documents
+When participating in traffic, the driver must carry the vehicle registration, driver's license, insurance and ID card/CCCD.
+
+Article 7: Not obeying traffic police orders
+Traffic participants must obey the signals and orders of the traffic police. Violators will be subject to administrative penalties.
+
+Article 8: Blood alcohol concentration
+Motorcycle and car drivers must not have alcohol concentration in their blood or breath. Violators will be fined from 2 million to 40 million VND and have their license revoked.
+
+Article 9: Using the phone while driving
+Car drivers are not allowed to use a hand-held phone while driving. Violations may be fined 1-2 million VND.
+
+Article 10: Overtaking in violation of regulations
+Overtaking when not ensuring safety, in prohibited areas, or without valid signals will be punished.
+
+Article 11: Motorcycles carrying too many people
+Motorbikes are only allowed to carry a maximum of 2 adults and 1 child under 14 years old. Violations will be fined from 100,000 VND to 200,000 VND.
+
+Article 12: Causing traffic accidents
+Depending on the severity of the accident, the person causing the traffic accident will be subject to administrative sanctions or criminal prosecution.
+
+Article 13: Not turning on the vehicle lights at night
+The driver must turn on the headlights from 7:00 p.m. to 5:00 a.m. The next morning. Failure to turn on the lights will be punished.
+
+Article 14: Making a U-turn in the wrong place
+U-turns are only allowed at places with a permit sign, or on a wide road. Violations will be fined and driving license points will be deducted.
+
+Article 15: Handing over the vehicle to an unqualified person
+A vehicle owner who hands over the vehicle to a person who does not have a driver's license or is prohibited from driving a vehicle will be severely punished.
+
+Article 16: Arbitrarily changing the vehicle's structure
+Users are not allowed to arbitrarily change the shape, paint color, or technical structure of the vehicle without permission from the competent authority.
+
+Article 17: Vehicles without license plates
+Vehicles without license plates or with fake license plates will be temporarily detained and severely punished.
+
+Article 18: Wearing headphones while driving a motorbike
+Motorcyclists are not allowed to wear headphones or use audio devices while driving a vehicle.
+
+Article 19: Stopping in prohibited parking areas by hours
+Some streets only prohibit parking by hours (for example, from 6am to 9am). Stopping and parking at the wrong time will also be punished as usual.
+
+Article 20: Honking and turning on headlights in violation of regulations
+Drivers are not allowed to honk or turn on headlights continuously, causing disturbance to others, especially at night in urban areas.
+
+# Traffic Information in Cần Thơ:
+Cần Thơ, located in the Mekong Delta, is a key transportation hub with National Highway 1A (QL1A) and the Cần Thơ Bridge facilitating regional connectivity. Traffic is often heavy in urban areas like Ninh Kiều District during peak hours (6-9 AM, 4-7 PM). Motorbikes dominate, making up over 70% of vehicles. Recent infrastructure projects include road widening and new bridges to alleviate congestion.
+SurTraff Features:
+- Speed Violation: Measures vehicle speed using two-point distance tracking and detects violations based on road-specific limits.
+- Red Light Detection: Identifies vehicles passing through red lights using camera feeds.
+- Helmet Violation: Detects motorbike riders without helmets via AI-based image analysis.
+- Fines: Red light violations incur fines from 600,000 VND to 5,000,000 VND depending on vehicle type.
+
+# Traffic information in Ho Chi Minh City:
+Ho Chi Minh City is a major economic center, with a developed road system with National Highway 1A, Hanoi Highway. Traffic is heavy in District 1, District 7, Tan Son Nhat Airport area during rush hour (6-9am, 4-7pm). Motorbikes account for more than 70% of vehicles. Metro projects are being implemented to reduce congestion.
+SurTraff feature:
+- Speeding detection: Measure vehicle speed over the distance of two points, compare with the road limit.
+- Red light detection: Use camera to detect vehicles running red lights.
+- Helmet detection: AI identifies motorcyclists without helmets.
+- Fine: Running red lights from 600,000 VND to 5,000,000 VND depending on the type of vehicle.
+
+# SurTraff - Smart Traffic Monitoring System Functions (Continued)
+
+## 26. IoT Integration
+- Connect with IoT devices (smart traffic lights, sensors) to enhance real-time data collection.
+- Support dynamic speed limit updates based on traffic conditions.
+
+## 27. AI Model Updates
+- Use advanced YOLOv8 models for improved object detection accuracy (>95% in optimal conditions).
+- Support periodic model retraining with new violation data.
+
+## 28. Mobile App Integration
+- Allow users to access SurTraff via iOS/Android apps for violation lookup and real-time alerts.
+- Support push notifications for violation updates or traffic congestion.
+
+## 29. Weather-Adaptive Detection
+- Adjust detection algorithms for adverse weather conditions (rain, fog, low light).
+- Use infrared and thermal cameras for improved night-time accuracy.
+
+## 30. Multi-Vehicle Tracking
+- Track multiple vehicles simultaneously in crowded intersections using advanced object tracking.
+- Assign unique IDs to vehicles to avoid confusion in dense traffic.
+
+## 31. Predictive Traffic Analysis
+- Use historical data to predict traffic congestion during peak hours or holidays.
+- Provide suggestions for alternative routes to users.
+
+## 32. Public API Access
+- Offer APIs for third-party apps to query violation data or traffic conditions.
+- Secure API endpoints with OAuth 2.0 authentication.
+
+## 33. Violation Appeal System
+- Allow users to submit appeals for detected violations via the SurTraff platform.
+- Provide an admin interface to review appeal submissions with evidence.
+
+## 34. Real-time Traffic Signal Control
+- Integrate with smart traffic lights to adjust signal timings based on real-time traffic density.
+- Reduce congestion by optimizing green/red light durations.
+
+## 35. Data Privacy and Encryption
+- Encrypt all violation data and user information using AES-256 standards.
+- Comply with Vietnam’s data protection laws for secure storage and access.
+
+# SurTraff - Smart Traffic Monitoring System Functions (Continued)
+
+## 26. Weather-Adaptive Detection
+- Use infrared and thermal cameras to maintain detection accuracy (>90%) in adverse weather conditions like rain, fog, or low light.
+- Adjust AI algorithms (e.g., YOLOv9) to handle reduced visibility for license plates, helmets, and red light violations.
+
+## 27. Contextual Conversation Handling
+- Analyze user inputs in the context of previous messages to provide responses that promote SurTraff features.
+- Handle short or ambiguous inputs (e.g., "không", "no", "ok") by suggesting actions like checking traffic conditions, violation history, or camera feeds.
+
+## 28. Mobile App Integration
+- Offer iOS/Android apps for users to access violation history, real-time traffic updates, and live camera feeds.
+- Provide push notifications for congestion alerts or violation updates.
+
+## 29. Advanced AI Object Detection
+- Utilize YOLOv9 models for enhanced detection accuracy (>97% in optimal conditions) of vehicles, helmets, and license plates.
+- Support complex scenarios like overlapping vehicles, partial occlusions, or low-visibility conditions.
+
+## 30. Multi-Object Tracking
+- Track multiple vehicles and pedestrians in crowded intersections with unique IDs to avoid confusion.
+- Detect simultaneous violations (e.g., speeding and no helmet) in dense traffic scenarios.
+
+## 31. Traffic Flow Prediction
+- Predict congestion using historical data, weather conditions, and events like Tet holidays or festivals.
+- Suggest alternative routes via dashboard, mobile app, or API to optimize travel.
+
+## 32. Public API Access
+- Provide secure APIs for third-party apps to query traffic data, violation reports, or camera feeds.
+- Use OAuth 2.0 for authentication and secure data access.
+
+## 33. Violation Appeal System
+- Enable users to submit violation appeals via the SurTraff platform or mobile app.
+- Provide admin tools to review appeals with video/image evidence playback.
+
+## 34. Smart Traffic Signal Optimization
+- Integrate with IoT-enabled traffic lights to adjust signal timings based on real-time traffic density.
+- Optimize green/red light durations to reduce congestion in urban areas.
+
+## 35. Data Security and Compliance
+- Encrypt all violation data and user information with AES-256, adhering to Vietnam’s data protection laws.
+- Maintain audit logs for all administrative actions and data access.
+
+# FAQ - Violation Handling in SurTraff System (Continued)
+
+## 26. How does SurTraff perform under rain or bad weather?
+SurTraff uses weather-adaptive algorithms and infrared/thermal cameras to ensure accurate detection (>90%) of license plates, helmets, and red light violations in rain, fog, or low light.
+
+## 27. How can I check traffic conditions with SurTraff?
+Users can check real-time traffic conditions for cities like Cần Thơ, HCM, Đà Nẵng, or Hải Phòng via the SurTraff web platform or mobile app.
+
+## 28. How does SurTraff handle short or vague user responses?
+SurTraff uses conversation history to interpret inputs like "không" or "no", suggesting actions such as checking traffic updates, violation history, or live camera feeds to promote system usage.
+
+## 29. Can SurTraff detect violations during off-peak hours?
+Yes. SurTraff operates 24/7, with adjusted detection thresholds for low-traffic periods to maintain accuracy.
+
+## 30. How do I look up a vehicle’s violation history?
+Enter the license plate number on the SurTraff web platform or app to view violation history, including timestamps, types, and evidence.
+
+## 31. Does SurTraff support non-Vietnamese users?
+Yes. The interface and chatbot support both Vietnamese and English, with dynamic language switching.
+
+## 32. Can SurTraff detect multiple violations in one event?
+Yes. A single event can trigger multiple violation detections (e.g., speeding and no helmet), logged separately with shared evidence.
+
+## 33. How does SurTraff provide real-time traffic updates?
+SurTraff analyzes camera feeds and IoT data to provide congestion alerts via the web dashboard, mobile app, or API.
+
+## 34. How are night-time violations detected?
+Infrared and thermal cameras ensure accurate detection of license plates, helmets, and red light violations at night.
+
+## 35. Can SurTraff predict traffic patterns?
+Yes. SurTraff uses historical and real-time data to predict congestion and suggest optimal routes.
+
+# Real-world Use Cases - SurTraff Smart Traffic System (Continued)
+
+## 26. Handling Short User Responses
+A user responds "không" after being asked "Có gì vui không?".
+→ SurTraff suggests checking real-time traffic conditions in Cần Thơ, viewing camera feeds, or looking up violation history to engage the user with system features.
+
+## 27. Violation Detection in Heavy Rain
+A motorbike runs a red light during heavy rain at 7:00 PM in Cần Thơ.
+→ Weather-adaptive algorithms and infrared cameras ensure accurate detection (>90%) and log the violation with clear evidence.
+
+## 28. Multi-Vehicle Violation at Busy Intersection
+Two motorbikes and a car violate lane rules and helmets at Nguyen Van Linh, Đà Nẵng.
+→ SurTraff assigns unique IDs, logs each violation, and provides video evidence.
+
+## 29. Mobile App Violation Lookup
+A user checks violation history for 51A-98765 via the SurTraff app.
+→ The app displays all violations with timestamps, types, and downloadable evidence.
+
+## 30. Congestion Prediction During Tet
+SurTraff predicts heavy traffic on National Highway 1A in Cần Thơ during Tet.
+→ The system alerts operators and suggests rerouting via mobile app notifications.
+
+## 31. Night-time Helmet Violation in HCM
+A motorbike without a helmet is detected at 10:00 PM in District 1.
+→ Thermal cameras capture the violation, logged with clear evidence.
+
+## 32. Smart Signal Adjustment in HCM
+Heavy traffic is detected on Hanoi Highway at 8:00 AM.
+→ SurTraff adjusts traffic light timings to reduce congestion.
+
+## 33. Third-party App Integration
+A navigation app queries SurTraff’s API for traffic data in Hải Phòng.
+→ The API returns real-time congestion levels and violation hotspots.
+
+## 34. Obstacle Detection During Construction
+A construction barrier blocks a lane on Lach Tray, Hải Phòng.
+→ SurTraff detects the obstacle, alerts operators, and updates the system map.
+
+## 35. Weekly Traffic Trend Analysis
+An officer reviews traffic patterns in Ninh Kiều, Cần Thơ.
+→ SurTraff’s dashboard displays congestion trends and violation statistics.
+
+# Vietnam Traffic Law (Continued)
+
+## 21. Child Safety on Motorbikes
+Children under 14 on motorbikes must wear helmets and be secured properly. Violations incur fines from 200,000 VND to 400,000 VND.
+
+## 22. Overloading Vehicles
+Vehicles carrying loads beyond permitted weight or size are fined from 1,000,000 VND to 5,000,000 VND, depending on severity.
+
+## 23. Pedestrian Violations
+Pedestrians crossing roads outside designated crosswalks or ignoring signals may be fined up to 100,000 VND.
+
+## 24. Temporary Road Closures
+Drivers must follow temporary road closure signs during construction or events. Violations incur fines from 500,000 VND to 2,000,000 VND.
+
+## 25. Electric Scooter Regulations
+Electric scooters must follow motorbike rules, including helmet use and speed limits. Violations are fined similarly to motorbikes.
+
+# Traffic Information in Đà Nẵng
+Đà Nẵng, a major coastal city, has a modern road network with key routes like Nguyễn Văn Linh and Dragon Bridge. Traffic peaks from 7-9 AM and 5-7 PM in central areas like Hải Châu District. Motorbikes make up 65% of vehicles. Ongoing projects include smart traffic lights and metro planning.
+SurTraff Features:
+- Speed Violation: Detects vehicles exceeding 50km/h in urban areas using camera tracking.
+- Red Light Detection: Monitors intersections like Dragon Bridge for violations.
+- Helmet Violation: Identifies non-helmeted riders with AI analysis.
+- Fines: Red light violations fined from 600,000 VND to 5,000,000 VND.
+
+# Traffic Information in Hải Phòng
+Hải Phòng, a key port city, has heavy traffic on routes like Lach Tray and Cat Bi Airport. Peak hours are 6:30-8:30 AM and 4:30-6:30 PM. Motorbikes dominate (70% of vehicles). New infrastructure includes widened roads and smart camera systems.
+SurTraff Features:
+- Speed Violation: Tracks speeding on major roads like Lach Tray.
+- Red Light Detection: Monitors key intersections for signal violations.
+- Helmet Violation: Detects non-helmeted riders in urban areas.
+- Fines: Helmet violations fined from 200,000 VND to 300,000 VND.
+
+#Red light violation detection: 
+SurTraff uses ANPR cameras, deep learning models (YOLOv5), and 3D radar to detect vehicles crossing stop lines during red signals, capturing images and videos for violation processing.

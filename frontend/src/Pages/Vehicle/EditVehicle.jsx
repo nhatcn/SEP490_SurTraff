@@ -5,7 +5,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 const EditVehicle = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const userId = 3; // Hardcode userId=3
   const [formData, setFormData] = useState({
+    id: '',
     name: '',
     licensePlate: '',
     userId: '',
@@ -38,11 +40,11 @@ const EditVehicle = () => {
     fetchVehicleTypes();
   }, []);
 
-  // Fetch vehicles
+  // Fetch vehicles for specific user
   useEffect(() => {
     const fetchVehicles = async () => {
       try {
-        const response = await fetch('http://localhost:8081/api/vehicle', {
+        const response = await fetch(`http://localhost:8081/api/vehicle/user/${userId}`, {
           headers: { 'Content-Type': 'application/json' }
         });
         if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
@@ -54,11 +56,15 @@ const EditVehicle = () => {
       }
     };
     fetchVehicles();
-  }, []);
+  }, [userId]);
 
   // Fetch vehicle details
   useEffect(() => {
     const fetchVehicle = async () => {
+      if (!id || id === '0') {
+        setErrorMessage('No valid vehicle ID for editing');
+        return;
+      }
       setIsLoading(true);
       try {
         const response = await fetch(`http://localhost:8081/api/vehicle/${id}`, {
@@ -67,6 +73,7 @@ const EditVehicle = () => {
         if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
         const data = await response.json();
         setFormData({
+          id: data.id ? data.id.toString() : '',
           name: data.name || '',
           licensePlate: data.licensePlate || '',
           userId: data.userId ? data.userId.toString() : '',
@@ -75,12 +82,12 @@ const EditVehicle = () => {
           brand: data.brand || ''
         });
       } catch (error) {
-        setErrorMessage(`Error loading vehicle: ${error.message}`);
+        setErrorMessage(`Error loading vehicle details: ${error.message}`);
       } finally {
         setIsLoading(false);
       }
     };
-    if (id && id !== '0') fetchVehicle();
+    fetchVehicle();
   }, [id]);
 
   const validateForm = () => {
@@ -104,11 +111,11 @@ const EditVehicle = () => {
     }
     if (!formData.vehicleTypeId) newErrors.vehicleTypeId = 'Vehicle type is required';
     if (!formData.color) {
-      newErrors.color = 'Color is required';
+      newErrors.color = 'Vehicle color is required';
     } else if (!colorRegex.test(formData.color)) {
-      newErrors.color = 'Color must contain only letters and spaces';
+      newErrors.color = 'Color can only contain letters and spaces';
     }
-    if (!formData.brand) newErrors.brand = 'Brand is required';
+    if (!formData.brand) newErrors.brand = 'Vehicle brand is required';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -119,6 +126,11 @@ const EditVehicle = () => {
     setSuccessMessage('');
     setErrorMessage('');
 
+    if (!id || id === '0') {
+      setErrorMessage('Invalid vehicle ID');
+      return;
+    }
+
     if (!validateForm()) return;
 
     setIsLoading(true);
@@ -127,9 +139,13 @@ const EditVehicle = () => {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...formData,
+          id: parseInt(id),
+          name: formData.name,
+          licensePlate: formData.licensePlate,
           userId: parseInt(formData.userId),
-          vehicleTypeId: parseInt(formData.vehicleTypeId)
+          vehicleTypeId: parseInt(formData.vehicleTypeId),
+          color: formData.color,
+          brand: formData.brand
         })
       });
       if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
@@ -147,6 +163,10 @@ const EditVehicle = () => {
   };
 
   const handleDelete = async () => {
+    if (!id || id === '0') {
+      setErrorMessage('Invalid vehicle ID');
+      return;
+    }
     if (!window.confirm('Are you sure you want to delete this vehicle?')) return;
     setIsLoading(true);
     setSuccessMessage('');
@@ -158,7 +178,7 @@ const EditVehicle = () => {
       });
       if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
       setSuccessMessage('Vehicle deleted successfully!');
-      setFormData({ name: '', licensePlate: '', userId: '', vehicleTypeId: '', color: '', brand: '' });
+      setFormData({ id: '', name: '', licensePlate: '', userId: '', vehicleTypeId: '', color: '', brand: '' });
       setVehicles(prev => prev.filter(v => v.id !== parseInt(id)));
       setExistingPlates(prev => prev.filter(p => p !== formData.licensePlate));
       setTimeout(() => navigate('/vehicle/add'), 2000);
@@ -209,7 +229,7 @@ const EditVehicle = () => {
           <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent mb-2">
             Edit Vehicle
           </h1>
-          <p className="text-gray-600 text-lg">Update your vehicle details</p>
+          <p className="text-gray-600 text-lg">Update your vehicle information</p>
         </div>
 
         {/* Form Card */}
@@ -231,12 +251,12 @@ const EditVehicle = () => {
                     d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
                   />
                 </svg>
-                <span>Select Vehicle to Edit</span>
+                <span>Select vehicle to edit</span>
               </div>
             </label>
             <select
               value={id || '0'}
-              onChange={(e) => navigate(`/vehicle/edit/${e.target.value}`)}
+              onChange={(e) => navigate(`/editv/${e.target.value}`)}
               className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-300 bg-gray-50/50 hover:bg-white cursor-pointer"
               disabled={isLoading}
             >
@@ -467,7 +487,7 @@ const EditVehicle = () => {
                           d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zM21 5a2 2 0 00-2-2h-4a2 2 0 00-2 2v12a4 4 0 004 4h4a2 2 0 002-2V5z"
                         />
                       </svg>
-                      <span>Color</span>
+                      <span>Vehicle Color</span>
                     </div>
                   </label>
                   <input
@@ -512,7 +532,7 @@ const EditVehicle = () => {
                           d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"
                         />
                       </svg>
-                      <span>Brand</span>
+                      <span>Vehicle Brand</span>
                     </div>
                   </label>
                   <input

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Pencil, Trash2, Save, X, Car, User, Palette, Tag, Hash, Settings, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react'
+import { Pencil, Trash2, Save, X, Car, User, Settings, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react'
 import Sidebar from '../../../components/Layout/Sidebar'
 import Header from '../../../components/Layout/Header'
 
@@ -51,11 +51,11 @@ const VehicleDetail = () => {
     brand: ''
   })
 
-  // Load vehicle types
+  // Tải danh sách loại xe
   useEffect(() => {
     const fetchVehicleTypes = async () => {
       try {
-        const response = await fetch('http://localhost:8081/api/vehicle/types', {
+        const response = await fetch('http://localhost:8081/api/violations/vehicle-types', {
           headers: { 'Content-Type': 'application/json' }
         })
         if (!response.ok) throw new Error(`HTTP error: ${response.status}`)
@@ -69,7 +69,7 @@ const VehicleDetail = () => {
     fetchVehicleTypes()
   }, [])
 
-  // Load vehicles
+  // Tải danh sách phương tiện
   useEffect(() => {
     const fetchVehicles = async () => {
       try {
@@ -87,7 +87,7 @@ const VehicleDetail = () => {
     fetchVehicles()
   }, [])
 
-  // Load vehicle detail
+  // Tải thông tin phương tiện
   useEffect(() => {
     const fetchVehicle = async () => {
       if (!id || id === '0') return
@@ -227,30 +227,15 @@ const VehicleDetail = () => {
 
   if (!vehicle && id !== '0') {
     return (
-      <div className="flex h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-        <Sidebar defaultActiveItem="vehicles"/>
+      <div className="flex h-screen bg-gray-50">
+        <Sidebar />
         <div className="flex flex-col flex-grow">
-          <Header title="Vehicle Detail" />
+          <Header title="Chi tiết Phương Tiện" />
           <div className="flex items-center justify-center h-full">
-            <motion.div
-              className="flex flex-col items-center space-y-4"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <motion.div
-                className="flex space-x-2"
-                animate={{ 
-                  scale: [1, 1.1, 1],
-                  opacity: [0.5, 1, 0.5]
-                }}
-                transition={{ duration: 2, repeat: Infinity }}
-              >
-                <div className="w-4 h-4 bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full" />
-                <div className="w-4 h-4 bg-gradient-to-r from-emerald-500 to-emerald-700 rounded-full" />
-                <div className="w-4 h-4 bg-gradient-to-r from-emerald-600 to-emerald-800 rounded-full" />
-              </motion.div>
-              <p className="text-gray-600 font-medium">Loading data...</p>
-            </motion.div>
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Đang tải dữ liệu...</p>
+            </div>
           </div>
         </div>
       </div>
@@ -258,57 +243,46 @@ const VehicleDetail = () => {
   }
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="flex h-screen bg-gray-50">
       <Sidebar />
       <div className="flex flex-col flex-grow">
-        <Header title={id === '0' ? 'Select a Vehicle to Edit' : `Vehicle Detail`} />
+        <Header title={id === '0' ? 'Chọn Phương Tiện để Chỉnh Sửa' : `Chi tiết Phương Tiện #${id}`} />
         
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="p-6 overflow-y-auto"
-        >
+        <div className="p-6 overflow-y-auto">
           {/* Back Button */}
-          <motion.button
-            onClick={() => navigate('/vehicles')}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="mb-6 flex items-center space-x-2 text-gray-600 hover:text-emerald-600 transition-colors"
+          <button
+            onClick={() => navigate('/vehicle')}
+            className="mb-6 flex items-center space-x-2 text-gray-600 hover:text-blue-600 transition-colors"
           >
             <ArrowLeft size={20} />
-            <span>Back to Vehicles</span>
-          </motion.button>
+            <span>Quay lại danh sách</span>
+          </button>
 
-          <div className="bg-white shadow-xl rounded-3xl overflow-hidden max-w-4xl mx-auto">
-            {/* Header Card */}
-            <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 p-6 text-white">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="p-3 bg-white/20 rounded-full">
-                    <Car size={24} />
-                  </div>
-                  <div>
-                    <h1 className="text-2xl font-bold">Vehicle Management</h1>
-                    <p className="text-emerald-100">Detail information and editing</p>
-                  </div>
+          <div className="bg-white shadow rounded-lg overflow-hidden max-w-4xl mx-auto">
+            {/* Header */}
+            <div className="bg-blue-600 p-6 text-white">
+              <div className="flex items-center space-x-3">
+                <Car size={24} />
+                <div>
+                  <h1 className="text-xl font-bold">Quản lý Phương Tiện</h1>
+                  <p className="text-blue-100">Thông tin chi tiết và chỉnh sửa</p>
                 </div>
               </div>
             </div>
 
-            <div className="p-8">
+            <div className="p-6">
               {/* Vehicle Selector */}
-              <div className="mb-8">
-                <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  <Settings className="inline mr-2" size={16} />
-                  Select Vehicle
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Chọn Phương Tiện
                 </label>
                 <select
                   value={id || '0'}
                   onChange={(e) => navigate(`/vehicle/edit/${e.target.value}`)}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 disabled:opacity-50 bg-gray-50"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   disabled={isLoading}
                 >
-                  <option value="0">Select a vehicle to view details</option>
+                  <option value="0">Chọn một phương tiện để xem chi tiết</option>
                   {vehicles.map(v => (
                     <option key={v.id} value={v.id}>
                       {v.licensePlate} - {v.name} ({v.brand})
@@ -320,138 +294,104 @@ const VehicleDetail = () => {
               {id !== '0' && vehicle && (
                 <>
                   {/* Action Buttons */}
-                  <div className="flex justify-between items-center mb-8">
-                    <h2 className="text-2xl font-bold text-gray-800 flex items-center">
-                      <Hash className="mr-2" size={24} />
-                      Vehicle Information
+                  <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-lg font-semibold text-gray-800">
+                      Thông tin Phương Tiện
                     </h2>
                     {!isEditing ? (
-                      <motion.button
+                      <button
                         onClick={() => setIsEditing(true)}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl hover:from-emerald-600 hover:to-emerald-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+                        className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                       >
-                        <Pencil size={18} />
-                        <span>Edit</span>
-                      </motion.button>
+                        <Pencil size={16} />
+                        <span>Chỉnh sửa</span>
+                      </button>
                     ) : (
-                      <div className="flex space-x-3">
-                        <motion.button
+                      <div className="flex space-x-2">
+                        <button
                           onClick={() => setShowConfirm(true)}
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl hover:from-emerald-600 hover:to-emerald-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50"
+                          className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50"
                           disabled={isLoading}
                         >
-                          <Save size={18} />
-                          <span>Save</span>
-                        </motion.button>
-                        <motion.button
+                          <Save size={16} />
+                          <span>Lưu</span>
+                        </button>
+                        <button
                           onClick={handleCancel}
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-gray-400 to-gray-500 text-white rounded-xl hover:from-gray-500 hover:to-gray-600 transition-all duration-200 shadow-lg hover:shadow-xl"
+                          className="flex items-center space-x-2 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
                         >
-                          <X size={18} />
-                          <span>Cancel</span>
-                        </motion.button>
-                        <motion.button
+                          <X size={16} />
+                          <span>Hủy</span>
+                        </button>
+                        <button
                           onClick={() => setShowDeleteConfirm(true)}
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl hover:from-red-600 hover:to-red-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50"
+                          className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors disabled:opacity-50"
                           disabled={isLoading}
                         >
-                          <Trash2 size={18} />
-                          <span>Delete</span>
-                        </motion.button>
+                          <Trash2 size={16} />
+                          <span>Xóa</span>
+                        </button>
                       </div>
                     )}
                   </div>
 
-                  {/* Vehicle Information Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Vehicle Information */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Vehicle Name */}
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200"
-                    >
-                      <label className="flex items-center text-sm font-semibold text-blue-800 mb-3">
-                        <Car className="mr-2" size={16} />
-                        Vehicle Name
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Tên Phương Tiện
                       </label>
                       {isEditing ? (
                         <input
                           name="name"
                           value={editForm.name}
                           onChange={handleChange}
-                          className="w-full px-4 py-3 border-2 border-blue-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:opacity-50"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                           placeholder="e.g., Toyota Camry"
                           disabled={isLoading}
                         />
                       ) : (
-                        <p className="text-blue-700 font-medium text-lg">{vehicle.name}</p>
+                        <p className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md">{vehicle.name}</p>
                       )}
                       {errors.name && (
-                        <motion.p
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          className="text-red-500 text-xs mt-2 flex items-center"
-                        >
-                          <AlertCircle size={14} className="mr-1" />
+                        <p className="text-red-500 text-xs mt-1 flex items-center">
+                          <AlertCircle size={12} className="mr-1" />
                           {errors.name}
-                        </motion.p>
+                        </p>
                       )}
-                    </motion.div>
+                    </div>
 
                     {/* License Plate */}
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.1 }}
-                      className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 border border-purple-200"
-                    >
-                      <label className="flex items-center text-sm font-semibold text-purple-800 mb-3">
-                        <Tag className="mr-2" size={16} />
-                        License Plate
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Biển Số
                       </label>
                       {isEditing ? (
                         <input
                           name="licensePlate"
                           value={editForm.licensePlate}
                           onChange={handleChange}
-                          className="w-full px-4 py-3 border-2 border-purple-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 disabled:opacity-50"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                           placeholder="e.g., 30A-12345"
                           disabled={isLoading}
                         />
                       ) : (
-                        <p className="text-purple-700 font-bold text-lg font-mono bg-white px-3 py-2 rounded-lg border-2 border-purple-200">
+                        <p className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md font-mono font-bold">
                           {vehicle.licensePlate}
                         </p>
                       )}
                       {errors.licensePlate && (
-                        <motion.p
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          className="text-red-500 text-xs mt-2 flex items-center"
-                        >
-                          <AlertCircle size={14} className="mr-1" />
+                        <p className="text-red-500 text-xs mt-1 flex items-center">
+                          <AlertCircle size={12} className="mr-1" />
                           {errors.licensePlate}
-                        </motion.p>
+                        </p>
                       )}
-                    </motion.div>
+                    </div>
 
                     {/* User ID */}
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.2 }}
-                      className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200"
-                    >
-                      <label className="flex items-center text-sm font-semibold text-green-800 mb-3">
-                        <User className="mr-2" size={16} />
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
                         User ID
                       </label>
                       {isEditing ? (
@@ -460,296 +400,206 @@ const VehicleDetail = () => {
                           type="text"
                           value={editForm.userId}
                           onChange={handleChange}
-                          className="w-full px-4 py-3 border-2 border-green-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 disabled:opacity-50"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                           placeholder="e.g., 123"
                           disabled={isLoading}
                         />
                       ) : (
-                        <p className="text-green-700 font-medium text-lg">#{vehicle.userId}</p>
+                        <p className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md">#{vehicle.userId}</p>
                       )}
                       {errors.userId && (
-                        <motion.p
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          className="text-red-500 text-xs mt-2 flex items-center"
-                        >
-                          <AlertCircle size={14} className="mr-1" />
+                        <p className="text-red-500 text-xs mt-1 flex items-center">
+                          <AlertCircle size={12} className="mr-1" />
                           {errors.userId}
-                        </motion.p>
+                        </p>
                       )}
-                    </motion.div>
+                    </div>
 
                     {/* Vehicle Type */}
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.3 }}
-                      className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-6 border border-orange-200"
-                    >
-                      <label className="flex items-center text-sm font-semibold text-orange-800 mb-3">
-                        <Settings className="mr-2" size={16} />
-                        Vehicle Type
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Loại Xe
                       </label>
                       {isEditing ? (
                         <select
                           name="vehicleTypeId"
                           value={editForm.vehicleTypeId}
                           onChange={handleChange}
-                          className="w-full px-4 py-3 border-2 border-orange-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 disabled:opacity-50"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                           disabled={isLoading}
                         >
-                          <option value="">Select vehicle type</option>
+                          <option value="">Chọn loại xe</option>
                           {vehicleTypes.map(type => (
                             <option key={type.id} value={type.id}>{type.typeName}</option>
                           ))}
                         </select>
                       ) : (
-                        <p className="text-orange-700 font-medium text-lg">
+                        <p className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md">
                           {vehicleTypes.find(t => t.id === vehicle.vehicleTypeId)?.typeName || 'N/A'}
                         </p>
                       )}
                       {errors.vehicleTypeId && (
-                        <motion.p
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          className="text-red-500 text-xs mt-2 flex items-center"
-                        >
-                          <AlertCircle size={14} className="mr-1" />
+                        <p className="text-red-500 text-xs mt-1 flex items-center">
+                          <AlertCircle size={12} className="mr-1" />
                           {errors.vehicleTypeId}
-                        </motion.p>
+                        </p>
                       )}
-                    </motion.div>
+                    </div>
 
                     {/* Color */}
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.4 }}
-                      className="bg-gradient-to-br from-pink-50 to-pink-100 rounded-xl p-6 border border-pink-200"
-                    >
-                      <label className="flex items-center text-sm font-semibold text-pink-800 mb-3">
-                        <Palette className="mr-2" size={16} />
-                        Color
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Màu Sắc
                       </label>
                       {isEditing ? (
                         <input
                           name="color"
                           value={editForm.color}
                           onChange={handleChange}
-                          className="w-full px-4 py-3 border-2 border-pink-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-all duration-200 disabled:opacity-50"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                           placeholder="e.g., Red"
                           disabled={isLoading}
                         />
                       ) : (
-                        <p className="text-pink-700 font-medium text-lg">{vehicle.color}</p>
+                        <p className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md">{vehicle.color}</p>
                       )}
                       {errors.color && (
-                        <motion.p
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          className="text-red-500 text-xs mt-2 flex items-center"
-                        >
-                          <AlertCircle size={14} className="mr-1" />
+                        <p className="text-red-500 text-xs mt-1 flex items-center">
+                          <AlertCircle size={12} className="mr-1" />
                           {errors.color}
-                        </motion.p>
+                        </p>
                       )}
-                    </motion.div>
+                    </div>
 
                     {/* Brand */}
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.5 }}
-                      className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl p-6 border border-indigo-200"
-                    >
-                      <label className="flex items-center text-sm font-semibold text-indigo-800 mb-3">
-                        <Tag className="mr-2" size={16} />
-                        Brand
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Hãng
                       </label>
                       {isEditing ? (
                         <input
                           name="brand"
                           value={editForm.brand}
                           onChange={handleChange}
-                          className="w-full px-4 py-3 border-2 border-indigo-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 disabled:opacity-50"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                           placeholder="e.g., Toyota"
                           disabled={isLoading}
                         />
                       ) : (
-                        <p className="text-indigo-700 font-medium text-lg">{vehicle.brand}</p>
+                        <p className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md">{vehicle.brand}</p>
                       )}
                       {errors.brand && (
-                        <motion.p
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          className="text-red-500 text-xs mt-2 flex items-center"
-                        >
-                          <AlertCircle size={14} className="mr-1" />
+                        <p className="text-red-500 text-xs mt-1 flex items-center">
+                          <AlertCircle size={12} className="mr-1" />
                           {errors.brand}
-                        </motion.p>
+                        </p>
                       )}
-                    </motion.div>
+                    </div>
                   </div>
                 </>
               )}
 
               {/* Messages */}
-              <AnimatePresence>
-                {successMessage && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -20, scale: 0.95 }}
-                    className="mt-6 p-4 bg-gradient-to-r from-green-50 to-green-100 border border-green-200 text-green-800 rounded-xl flex items-center shadow-md"
-                  >
-                    <CheckCircle size={20} className="mr-3 text-green-600" />
-                    <span className="font-medium">{successMessage}</span>
-                  </motion.div>
-                )}
-                {errorMessage && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -20, scale: 0.95 }}
-                    className="mt-6 p-4 bg-gradient-to-r from-red-50 to-red-100 border border-red-200 text-red-800 rounded-xl flex items-center shadow-md"
-                  >
-                    <AlertCircle size={20} className="mr-3 text-red-600" />
-                    <span className="font-medium">{errorMessage}</span>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              {successMessage && (
+                <div className="mt-4 p-3 bg-green-50 border border-green-200 text-green-800 rounded-md flex items-center">
+                  <CheckCircle size={16} className="mr-2" />
+                  <span>{successMessage}</span>
+                </div>
+              )}
+              {errorMessage && (
+                <div className="mt-4 p-3 bg-red-50 border border-red-200 text-red-800 rounded-md flex items-center">
+                  <AlertCircle size={16} className="mr-2" />
+                  <span>{errorMessage}</span>
+                </div>
+              )}
             </div>
           </div>
-        </motion.div>
+        </div>
 
         {/* Confirmation Modal */}
-        <AnimatePresence>
-          {showConfirm && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-            >
-              <motion.div
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.8, opacity: 0 }}
-                className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full"
-              >
-                <div className="flex items-center mb-4">
-                  <div className="p-3 bg-emerald-100 rounded-full mr-4">
-                    <CheckCircle className="text-emerald-600" size={24} />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-800">Confirm Save Changes</h3>
-                    <p className="text-sm text-gray-600">Are you sure you want to save these changes?</p>
-                  </div>
+        {showConfirm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
+              <div className="flex items-center mb-4">
+                <CheckCircle className="text-green-600 mr-3" size={24} />
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800">Xác nhận lưu thay đổi</h3>
+                  <p className="text-sm text-gray-600">Bạn có chắc chắn muốn lưu các thay đổi này?</p>
                 </div>
-                <div className="flex justify-end space-x-3">
-                  <motion.button
-                    onClick={() => setShowConfirm(false)}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="px-6 py-3 bg-gray-200 text-gray-800 rounded-xl hover:bg-gray-300 transition-colors"
-                  >
-                    Cancel
-                  </motion.button>
-                  <motion.button
-                    onClick={handleSave}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl hover:from-emerald-600 hover:to-emerald-700 transition-all duration-200 disabled:opacity-50 flex items-center space-x-2"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <>
-                        <motion.div
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                          className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
-                        />
-                        <span>Saving...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Save size={16} />
-                        <span>Confirm</span>
-                      </>
-                    )}
-                  </motion.button>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              </div>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowConfirm(false)}
+                  className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition-colors"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleSave}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center space-x-2"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>Đang lưu...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save size={16} />
+                      <span>Xác nhận</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Delete Confirmation Modal */}
-        <AnimatePresence>
-          {showDeleteConfirm && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-            >
-              <motion.div
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.8, opacity: 0 }}
-                className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full"
-              >
-                <div className="flex items-center mb-4">
-                  <div className="p-3 bg-red-100 rounded-full mr-4">
-                    <AlertCircle className="text-red-600" size={24} />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-800">Confirm Delete Vehicle</h3>
-                    <p className="text-sm text-gray-600">This action cannot be undone. Are you sure?</p>
-                  </div>
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
+              <div className="flex items-center mb-4">
+                <AlertCircle className="text-red-600 mr-3" size={24} />
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800">Xác nhận xóa phương tiện</h3>
+                  <p className="text-sm text-gray-600">Hành động này không thể hoàn tác. Bạn có chắc chắn?</p>
                 </div>
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
-                  <p className="text-red-700 text-sm font-medium">
-                    ⚠️ The vehicle will be permanently deleted from the system
-                  </p>
-                </div>
-                <div className="flex justify-end space-x-3">
-                  <motion.button
-                    onClick={() => setShowDeleteConfirm(false)}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="px-6 py-3 bg-gray-200 text-gray-800 rounded-xl hover:bg-gray-300 transition-colors"
-                  >
-                    Cancel
-                  </motion.button>
-                  <motion.button
-                    onClick={handleDelete}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl hover:from-red-600 hover:to-red-700 transition-all duration-200 disabled:opacity-50 flex items-center space-x-2"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <>
-                        <motion.div
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                          className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
-                        />
-                        <span>Deleting...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Trash2 size={16} />
-                        <span>Confirm Delete</span>
-                      </>
-                    )}
-                  </motion.button>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              </div>
+              <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4">
+                <p className="text-red-700 text-sm">
+                  ⚠️ Phương tiện sẽ bị xóa vĩnh viễn khỏi hệ thống
+                </p>
+              </div>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition-colors"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center space-x-2"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>Đang xóa...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 size={16} />
+                      <span>Xác nhận xóa</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

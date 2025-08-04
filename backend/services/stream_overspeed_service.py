@@ -1,4 +1,3 @@
-
 import os
 import cv2
 import numpy as np
@@ -14,6 +13,9 @@ from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 from filterpy.kalman import KalmanFilter
 from utils.yt_stream import get_stream_url
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import ExitStack
+import atexit
 
 # Constants
 VIOLATIONS_DIR = "overspeed_violations"
@@ -25,6 +27,7 @@ SPEED_LIMIT = 60  # km/h, adjust as needed
 MIN_VEHICLE_SIZE = 50  # Minimum vehicle bounding box size (pixels)
 DISTANCE_REF = 10  # Reference real-world distance (meters) for calibration
 PIXEL_REF = 100  # Corresponding pixel distance for DISTANCE_REF
+VIOLATION_API_URL = "http://localhost:8081/api/violations"
 
 # Load YOLOv8m model
 model = YOLO("yolov8m.pt")  # Pre-trained YOLOv8m model
@@ -39,10 +42,13 @@ class_names = {
 }
 
 # Initialize EasyOCR
-ocr_reader = easyocr.Reader(['en'], gpu=True)
+ocr_reader = easyocr.Reader(['en'], gpu=False)
 
 # Initialize FastAPI
 app = FastAPI()
+
+# Thread pool for async violation sending
+violation_executor = ThreadPoolExecutor(max_workers=5)
 
 def initialize_kalman_filter():
     """Initialize Kalman Filter for tracking position and velocity."""
@@ -103,10 +109,32 @@ def calculate_speed(prev_pos, curr_pos, frame_time, pixel_to_meter):
     km_per_hour = meters_per_second * 3.6  # Convert m/s to km/h
     return km_per_hour
 
-@app.get("/stream/{camera_id}")
-async def stream_overspeed_service(youtube_url: str, camera_id: int):
+def send_violation_async(violation_data, snapshot_filepath, video_filepath, track_id):
+    """Gửi dữ liệu vi phạm đến API bất đồng bộ."""
+    def send_violation():
+        with ExitStack() as stack:
+            try:
+                img_file = stack.enter_context(open(snapshot_filepath, 'rb'))
+                vid_file = stack.enter_context(open(video_filepath, 'rb'))
+                files = {
+                    'imageFile': (os.path.basename(snapshot_filepath), img_file, 'image/jpeg'),
+                    'videoFile': (os.path.basename(video_filepath), vid_file, 'video/mp4'),
+                    'Violation': (None, json.dumps(violation_data), 'application/json')
+                }
+                response = requests.post(VIOLATION_API_URL, files=files, timeout=10)
+                response.raise_for_status()
+                print(f"[+] Violation sent successfully for track {track_id}: {response.status_code}")
+            except Exception as e:
+                print(f"[-] Failed to send violation to API for track {track_id}: {e}")
+            finally:
+                stack.callback(lambda: os.remove(snapshot_filepath) if os.path.exists(snapshot_filepath) else None)
+                stack.callback(lambda: os.remove(video_filepath) if os.path.exists(video_filepath) else None)
+                print(f"[+] Cleaned up temp files for track {track_id}")
+
+    violation_executor.submit(send_violation)
+
+def stream_overspeed_service(youtube_url: str, camera_id: int):
     """Stream video and detect overspeed violations."""
-    # Print model class names for verification
     print(f"Loaded model classes: {model.names}")
     
     camera_config = fetch_camera_config(camera_id)
@@ -191,9 +219,9 @@ async def stream_overspeed_service(youtube_url: str, camera_id: int):
                 avg_speed = np.mean([calculate_speed(speed_history[track_id][i-1], speed_history[track_id][i], frame_time, pixel_to_meter) 
                                      for i in range(1, len(speed_history[track_id]))]) if len(speed_history[track_id]) > 1 else speed
 
-                if avg_speed > SPEED_LIMIT and track_id not in vehicle_violations:
+                if avg_speed > SPEED_LIMIT and track_id not in vehicle_violations and track_id not in recording_tasks:
                     vehicle_violations[track_id] = "OVERSPEED"
-                    print(f"OVERSPEED VIOLATION: Vehicle {track_id}, Plate: {license_plate_text}, Speed: {avg_speed:.2f} km/h")
+                    print(f"[+] OVERSPEED VIOLATION: Vehicle {track_id}, Plate: {license_plate_text}, Speed: {avg_speed:.2f} km/h")
 
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     snapshot_filename = f"overspeed_{track_id}_{timestamp}.jpg"
@@ -212,20 +240,6 @@ async def stream_overspeed_service(youtube_url: str, camera_id: int):
                         'file_path': video_filepath
                     }
 
-                    # Ensure video is written before sending
-                    if track_id in recording_tasks:
-                        task = recording_tasks[track_id]
-                        while task['frames_remaining'] > 0:
-                            ret, frame = cap.read()
-                            if not ret:
-                                continue
-                            frame_for_video = frame.copy()
-                            task['writer'].write(frame_for_video)
-                            task['frames_remaining'] -= 1
-                            frame_buffer.append(frame_for_video.copy())
-                        task['writer'].release()
-                        del recording_tasks[track_id]
-
                     violation_data = {
                         "camera": {"id": camera_id},
                         "vehicle": {"licensePlate": license_plate_text},
@@ -242,25 +256,8 @@ async def stream_overspeed_service(youtube_url: str, camera_id: int):
                         ]
                     }
 
-                    try:
-                        with open(snapshot_filepath, "rb") as img_file, open(video_filepath, "rb") as vid_file:
-                            files = {
-                                "imageFile": (snapshot_filename, img_file, "image/jpeg"),
-                                "videoFile": (video_filename, vid_file, "video/mp4")
-                            }
-                            data = {"Violation": json.dumps(violation_data)}
-                            response = requests.post(
-                                "http://localhost:8081/api/violations",
-                                files=files,
-                                data=data
-                            )
-                            response.raise_for_status()
-                            print(f"Violation saved to API: {response.json()}")
-                            print(f"Successfully sent image: {snapshot_filename} and video: {video_filename}")
-                    except requests.exceptions.HTTPError as http_err:
-                        print(f"HTTP error when saving violation to API: {http_err}")
-                    except Exception as e:
-                        print(f"Error saving violation to API: {e}")
+                    print(f"[+] Sending OVERSPEED violation for track {track_id} asynchronously...")
+                    send_violation_async(violation_data, snapshot_filepath, video_filepath, track_id)
 
                 color = (0, 0, 255) if vehicle_violations.get(track_id, False) else (0, 255, 0)
                 label = f"ID:{track_id} {class_name} Plate: {license_plate_text} Speed: {avg_speed:.2f} km/h"
@@ -292,12 +289,22 @@ async def stream_overspeed_service(youtube_url: str, camera_id: int):
             )
 
     except Exception as e:
-        print(f"Error in stream_overspeed_service: {e}")
+        print(f"[-] Error in stream_overspeed_service: {e}")
         traceback.print_exc()
     finally:
         cap.release()
         for task in recording_tasks.values():
             task['writer'].release()
+        print("[+] Closed stream for camera")
+
+def cleanup_on_exit():
+    """Dọn dẹp thread pool khi thoát."""
+    print("[+] Shutting down violation executor...")
+    violation_executor.shutdown(wait=True)
+    print("[+] Violation executor shutdown complete")
+
+# Đăng ký hàm cleanup
+atexit.register(cleanup_on_exit)
 
 if __name__ == "__main__":
     import uvicorn

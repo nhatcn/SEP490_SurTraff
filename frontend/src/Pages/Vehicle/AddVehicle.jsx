@@ -5,7 +5,7 @@ const AddVehicle = () => {
   const [formData, setFormData] = useState({
     name: '',
     licensePlate: '',
-    userId: '',
+    userId: '3',
     vehicleTypeId: '',
     color: '',
     brand: '',
@@ -14,29 +14,43 @@ const AddVehicle = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
-  const [vehicleTypes, setVehicleTypes] = useState([
-    { id: 1, typeName: 'Sedan' },
-    { id: 2, typeName: 'SUV' },
-    { id: 3, typeName: 'Truck' },
-    { id: 4, typeName: 'Motorcycle' },
-    { id: 5, typeName: 'Hatchback' },
-  ]);
-  const [existingPlates, setExistingPlates] = useState(['30A-12345', '51B-67890']);
+  const [vehicleTypes, setVehicleTypes] = useState([]);
+  const [existingPlates, setExistingPlates] = useState([]);
 
-  // Simulate fetching vehicle types (replace with real API if needed)
+  // Fetch userId automatically
+  useEffect(() => {
+    const fetchUserId = async () => {
+      try {
+        // Simulated API call to get current user ID (replace with actual authentication endpoint)
+        const response = await fetch('http://localhost:8081/api/auth/current-user', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            // Add authorization header if needed
+            // 'Authorization': `Bearer ${yourToken}`
+          },
+        });
+        if (!response.ok) throw new Error('Failed to fetch user ID');
+        const userData = await response.json();
+        setFormData((prev) => ({ ...prev, userId: userData.id.toString() }));
+      } catch (error) {
+        setErrorMessage(`Error fetching user ID: ${error.message}`);
+      }
+    };
+    fetchUserId();
+  }, []);
+
+  // Fetch vehicle types from API
   useEffect(() => {
     const fetchVehicleTypes = async () => {
       try {
-        // Replace with actual API call if vehicle types are served from backend
-        setTimeout(() => {
-          setVehicleTypes([
-            { id: 1, typeName: 'Sedan' },
-            { id: 2, typeName: 'SUV' },
-            { id: 3, typeName: 'Truck' },
-            { id: 4, typeName: 'Motorcycle' },
-            { id: 5, typeName: 'Hatchback' },
-          ]);
-        }, 500);
+        const response = await fetch('http://localhost:8081/api/violations/vehicle-types', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        if (!response.ok) throw new Error('Failed to fetch vehicle types');
+        const data = await response.json();
+        setVehicleTypes(data);
       } catch (error) {
         setErrorMessage(`Error loading vehicle types: ${error.message}`);
       }
@@ -44,14 +58,17 @@ const AddVehicle = () => {
     fetchVehicleTypes();
   }, []);
 
-  // Fetch existing license plates (optional: replace with real API)
+  // Fetch existing vehicles to check license plates
   useEffect(() => {
     const fetchVehicles = async () => {
       try {
-        // Simulated API call (replace with real API if needed)
-        setTimeout(() => {
-          setExistingPlates(['30A-12345', '51B-67890']);
-        }, 300);
+        const response = await fetch('http://localhost:8081/api/vehicle', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        if (!response.ok) throw new Error('Failed to fetch vehicles');
+        const vehicles = await response.json();
+        setExistingPlates(vehicles.map((vehicle) => vehicle.licensePlate));
       } catch (error) {
         setErrorMessage(`Error loading vehicles: ${error.message}`);
       }
@@ -105,7 +122,7 @@ const AddVehicle = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          id: 0, // As per API schema, id is 0 for new vehicles
+          id: 0,
           name: formData.name,
           licensePlate: formData.licensePlate,
           userId: parseInt(formData.userId),
@@ -125,14 +142,13 @@ const AddVehicle = () => {
       setFormData({
         name: '',
         licensePlate: '',
-        userId: '',
+        userId: formData.userId, // Keep userId
         vehicleTypeId: '',
         color: '',
         brand: '',
       });
       setExistingPlates((prev) => [...prev, newVehicle.licensePlate]);
 
-      // Auto-hide success message after 5 seconds
       setTimeout(() => setSuccessMessage(''), 5000);
     } catch (error) {
       setErrorMessage(`Error: ${error.message}`);
@@ -160,7 +176,6 @@ const AddVehicle = () => {
         transition={{ duration: 0.6, ease: 'easeOut' }}
         className="max-w-2xl mx-auto"
       >
-        {/* Header */}
         <div className="text-center mb-8">
           <motion.div
             initial={{ scale: 0 }}
@@ -183,7 +198,6 @@ const AddVehicle = () => {
           <p className="text-gray-600 text-lg">Register your vehicle with ease</p>
         </div>
 
-        {/* Form Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -191,9 +205,7 @@ const AddVehicle = () => {
           className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-white/20 p-8 hover:shadow-3xl transition-shadow duration-300"
         >
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Grid Layout for Form Fields */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Vehicle Name */}
               <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   <div className="flex items-center space-x-2">
@@ -238,7 +250,6 @@ const AddVehicle = () => {
                 </AnimatePresence>
               </motion.div>
 
-              {/* License Plate */}
               <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   <div className="flex items-center space-x-2">
@@ -283,52 +294,6 @@ const AddVehicle = () => {
                 </AnimatePresence>
               </motion.div>
 
-              {/* User ID */}
-              <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  <div className="flex items-center space-x-2">
-                    <svg className="w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                      />
-                    </svg>
-                    <span>User ID</span>
-                  </div>
-                </label>
-                <input
-                  type="text"
-                  name="userId"
-                  value={formData.userId}
-                  onChange={handleChange}
-                  placeholder="e.g., 123"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-300 bg-gray-50/50 hover:bg-white"
-                  disabled={isLoading}
-                />
-                <AnimatePresence>
-                  {errors.userId && (
-                    <motion.p
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="text-red-500 text-xs flex items-center space-x-1"
-                    >
-                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path
-                          fillRule="evenodd"
-                          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                      <span>{errors.userId}</span>
-                    </motion.p>
-                  )}
-                </AnimatePresence>
-              </motion.div>
-
-              {/* Vehicle Type */}
               <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   <div className="flex items-center space-x-2">
@@ -378,7 +343,6 @@ const AddVehicle = () => {
                 </AnimatePresence>
               </motion.div>
 
-              {/* Color */}
               <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   <div className="flex items-center space-x-2">
@@ -423,7 +387,6 @@ const AddVehicle = () => {
                 </AnimatePresence>
               </motion.div>
 
-              {/* Brand */}
               <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   <div className="flex items-center space-x-2">
@@ -469,7 +432,6 @@ const AddVehicle = () => {
               </motion.div>
             </div>
 
-            {/* Submit Button */}
             <motion.button
               type="submit"
               disabled={isLoading}
@@ -500,7 +462,6 @@ const AddVehicle = () => {
             </motion.button>
           </form>
 
-          {/* Messages */}
           <AnimatePresence mode="wait">
             {successMessage && (
               <motion.div

@@ -129,7 +129,7 @@ const RequestButton: React.FC<RequestButtonProps> = ({ violationId, onStatusUpda
       } else if (error.response?.status === 400) {
         setError(
           (error.response?.data as any)?.message ||
-            'Invalid status. Valid statuses: PENDING, REQUEST, RESOLVED, DISMISSED.'
+            'Invalid status. Valid statuses: PENDING, REQUEST, RESOLVED, DISMISSED, APPROVE, REJECT.'
         );
       } else {
         setError((error.response?.data as any)?.message || 'An error occurred. Please try again.');
@@ -141,27 +141,35 @@ const RequestButton: React.FC<RequestButtonProps> = ({ violationId, onStatusUpda
   };
 
   // Determine button text and disabled state
-  const isRequested = violationStatus === 'REQUEST';
+  const isRequestAllowed = violationStatus === 'PENDING';
   const buttonText = isLoading
     ? 'Processing...'
     : success === true
     ? 'Success'
     : success === false
     ? 'Failed'
-    : isRequested
+    : violationStatus === 'APPROVE'
+    ? 'Approved'
+    : violationStatus === 'REJECT'
+    ? 'Rejected'
+    : violationStatus === 'REQUEST'
     ? 'Requested'
+    : violationStatus === 'RESOLVED'
+    ? 'Resolved'
+    : violationStatus === 'DISMISSED'
+    ? 'Dismissed'
     : 'Send Request';
 
   return (
     <div className="flex flex-col items-center">
       <button
         onClick={handleRequest}
-        disabled={isLoading || isRequested}
+        disabled={isLoading || !isRequestAllowed}
         className={`
           relative px-6 py-3 rounded-lg font-semibold text-white 
           ${success === true ? 'bg-green-600 hover:bg-green-700' : 
             success === false ? 'bg-red-600 hover:bg-red-700' : 
-            isRequested ? 'bg-gray-600 hover:bg-gray-700' : 
+            !isRequestAllowed ? 'bg-gray-600 hover:bg-gray-700' : 
             'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'}
           transition-all duration-300 ease-in-out
           transform hover:scale-105 hover:shadow-xl
