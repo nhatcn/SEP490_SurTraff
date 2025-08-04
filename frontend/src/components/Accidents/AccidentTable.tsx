@@ -1,9 +1,9 @@
-"use client";
-import type React from "react";
-import { useEffect, useState, useCallback, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
-import { toast } from "react-toastify";
+"use client"
+import type React from "react"
+import { useEffect, useState, useCallback, useMemo } from "react"
+import { useNavigate } from "react-router-dom"
+import { motion } from "framer-motion"
+import { toast } from "react-toastify"
 import {
   Eye,
   Trash2,
@@ -13,11 +13,9 @@ import {
   AlertTriangle,
   RefreshCw,
   TrendingUp,
-  Download,
   BarChart3,
   Calendar,
   Sparkles,
-  Shield,
   Target,
   Activity,
   Globe,
@@ -28,69 +26,67 @@ import {
   Filter,
   AlertCircle,
   X,
-} from "lucide-react";
-import { format } from "date-fns";
+} from "lucide-react"
+import { format } from "date-fns"
+import ExportAccidentPDF from "../../components/Accidents/export-accident-pdf" // Import the new component
 
 // Types
 interface AccidentType {
-  id: number;
-  cameraId: number;
-  cameraName: string;
-  cameraLocation: string;
-  location: string;
-  status: string;
-  accidentTime: string;
+  id: number
+  cameraId: number
+  cameraName: string
+  cameraLocation: string
+  location: string
+  status: string
+  accidentTime: string
 }
 
 // Generic interfaces for GenericTable
 export interface TableColumn<T> {
-  key: keyof T | string;
-  title: string;
-  render?: (value: any, record: T, index: number) => React.ReactNode;
-  width?: string;
+  key: keyof T | string
+  title: string
+  render?: (value: any, record: T, index: number) => React.ReactNode
+  width?: string
 }
-
 export interface TableAction<T> {
-  key: string;
-  label: string;
-  icon?: React.ReactNode;
-  onClick: (record: T, index: number) => void;
-  className?: string;
+  key: string
+  label: string
+  icon?: React.ReactNode
+  onClick: (record: T, index: number) => void
+  className?: string
 }
-
 export interface FilterConfig {
-  key: string;
-  label: string;
-  type: "text" | "select";
-  options?: { value: string; label: string }[];
-  placeholder?: string;
+  key: string
+  label: string
+  type: "text" | "select"
+  options?: { value: string; label: string }[]
+  placeholder?: string
 }
-
 export interface GenericTableProps<T> {
-  data: T[];
-  filteredData: T[];
-  columns: TableColumn<T>[];
-  rowKey: keyof T;
-  actions?: TableAction<T>[];
-  filters?: FilterConfig[];
-  filterValues?: Record<string, any>;
-  onFilterChange?: (key: string, value: any) => void;
-  onResetFilters?: () => void;
-  loading?: boolean;
-  error?: string | null;
-  onRetry?: () => void;
-  onRowClick?: (record: T, index: number) => void;
+  data: T[]
+  filteredData: T[]
+  columns: TableColumn<T>[]
+  rowKey: keyof T
+  actions?: TableAction<T>[]
+  filters?: FilterConfig[]
+  filterValues?: Record<string, any>
+  onFilterChange?: (key: string, value: any) => void
+  onResetFilters?: () => void
+  loading?: boolean
+  error?: string | null
+  onRetry?: () => void
+  onRowClick?: (record: T, index: number) => void
   pagination?: {
-    enabled: boolean;
-    currentPage: number;
-    totalPages: number;
-    pageSize: number;
-    totalItems: number;
-    onPageChange: (page: number) => void;
-    onPageSizeChange?: (pageSize: number) => void;
-  };
-  className?: string;
-  emptyMessage?: string;
+    enabled: boolean
+    currentPage: number
+    totalPages: number
+    pageSize: number
+    totalItems: number
+    onPageChange: (page: number) => void
+    onPageSizeChange?: (pageSize: number) => void
+  }
+  className?: string
+  emptyMessage?: string
 }
 
 // GenericTable Component
@@ -112,61 +108,47 @@ function GenericTable<T extends Record<string, any>>({
   className = "",
   emptyMessage = "No data found",
 }: GenericTableProps<T>) {
-  const [showFilters, setShowFilters] = useState(false);
-
+  const [showFilters, setShowFilters] = useState(false)
   // Check if filters are active
   const hasActiveFilters = Object.values(filterValues).some(
-    (value) => value !== "" && value !== null && value !== undefined
-  );
-
+    (value) => value !== "" && value !== null && value !== undefined,
+  )
   // Get paginated data
-  const displayData = pagination?.enabled ? data : filteredData;
-
+  const displayData = pagination?.enabled ? data : filteredData
   // Calculate pagination info
-  const startEntry = pagination?.enabled
-    ? (pagination.currentPage - 1) * pagination.pageSize + 1
-    : 1;
+  const startEntry = pagination?.enabled ? (pagination.currentPage - 1) * pagination.pageSize + 1 : 1
   const endEntry = pagination?.enabled
     ? Math.min(pagination.currentPage * pagination.pageSize, filteredData.length)
-    : filteredData.length;
-
+    : filteredData.length
   // Page size options
-  const pageSizeOptions = [10, 25, 50, 100];
-
+  const pageSizeOptions = [10, 25, 50, 100]
   // Generate page numbers for pagination
   const getPageNumbers = () => {
-    if (!pagination) return [];
-
-    const { currentPage, totalPages } = pagination;
-    const pages = [];
-    const maxVisiblePages = 5;
-
+    if (!pagination) return []
+    const { currentPage, totalPages } = pagination
+    const pages = []
+    const maxVisiblePages = 5
     if (totalPages <= maxVisiblePages) {
       for (let i = 1; i <= totalPages; i++) {
-        pages.push(i);
+        pages.push(i)
       }
     } else {
-      const half = Math.floor(maxVisiblePages / 2);
-      let start = Math.max(currentPage - half, 1);
-      let end = Math.min(start + maxVisiblePages - 1, totalPages);
-
+      const half = Math.floor(maxVisiblePages / 2)
+      let start = Math.max(currentPage - half, 1)
+      const end = Math.min(start + maxVisiblePages - 1, totalPages)
       if (end - start + 1 < maxVisiblePages) {
-        start = Math.max(end - maxVisiblePages + 1, 1);
+        start = Math.max(end - maxVisiblePages + 1, 1)
       }
-
       for (let i = start; i <= end; i++) {
-        pages.push(i);
+        pages.push(i)
       }
     }
-
-    return pages;
-  };
-
+    return pages
+  }
   // Helper function to get nested values
   const getNestedValue = (obj: any, path: string) => {
-    return path.split(".").reduce((current, key) => current?.[key], obj);
-  };
-
+    return path.split(".").reduce((current, key) => current?.[key], obj)
+  }
   return (
     <div className={`bg-white rounded-lg shadow-sm ${className}`}>
       {/* Filter Section */}
@@ -179,12 +161,8 @@ function GenericTable<T extends Record<string, any>>({
             >
               <Filter size={20} className="text-gray-600" />
             </div>
-
             {filters.map((filter) => (
-              <div
-                key={filter.key}
-                className="border rounded-lg bg-gray-50 hover:bg-gray-100 flex-grow max-w-xs"
-              >
+              <div key={filter.key} className="border rounded-lg bg-gray-50 hover:bg-gray-100 flex-grow max-w-xs">
                 {filter.type === "text" && (
                   <div className="flex items-center px-4 py-2">
                     <input
@@ -196,7 +174,6 @@ function GenericTable<T extends Record<string, any>>({
                     />
                   </div>
                 )}
-
                 {filter.type === "select" && (
                   <select
                     value={filterValues[filter.key] || ""}
@@ -213,7 +190,6 @@ function GenericTable<T extends Record<string, any>>({
                 )}
               </div>
             ))}
-
             {hasActiveFilters && onResetFilters && (
               <button
                 className="flex items-center text-red-500 hover:text-red-600 px-3 py-2 transition-colors"
@@ -224,33 +200,27 @@ function GenericTable<T extends Record<string, any>>({
               </button>
             )}
           </div>
-
           {hasActiveFilters && (
             <div className="p-4 border-b border-gray-200 flex flex-wrap gap-2">
               {filters.map((filter) => {
-                const value = filterValues[filter.key];
-                if (!value) return null;
-
+                const value = filterValues[filter.key]
+                if (!value) return null
                 return (
                   <span
                     key={filter.key}
                     className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800"
                   >
                     {filter.label}: {String(value)}
-                    <button
-                      onClick={() => onFilterChange?.(filter.key, "")}
-                      className="ml-2 hover:text-blue-600"
-                    >
+                    <button onClick={() => onFilterChange?.(filter.key, "")} className="ml-2 hover:text-blue-600">
                       <X size={14} />
                     </button>
                   </span>
-                );
+                )
               })}
             </div>
           )}
         </>
       )}
-
       {/* Table Header Info */}
       <div className="flex justify-between items-center p-4 border-b border-gray-200">
         <div className="flex items-center space-x-4">
@@ -261,7 +231,6 @@ function GenericTable<T extends Record<string, any>>({
             )}
           </span>
         </div>
-
         {pagination?.enabled && pagination.onPageSizeChange && (
           <div className="flex items-center space-x-2">
             <span className="text-sm text-gray-700">Show</span>
@@ -280,7 +249,6 @@ function GenericTable<T extends Record<string, any>>({
           </div>
         )}
       </div>
-
       {/* Table */}
       <div className="overflow-hidden">
         {loading ? (
@@ -303,7 +271,10 @@ function GenericTable<T extends Record<string, any>>({
           </div>
         ) : displayData.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
-            <p>{emptyMessage}{hasActiveFilters ? " matching your filters" : ""}</p>
+            <p>
+              {emptyMessage}
+              {hasActiveFilters ? " matching your filters" : ""}
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -335,12 +306,13 @@ function GenericTable<T extends Record<string, any>>({
                   >
                     {columns.map((column) => (
                       <td key={String(column.key)} className="px-6 py-4 whitespace-nowrap">
-                        {column.render
-                          ? column.render(getNestedValue(record, String(column.key)), record, index)
-                          : <span className="text-sm text-gray-900">
-                              {String(getNestedValue(record, String(column.key)) || "")}
-                            </span>
-                        }
+                        {column.render ? (
+                          column.render(getNestedValue(record, String(column.key)), record, index)
+                        ) : (
+                          <span className="text-sm text-gray-900">
+                            {String(getNestedValue(record, String(column.key)) || "")}
+                          </span>
+                        )}
                       </td>
                     ))}
                     {actions.length > 0 && (
@@ -353,8 +325,8 @@ function GenericTable<T extends Record<string, any>>({
                                 action.className || "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
                               }`}
                               onClick={(e) => {
-                                e.stopPropagation();
-                                action.onClick(record, index);
+                                e.stopPropagation()
+                                action.onClick(record, index)
                               }}
                               title={action.label}
                             >
@@ -371,7 +343,6 @@ function GenericTable<T extends Record<string, any>>({
           </div>
         )}
       </div>
-
       {/* Pagination */}
       {pagination?.enabled && pagination.totalPages > 1 && (
         <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
@@ -380,7 +351,6 @@ function GenericTable<T extends Record<string, any>>({
               Page {pagination.currentPage} of {pagination.totalPages}
             </span>
           </div>
-
           <div className="flex items-center space-x-1">
             <button
               className="flex items-center px-3 py-2 text-sm rounded border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
@@ -390,7 +360,6 @@ function GenericTable<T extends Record<string, any>>({
               <ChevronLeft size={16} className="mr-1" />
               Previous
             </button>
-
             {getPageNumbers().map((page) => (
               <button
                 key={page}
@@ -404,7 +373,6 @@ function GenericTable<T extends Record<string, any>>({
                 {page}
               </button>
             ))}
-
             <button
               className="flex items-center px-3 py-2 text-sm rounded border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
               onClick={() => pagination.onPageChange(pagination.currentPage + 1)}
@@ -417,195 +385,185 @@ function GenericTable<T extends Record<string, any>>({
         </div>
       )}
     </div>
-  );
+  )
 }
 
 // Constants
-const API_URL_ACCIDENTS = "http://localhost:8081";
+const API_URL_ACCIDENTS = "http://localhost:8081"
 
 // ConfirmDialog Component (Placeholder, assuming it's defined elsewhere)
 const ConfirmDialog: React.FC<{
-  isOpen: boolean;
-  title: string;
-  message: string;
-  onConfirm: () => void;
-  onCancel: () => void;
-  confirmButtonText: string;
-  confirmButtonColor: string;
+  isOpen: boolean
+  title: string
+  message: string
+  onConfirm: () => void
+  onCancel: () => void
+  confirmButtonText: string
+  confirmButtonColor: string
 }> = ({ isOpen, title, message, onConfirm, onCancel, confirmButtonText, confirmButtonColor }) => {
-  if (!isOpen) return null;
+  if (!isOpen) return null
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white p-6 rounded-lg shadow-xl">
         <h3 className="text-lg font-semibold">{title}</h3>
         <p className="mt-2 text-gray-600">{message}</p>
         <div className="mt-4 flex justify-end space-x-2">
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
-          >
+          <button onClick={onCancel} className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">
             Cancel
           </button>
-          <button
-            onClick={onConfirm}
-            className={`px-4 py-2 text-white rounded ${confirmButtonColor}`}
-          >
+          <button onClick={onConfirm} className={`px-4 py-2 text-white rounded ${confirmButtonColor}`}>
             {confirmButtonText}
           </button>
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
 // AccidentTable Component
 export default function AccidentTable() {
-  const [accidents, setAccidents] = useState<AccidentType[]>([]);
-  const [statusOptions, setStatusOptions] = useState<{ value: string; label: string }[]>([]);
-  const [locationOptions, setLocationOptions] = useState<{ value: string; label: string }[]>([]);
-  const [cameraOptions, setCameraOptions] = useState<{ value: string; label: string }[]>([]);
+  const [accidents, setAccidents] = useState<AccidentType[]>([])
+  const [statusOptions, setStatusOptions] = useState<{ value: string; label: string }[]>([])
+  const [locationOptions, setLocationOptions] = useState<{ value: string; label: string }[]>([])
+  const [cameraOptions, setCameraOptions] = useState<{ value: string; label: string }[]>([])
   const [filterValues, setFilterValues] = useState<Record<string, any>>({
     status: "",
     cameraId: "",
     location: "",
-  });
-  const [modalDeleteId, setModalDeleteId] = useState<number | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [isRejecting, setIsRejecting] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [refreshing, setRefreshing] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const navigate = useNavigate();
+  })
+  const [modalDeleteId, setModalDeleteId] = useState<number | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [isRejecting, setIsRejecting] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
+  const [refreshing, setRefreshing] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const navigate = useNavigate()
 
   // Authorization header
-  const token = localStorage.getItem("token");
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null // Check for window
   const authHeader = {
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-  };
+  }
 
   // Fetch Accident Data
   const fetchAccidentData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+    setLoading(true)
+    setError(null)
     try {
-      const res = await fetch(`${API_URL_ACCIDENTS}/api/accident`, authHeader);
+      const res = await fetch(`${API_URL_ACCIDENTS}/api/accident`, authHeader)
       if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`);
+        throw new Error(`HTTP error! status: ${res.status}`)
       }
-      const data: AccidentType[] = await res.json();
-      setAccidents(data);
-      const uniqueStatuses = Array.from(new Set(data.map((acc) => acc.status)));
-      setStatusOptions(uniqueStatuses.map((status) => ({ value: status, label: status })));
-      const uniqueLocations = Array.from(new Set(data.map((acc) => acc.location)));
-      setLocationOptions(uniqueLocations.map((loc) => ({ value: loc, label: loc })));
-      const uniqueCameras = new Map<number, string>();
+      const data: AccidentType[] = await res.json()
+      setAccidents(data)
+      const uniqueStatuses = Array.from(new Set(data.map((acc) => acc.status)))
+      setStatusOptions(uniqueStatuses.map((status) => ({ value: status, label: status })))
+      const uniqueLocations = Array.from(new Set(data.map((acc) => acc.location)))
+      setLocationOptions(uniqueLocations.map((loc) => ({ value: loc, label: loc })))
+      const uniqueCameras = new Map<number, string>()
       data.forEach((acc) => {
         if (acc.cameraId && acc.cameraName && !uniqueCameras.has(acc.cameraId)) {
-          uniqueCameras.set(acc.cameraId, acc.cameraName);
+          uniqueCameras.set(acc.cameraId, acc.cameraName)
         }
-      });
+      })
       const cameraOptionsArray = Array.from(uniqueCameras.entries()).map(([id, name]) => ({
         value: id.toString(),
         label: name,
-      }));
-      setCameraOptions(cameraOptionsArray);
+      }))
+      setCameraOptions(cameraOptionsArray)
     } catch (err) {
-      console.error("Failed to load accidents:", err);
-      setError("Unable to load accident list. Please try again.");
-      toast.error("❌ Failed to load accidents!");
+      console.error("Failed to load accidents:", err)
+      setError("Unable to load accident list. Please try again.")
+      toast.error("❌ Failed to load accidents!")
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, [refreshKey]);
+  }, [refreshKey]) // Added refreshKey to dependency array
 
   useEffect(() => {
-    fetchAccidentData();
-  }, [fetchAccidentData]);
+    fetchAccidentData()
+  }, [fetchAccidentData])
 
   // Apply Filters (aligned with TableUser's applyFilters)
   const filteredAccidents = useMemo(() => {
-    let filtered = accidents;
-
+    let filtered = accidents
     if (filterValues.status) {
-      filtered = filtered.filter((acc) => acc.status === filterValues.status);
+      filtered = filtered.filter((acc) => acc.status === filterValues.status)
     }
     if (filterValues.cameraId) {
-      filtered = filtered.filter((acc) => acc.cameraId === Number(filterValues.cameraId));
+      filtered = filtered.filter((acc) => acc.cameraId === Number(filterValues.cameraId))
     }
     if (filterValues.location) {
-      filtered = filtered.filter((acc) => acc.location === filterValues.location);
+      filtered = filtered.filter((acc) => acc.location === filterValues.location)
     }
-
-    console.log("Filtered Accidents:", filtered); // Debugging
-    return filtered;
-  }, [accidents, filterValues]);
+    console.log("Filtered Accidents:", filtered) // Debugging
+    return filtered
+  }, [accidents, filterValues])
 
   // Paginate Data (aligned with TableUser's getPaginatedData)
   const getPaginatedData = useCallback(() => {
-    const startIndex = (currentPage - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    const paginatedData = filteredAccidents.slice(startIndex, endIndex);
-    console.log("Paginated Data:", paginatedData); // Debugging
-    return paginatedData;
-  }, [filteredAccidents, currentPage, pageSize]);
+    const startIndex = (currentPage - 1) * pageSize
+    const endIndex = startIndex + pageSize
+    const paginatedData = filteredAccidents.slice(startIndex, endIndex)
+    console.log("Paginated Data:", paginatedData) // Debugging
+    return paginatedData
+  }, [filteredAccidents, currentPage, pageSize])
 
   // Calculate total pages
-  const totalPages = Math.ceil(filteredAccidents.length / pageSize);
+  const totalPages = Math.ceil(filteredAccidents.length / pageSize)
 
   // Handle filter change and reset page
   const handleFilterChange = useCallback((key: string, value: any) => {
-    setFilterValues((prev) => ({ ...prev, [key]: value }));
-    setCurrentPage(1); // Reset to first page on filter change
-  }, []);
+    setFilterValues((prev) => ({ ...prev, [key]: value }))
+    setCurrentPage(1) // Reset to first page on filter change
+  }, [])
 
   // Reset filters and page
   const resetFilters = useCallback(() => {
-    setFilterValues({ status: "", cameraId: "", location: "" });
-    setCurrentPage(1); // Reset to first page on filter reset
-  }, []);
+    setFilterValues({ status: "", cameraId: "", location: "" })
+    setCurrentPage(1) // Reset to first page on filter reset
+  }, [])
 
   // Handle page change
   const handlePageChange = useCallback((page: number) => {
-    setCurrentPage(page);
-  }, []);
+    setCurrentPage(page)
+  }, [])
 
   // Handle page size change
   const handlePageSizeChange = useCallback((newPageSize: number) => {
-    setPageSize(newPageSize);
-    setCurrentPage(1); // Reset to first page on page size change
-  }, []);
+    setPageSize(newPageSize)
+    setCurrentPage(1) // Reset to first page on page size change
+  }, [])
 
   // Statistics
   const stats = useMemo(() => {
-    const totalAccidents = filteredAccidents.length;
-    const today = new Date();
+    const totalAccidents = filteredAccidents.length
+    const today = new Date()
     const todayAccidents = filteredAccidents.filter((acc) => {
-      const accidentDate = new Date(acc.accidentTime);
-      return accidentDate.toDateString() === today.toDateString();
-    }).length;
+      const accidentDate = new Date(acc.accidentTime)
+      return accidentDate.toDateString() === today.toDateString()
+    }).length
     const locationStats = Array.from(
       filteredAccidents.reduce((acc, accident) => {
-        acc.set(accident.location, (acc.get(accident.location) || 0) + 1);
-        return acc;
+        acc.set(accident.location, (acc.get(accident.location) || 0) + 1)
+        return acc
       }, new Map<string, number>()),
     )
       .map(([location, count]) => ({ location, count }))
-      .sort((a, b) => b.count - a.count);
-    const cameraInvolvedCount = new Set(filteredAccidents.map((acc) => acc.cameraId)).size;
-    const prevWeekAccidents = totalAccidents - Math.floor(Math.random() * 20);
+      .sort((a, b) => b.count - a.count)
+    const cameraInvolvedCount = new Set(filteredAccidents.map((acc) => acc.cameraId)).size
+    const prevWeekAccidents = totalAccidents - Math.floor(Math.random() * 20) // Placeholder for trend
     const trendPercentage =
-      totalAccidents > 0 && prevWeekAccidents > 0
-        ? ((totalAccidents - prevWeekAccidents) / prevWeekAccidents) * 100
-        : 0;
-    return { totalAccidents, todayAccidents, locationStats, cameraInvolvedCount, trendPercentage };
-  }, [filteredAccidents]);
+      totalAccidents > 0 && prevWeekAccidents > 0 ? ((totalAccidents - prevWeekAccidents) / prevWeekAccidents) * 100 : 0
+    return { totalAccidents, todayAccidents, locationStats, cameraInvolvedCount, trendPercentage }
+  }, [filteredAccidents])
 
   // Get status color
   const getStatusColor = (status: string | null) => {
@@ -635,15 +593,15 @@ export default function AccidentTable() {
         text: "text-gray-500",
         icon: <div className="w-2 h-2 bg-gray-400 rounded-full" />,
       },
-    };
+    }
     return (
       statusMap[status || "null"] || {
         bg: "bg-gray-100",
         text: "text-gray-500",
         icon: <div className="w-2 h-2 bg-gray-400 rounded-full" />,
       }
-    );
-  };
+    )
+  }
 
   const columns: TableColumn<AccidentType>[] = useMemo(
     () => [
@@ -668,7 +626,7 @@ export default function AccidentTable() {
             </div>
           ) : (
             <div className="text-gray-400 italic bg-gray-50 px-3 py-2 rounded-lg">Unidentified</div>
-          );
+          )
         },
       },
       {
@@ -686,8 +644,8 @@ export default function AccidentTable() {
         title: "Time",
         render: (value: string) => {
           try {
-            const date = new Date(value);
-            const isToday = date.toDateString() === new Date().toDateString();
+            const date = new Date(value)
+            const isToday = date.toDateString() === new Date().toDateString()
             return (
               <div className="space-y-2">
                 <div className="flex items-center space-x-2">
@@ -712,9 +670,9 @@ export default function AccidentTable() {
                   )}
                 </div>
               </div>
-            );
+            )
           } catch {
-            return <span className="text-gray-400 italic">N/A</span>;
+            return <span className="text-gray-400 italic">N/A</span>
           }
         },
       },
@@ -722,13 +680,13 @@ export default function AccidentTable() {
         key: "status",
         title: "Status",
         render: (value: string) => {
-          const { bg, text, icon } = getStatusColor(value);
+          const { bg, text, icon } = getStatusColor(value)
           return (
             <div className={`inline-flex items-center px-3 py-1 rounded-lg ${bg} ${text} font-medium`}>
               {icon}
               <span className="ml-2 capitalize">{value || "Pending"}</span>
             </div>
-          );
+          )
         },
       },
       {
@@ -740,8 +698,8 @@ export default function AccidentTable() {
               <div className="flex space-x-2">
                 <button
                   onClick={(e) => {
-                    e.stopPropagation();
-                    handleProcess(record.id);
+                    e.stopPropagation()
+                    handleProcess(record.id)
                   }}
                   disabled={isProcessing}
                   className="px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -750,8 +708,8 @@ export default function AccidentTable() {
                 </button>
                 <button
                   onClick={(e) => {
-                    e.stopPropagation();
-                    handleReject(record.id);
+                    e.stopPropagation()
+                    handleReject(record.id)
                   }}
                   disabled={isRejecting}
                   className="px-3 py-1 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -759,14 +717,14 @@ export default function AccidentTable() {
                   {isRejecting ? "Rejecting..." : "Reject"}
                 </button>
               </div>
-            );
+            )
           } else {
             return (
               <div className="flex space-x-2">
                 <button
                   onClick={(e) => {
-                    e.stopPropagation();
-                    navigate(`/accidents/${record.id}`);
+                    e.stopPropagation()
+                    navigate(`/accidents/${record.id}`)
                   }}
                   className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-all duration-200 rounded-lg p-2"
                   title="View Details"
@@ -776,8 +734,8 @@ export default function AccidentTable() {
                 </button>
                 <button
                   onClick={(e) => {
-                    e.stopPropagation();
-                    setModalDeleteId(record.id);
+                    e.stopPropagation()
+                    setModalDeleteId(record.id)
                   }}
                   className="text-red-600 hover:text-red-700 hover:bg-red-50 transition-all duration-200 rounded-lg p-2"
                   title="Delete"
@@ -786,13 +744,13 @@ export default function AccidentTable() {
                   <span className="sr-only">Delete</span>
                 </button>
               </div>
-            );
+            )
           }
         },
       },
     ],
-    [isProcessing, isRejecting, navigate]
-  );
+    [isProcessing, isRejecting, navigate],
+  )
 
   const filters: FilterConfig[] = useMemo(
     () => [
@@ -816,8 +774,8 @@ export default function AccidentTable() {
         options: locationOptions,
       },
     ],
-    [statusOptions, cameraOptions, locationOptions]
-  );
+    [statusOptions, cameraOptions, locationOptions],
+  )
 
   // Pagination configuration
   const pagination = useMemo(
@@ -830,17 +788,17 @@ export default function AccidentTable() {
       onPageChange: handlePageChange,
       onPageSizeChange: handlePageSizeChange,
     }),
-    [currentPage, totalPages, pageSize, filteredAccidents.length, handlePageChange, handlePageSizeChange]
-  );
+    [currentPage, totalPages, pageSize, filteredAccidents.length, handlePageChange, handlePageSizeChange],
+  )
 
   const handleDelete = useCallback(async () => {
-    if (modalDeleteId === null) return;
-    setIsDeleting(true);
+    if (modalDeleteId === null) return
+    setIsDeleting(true)
     try {
       const res = await fetch(`${API_URL_ACCIDENTS}/api/accident/${modalDeleteId}`, {
         method: "DELETE",
         ...authHeader,
-      });
+      })
       if (res.ok) {
         toast.success("🗑️ Accident deleted successfully!", {
           position: "top-right",
@@ -849,14 +807,14 @@ export default function AccidentTable() {
           closeOnClick: true,
           pauseOnHover: true,
           draggable: true,
-        });
-        fetchAccidentData();
+        })
+        fetchAccidentData()
       } else {
-        const errorData = await res.json();
-        throw new Error(errorData.message || "Failed to delete accident.");
+        const errorData = await res.json()
+        throw new Error(errorData.message || "Failed to delete accident.")
       }
     } catch (error: any) {
-      console.error(error);
+      console.error(error)
       toast.error(`❌ ${error.message || "An error occurred while deleting the accident."}`, {
         position: "top-right",
         autoClose: 3000,
@@ -864,21 +822,21 @@ export default function AccidentTable() {
         closeOnClick: true,
         pauseOnHover: true,
         draggable: true,
-      });
+      })
     } finally {
-      setIsDeleting(false);
-      setModalDeleteId(null);
+      setIsDeleting(false)
+      setModalDeleteId(null)
     }
-  }, [modalDeleteId, fetchAccidentData]);
+  }, [modalDeleteId, fetchAccidentData, authHeader]) // Added authHeader to dependency array
 
   const handleProcess = useCallback(
     async (id: number) => {
-      setIsProcessing(true);
+      setIsProcessing(true)
       try {
         const res = await fetch(`${API_URL_ACCIDENTS}/api/accident/${id}/process`, {
           method: "POST",
           ...authHeader,
-        });
+        })
         if (res.ok) {
           toast.success("✅ Accident processed successfully!", {
             position: "top-right",
@@ -887,14 +845,14 @@ export default function AccidentTable() {
             closeOnClick: true,
             pauseOnHover: true,
             draggable: true,
-          });
-          fetchAccidentData();
+          })
+          fetchAccidentData()
         } else {
-          const errorData = await res.json();
-          throw new Error(errorData.message || "Failed to process accident.");
+          const errorData = await res.json()
+          throw new Error(errorData.message || "Failed to process accident.")
         }
       } catch (error: any) {
-        console.error(error);
+        console.error(error)
         toast.error(`❌ ${error.message || "An error occurred while processing the accident."}`, {
           position: "top-right",
           autoClose: 3000,
@@ -902,22 +860,22 @@ export default function AccidentTable() {
           closeOnClick: true,
           pauseOnHover: true,
           draggable: true,
-        });
+        })
       } finally {
-        setIsProcessing(false);
+        setIsProcessing(false)
       }
     },
-    [fetchAccidentData]
-  );
+    [fetchAccidentData, authHeader], // Added authHeader to dependency array
+  )
 
   const handleReject = useCallback(
     async (id: number) => {
-      setIsRejecting(true);
+      setIsRejecting(true)
       try {
         const res = await fetch(`${API_URL_ACCIDENTS}/api/accident/${id}/reject`, {
           method: "POST",
           ...authHeader,
-        });
+        })
         if (res.ok) {
           toast.success("🚫 Accident rejected successfully!", {
             position: "top-right",
@@ -926,14 +884,14 @@ export default function AccidentTable() {
             closeOnClick: true,
             pauseOnHover: true,
             draggable: true,
-          });
-          fetchAccidentData();
+          })
+          fetchAccidentData()
         } else {
-          const errorData = await res.json();
-          throw new Error(errorData.message || "Failed to reject accident.");
+          const errorData = await res.json()
+          throw new Error(errorData.message || "Failed to reject accident.")
         }
       } catch (error: any) {
-        console.error(error);
+        console.error(error)
         toast.error(`❌ ${error.message || "An error occurred while rejecting the accident."}`, {
           position: "top-right",
           autoClose: 3000,
@@ -941,28 +899,28 @@ export default function AccidentTable() {
           closeOnClick: true,
           pauseOnHover: true,
           draggable: true,
-        });
+        })
       } finally {
-        setIsRejecting(false);
+        setIsRejecting(false)
       }
     },
-    [fetchAccidentData]
-  );
+    [fetchAccidentData, authHeader], // Added authHeader to dependency array
+  )
 
   const handleRefresh = useCallback(async () => {
-    setRefreshing(true);
-    setRefreshKey((prev) => prev + 1);
-    setTimeout(() => setRefreshing(false), 500);
-  }, []);
+    setRefreshing(true)
+    setRefreshKey((prev) => prev + 1)
+    setTimeout(() => setRefreshing(false), 500)
+  }, [])
 
   const handleRetry = useCallback(() => {
-    setRefreshKey((prev) => prev + 1);
-  }, []);
+    setRefreshKey((prev) => prev + 1)
+  }, [])
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 overflow-hidden">
+    <div>
       <div className="flex flex-col flex-grow overflow-hidden">
-        <div className="flex-grow p-6 overflow-y-auto">
+        <div>
           <div className="max-w-full space-y-8">
             {/* Enhanced Statistics Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -982,10 +940,7 @@ export default function AccidentTable() {
                       {stats.totalAccidents}
                     </p>
                     <div className="flex items-center space-x-1 mt-2">
-                      <TrendingUp
-                        size={14}
-                        className={stats.trendPercentage > 0 ? "text-red-500" : "text-green-500"}
-                      />
+                      <TrendingUp size={14} className={stats.trendPercentage > 0 ? "text-red-500" : "text-green-500"} />
                       <span
                         className={`text-sm font-medium ${
                           stats.trendPercentage > 0 ? "text-red-500" : "text-green-500"
@@ -1002,7 +957,6 @@ export default function AccidentTable() {
                   </div>
                 </div>
               </motion.div>
-
               <motion.div
                 className="bg-gradient-to-br from-white/90 to-green-50/90 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-6 border border-green-200/70 hover:border-green-300/70 transform hover:-translate-y-2"
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -1029,7 +983,6 @@ export default function AccidentTable() {
                   </div>
                 </div>
               </motion.div>
-
               <motion.div
                 className="bg-gradient-to-br from-white/90 to-orange-50/90 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-6 border border-orange-200/70 hover:border-orange-300/70 transform hover:-translate-y-2"
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -1054,7 +1007,6 @@ export default function AccidentTable() {
                   </div>
                 </div>
               </motion.div>
-
               <motion.div
                 className="bg-gradient-to-br from-white/90 to-purple-50/90 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-6 border border-purple-200/70 hover:border-purple-300/70 transform hover:-translate-y-2"
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -1080,7 +1032,6 @@ export default function AccidentTable() {
                 </div>
               </motion.div>
             </div>
-
             {/* Enhanced Controls Section */}
             <motion.div
               className="bg-gradient-to-r from-white/90 to-slate-50/90 rounded-2xl shadow-xl border border-slate-200/70 p-6 backdrop-blur-md"
@@ -1090,10 +1041,8 @@ export default function AccidentTable() {
             >
               <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
                 <div className="flex flex-wrap items-center gap-3">
-                  <button className="flex items-center space-x-2 px-4 py-2 bg-white text-gray-700 rounded-xl hover:bg-gray-50 border border-gray-200 transition-all duration-200 shadow-sm hover:shadow-md">
-                    <Download size={16} />
-                    <span>Export PDF</span>
-                  </button>
+                  {/* Use the new ExportAccidentPDF component here */}
+                  <ExportAccidentPDF accidents={filteredAccidents} />
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
@@ -1113,7 +1062,6 @@ export default function AccidentTable() {
                 </div>
               </div>
             </motion.div>
-
             {/* Enhanced Data Table */}
             <motion.div
               className="bg-white/90 rounded-2xl shadow-2xl border border-gray-200/70 overflow-hidden backdrop-blur-sm"
@@ -1171,5 +1119,5 @@ export default function AccidentTable() {
         confirmButtonColor="bg-red-500 hover:bg-red-600"
       />
     </div>
-  );
+  )
 }
