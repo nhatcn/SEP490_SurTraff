@@ -1,123 +1,131 @@
-"use client"
-
-import type React from "react"
-
-import { User, ChevronDown, Menu, X, Shield, LogOut, Eye, Search } from "lucide-react"
-import { useState, useEffect, useRef } from "react"
-import Logo from "../../components/Logo/Logo"
-import NotificationDropdown from "./NotificationDropdown"
-import { eraseCookie } from "../../utils/cookieUltil"
+"use client";
+import type React from "react";
+import {
+  User,
+  ChevronDown,
+  Menu,
+  X,
+  Shield,
+  LogOut,
+  Eye,
+  Search,
+  Map,
+  Home,
+} from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import Logo from "../../components/Logo/Logo";
+import NotificationDropdown from "./NotificationDropdown";
+import { eraseCookie } from "../../utils/cookieUltil";
 
 interface HeaderProps {
-  showMobileMenu: boolean
-  setShowMobileMenu: React.Dispatch<React.SetStateAction<boolean>>
+  showMobileMenu: boolean;
+  setShowMobileMenu: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 interface UserData {
-  id: string
-  name: string
-  email: string
-  avatar?: string
-  role: string
+  id: string;
+  name: string;
+  email: string;
+  avatar?: string;
+  role: string;
 }
 
 const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
-  const [showUserMenu, setShowUserMenu] = useState(false)
-  const [hoveredMenuItem, setHoveredMenuItem] = useState<string | null>(null)
-  const [userData, setUserData] = useState<UserData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const userMenuRef = useRef<HTMLDivElement>(null)
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [hoveredMenuItem, setHoveredMenuItem] = useState<string | null>(null);
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+  const userId = localStorage.getItem("userId");
 
-
-  const userId = localStorage.getItem("userId")
   // Handle sign out
   const handleSignOut = () => {
     // Erase userId cookie
-    eraseCookie('userId')
-    
+    eraseCookie("userId");
+
     // Remove items from localStorage
-    localStorage.removeItem('token')
-    localStorage.removeItem('role')
-    localStorage.removeItem('userId')
-    
+    localStorage.removeItem("token");
+    localStorage.removeItem("role");
+    localStorage.removeItem("userId");
+
     // Redirect to login page
-    window.location.href = '/login'
-  }
+    window.location.href = "/login";
+  };
 
   // Close user dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
-        setShowUserMenu(false)
+      if (
+        userMenuRef.current &&
+        !userMenuRef.current.contains(event.target as Node)
+      ) {
+        setShowUserMenu(false);
       }
-    }
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [])
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Fetch user data - same logic as Header.tsx
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        
-        const role = localStorage.getItem("role") || "Admin"
-
+        const role = localStorage.getItem("role") || "Admin";
         if (!userId) {
           setUserData({
             id: "",
             name: "Admin",
             email: "admin@system.com",
             role: role,
-          })
-          setLoading(false)
-          return
+          });
+          setLoading(false);
+          return;
         }
-
-        const response = await fetch(`http://localhost:8081/api/users/${userId}`)
-
+        const response = await fetch(
+          `http://localhost:8081/api/users/${userId}`
+        );
         if (response.ok) {
-          const user = await response.json()
+          const user = await response.json();
           setUserData({
             ...user,
             role: role || user.role || "Admin",
-          })
+          });
         } else {
           setUserData({
             id: userId,
             name: "User",
             email: "",
             role: role,
-          })
+          });
         }
       } catch (error) {
-        console.error("Error fetching user data:", error)
-        const userId = localStorage.getItem("userId") || ""
-        const role = localStorage.getItem("role") || "Admin"
+        console.error("Error fetching user data:", error);
+        const userId = localStorage.getItem("userId") || "";
+        const role = localStorage.getItem("role") || "Admin";
         setUserData({
           id: userId,
           name: "User",
           email: "",
           role: role,
-        })
+        });
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
-
-    fetchUserData()
-  }, [])
+    };
+    fetchUserData();
+  }, []);
 
   // Get avatar initials - same logic as Header.tsx
   const getAvatarInitials = (user: UserData) => {
     if (user.name) {
-      const words = user.name.split(" ").filter((word) => word.length > 0)
+      const words = user.name.split(" ").filter((word) => word.length > 0);
       if (words.length >= 2) {
-        return (words[0][0] + words[1][0]).toUpperCase()
+        return (words[0][0] + words[1][0]).toUpperCase();
       }
-      return user.name.substring(0, 2).toUpperCase()
+      return user.name.substring(0, 2).toUpperCase();
     }
-    return "AD"
-  }
+    return "AD";
+  };
 
   const userMenuItems = [
     {
@@ -125,16 +133,9 @@ const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
       name: "Your Profile",
       icon: <User size={16} />,
       description: "Personal Information",
-      href: "#"
+      href: "#",
     },
-    {
-      id: "settings", 
-      name: "Settings",
-      icon: <Shield size={16} />,
-      description: "System Configuration",
-      href: "#"
-    }
-  ]
+  ];
 
   return (
     <header className="bg-white border-b border-gray-200 py-4 px-6 flex items-center justify-between shadow-sm relative z-50">
@@ -148,39 +149,61 @@ const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
             <X
               size={24}
               className={`absolute inset-0 transition-all duration-300 ${
-                showMobileMenu ? "opacity-100 rotate-0 scale-100" : "opacity-0 rotate-90 scale-75"
+                showMobileMenu
+                  ? "opacity-100 rotate-0 scale-100"
+                  : "opacity-0 rotate-90 scale-75"
               }`}
             />
             <Menu
               size={24}
               className={`absolute inset-0 transition-all duration-300 ${
-                showMobileMenu ? "opacity-0 -rotate-90 scale-75" : "opacity-100 rotate-0 scale-100"
+                showMobileMenu
+                  ? "opacity-0 -rotate-90 scale-75"
+                  : "opacity-100 rotate-0 scale-100"
               }`}
             />
           </div>
         </button>
         <Logo />
       </div>
-
       <div className="flex items-center space-x-4">
         <nav className="hidden lg:flex space-x-6 mr-8">
-          <a href="home" className="text-blue-700 font-medium hover:text-blue-900 transition-colors duration-200">
+          <a
+            href="/usermap"
+            className="flex items-center text-blue-700 font-medium hover:text-blue-900 transition-colors duration-200"
+          >
+            <Map size={16} className="mr-1" />
+            Map
+          </a>
+
+          <a
+            href="home"
+            className="flex items-center text-blue-700 font-medium hover:text-blue-900 transition-colors duration-200"
+          >
+            <Home size={16} className="mr-1" />
             Home
           </a>
-          <a href="#" className="text-gray-500 hover:text-gray-800 transition-colors duration-200">
+          <a
+            href="#"
+            className="text-gray-500 hover:text-gray-800 transition-colors duration-200"
+          >
             Search Violations
           </a>
-          <a href="#" className="text-gray-600 hover:text-gray-800 transition-colors duration-200">
+          <a
+            href="#"
+            className="text-gray-600 hover:text-gray-800 transition-colors duration-200"
+          >
             Help
           </a>
-          <a href="#" className="text-gray-600 hover:text-gray-800 transition-colors duration-200">
+          <a
+            href="#"
+            className="text-gray-600 hover:text-gray-800 transition-colors duration-200"
+          >
             Contact
           </a>
         </nav>
-
         {/* Notification Component */}
         <NotificationDropdown />
-
         {/* User Dropdown - Updated with dynamic user data */}
         <div className="relative" ref={userMenuRef}>
           <button
@@ -196,9 +219,9 @@ const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
                   alt="User Avatar"
                   className="w-8 h-8 rounded-full object-cover"
                   onError={(e) => {
-                    const target = e.target as HTMLImageElement
-                    target.style.display = "none"
-                    target.nextElementSibling?.classList.remove("hidden")
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = "none";
+                    target.nextElementSibling?.classList.remove("hidden");
                   }}
                 />
               ) : null}
@@ -207,48 +230,58 @@ const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
                   userData?.avatar ? "hidden" : ""
                 }`}
               >
-                {loading ? "..." : userData ? getAvatarInitials(userData) : "AD"}
+                {loading
+                  ? "..."
+                  : userData
+                  ? getAvatarInitials(userData)
+                  : "AD"}
               </div>
               <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 rounded-full border-2 border-white" />
             </div>
-            
+
             {/* User name - Updated */}
             <span className="text-sm text-gray-700 font-medium hidden sm:block max-w-24 truncate">
-              {loading ? "Loading..." : userData?.name || userData?.role || "Admin"}
+              {loading
+                ? "Loading..."
+                : userData?.name || userData?.role || "Admin"}
             </span>
             <ChevronDown
               size={16}
-              className={`text-gray-400 transition-transform duration-200 ${showUserMenu ? "rotate-180" : "rotate-0"}`}
+              className={`text-gray-400 transition-transform duration-200 ${
+                showUserMenu ? "rotate-180" : "rotate-0"
+              }`}
             />
           </button>
-
           {/* User Dropdown - Updated with sign out functionality */}
           {showUserMenu && (
             <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
               <div className="px-4 py-3 border-b border-gray-100">
-                <p className="font-medium text-gray-800">{loading ? "Loading..." : userData?.name || userData?.role || "Admin"}</p>
-                <p className="text-sm text-gray-600">{loading ? "" : userData?.email || ""}</p>
+                <p className="font-medium text-gray-800">
+                  {loading
+                    ? "Loading..."
+                    : userData?.name || userData?.role || "Admin"}
+                </p>
+                <p className="text-sm text-gray-600">
+                  {loading ? "" : userData?.email || ""}
+                </p>
               </div>
-
               <div className="py-1">
-                <a href="myprofile" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                  <User size={16} className="mr-2" />
-                  Your Profile
-                </a>
-
+                {userMenuItems.map((item) => (
+                  <a
+                    key={item.id}
+                    href={item.href}
+                    className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  >
+                    {item.icon}
+                    <span className="ml-2">{item.name}</span>
+                  </a>
+                ))}
                 <div className="border-t border-gray-100 my-1"></div>
-                <button 
+                <button
                   onClick={handleSignOut}
                   className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-gray-100 transition-colors duration-200"
                 >
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                    />
-                  </svg>
+                  <LogOut size={16} className="mr-2" />
                   Sign out
                 </button>
               </div>
@@ -257,47 +290,73 @@ const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
         </div>
       </div>
     </header>
-  )
-}
+  );
+};
 
 // MobileDropdownMenu component
-const MobileDropdownMenu = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
+const MobileDropdownMenu = ({
+  showMobileMenu,
+  setShowMobileMenu,
+}: HeaderProps) => {
   // Function to erase cookie
   const eraseCookie = (name: string) => {
-    document.cookie = `${name}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;`
-  }
+    document.cookie = `${name}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;`;
+  };
 
   // Handle sign out for mobile menu
   const handleSignOut = () => {
     // Erase userId cookie
-    eraseCookie('userId')
-    
+    eraseCookie("userId");
+
     // Remove items from localStorage
-    localStorage.removeItem('token')
-    localStorage.removeItem('role')
-    localStorage.removeItem('userId')
-    
+    localStorage.removeItem("token");
+    localStorage.removeItem("role");
+    localStorage.removeItem("userId");
+
     // Redirect to login page
-    window.location.href = '/login'
-  }
+    window.location.href = "/login";
+  };
 
   const menuItems = [
-    { id: "home", name: "Home", icon: <Eye size={20} />, path: "/home", active: true },
-    { id: "search", name: "Search Violations", icon: <Search size={20} />, path: "/search" },
+    {
+      id: "home",
+      name: "Home",
+      icon: <Eye size={20} />,
+      path: "/home",
+      active: true,
+    },
+    {
+      id: "search",
+      name: "Search Violations",
+      icon: <Search size={20} />,
+      path: "/search",
+    },
     { id: "help", name: "Help", icon: <Shield size={20} />, path: "/help" },
-    { id: "contact", name: "Contact", icon: <User size={20} />, path: "/contact" },
-    { id: "logout", name: "Log Out", icon: <LogOut size={20} />, path: "/logout" },
-  ]
+    {
+      id: "contact",
+      name: "Contact",
+      icon: <User size={20} />,
+      path: "/contact",
+    },
+    {
+      id: "logout",
+      name: "Log Out",
+      icon: <LogOut size={20} />,
+      path: "/logout",
+    },
+  ];
 
   if (!showMobileMenu) {
-    return null
+    return null;
   }
 
   return (
     <>
       {/* Overlay */}
-      <div className="md:hidden fixed inset-0 bg-black bg-opacity-25 z-40" onClick={() => setShowMobileMenu(false)} />
-
+      <div
+        className="md:hidden fixed inset-0 bg-black bg-opacity-25 z-40"
+        onClick={() => setShowMobileMenu(false)}
+      />
       {/* Dropdown menu */}
       <div className="md:hidden absolute top-0 left-0 right-0 bg-white border-b border-gray-200 shadow-xl z-50 mt-16 animate-slideDown">
         <nav className="py-2">
@@ -313,22 +372,24 @@ const MobileDropdownMenu = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) 
               >
                 <button
                   onClick={() => {
-                    setShowMobileMenu(false)
+                    setShowMobileMenu(false);
                     if (item.id === "logout") {
-                      handleSignOut()
+                      handleSignOut();
                     }
                     // Add navigation logic for other items here if needed
                   }}
                   className={`w-full flex items-center py-3 px-6 transition-all duration-200 relative group
-                    ${
-                      item.active
-                        ? "bg-blue-600 text-white shadow-lg"
-                        : "text-gray-700 hover:bg-blue-50 hover:text-blue-700"
-                    }`}
+                  ${
+                    item.active
+                      ? "bg-blue-600 text-white shadow-lg"
+                      : "text-gray-700 hover:bg-blue-50 hover:text-blue-700"
+                  }`}
                 >
                   <span
                     className={`transition-colors duration-200 ${
-                      item.active ? "text-white" : "text-gray-400 group-hover:text-blue-600"
+                      item.active
+                        ? "text-white"
+                        : "text-gray-400 group-hover:text-blue-600"
                     }`}
                   >
                     {item.icon}
@@ -337,11 +398,12 @@ const MobileDropdownMenu = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) 
                   {item.active && (
                     <div className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-blue-300 h-2 w-2 rounded-full animate-pulse"></div>
                   )}
-
                   {/* Hover effect */}
                   <div
                     className={`absolute left-0 top-0 bottom-0 w-1 bg-blue-600 transition-all duration-200 ${
-                      item.active ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                      item.active
+                        ? "opacity-100"
+                        : "opacity-0 group-hover:opacity-100"
                     }`}
                   ></div>
                 </button>
@@ -350,40 +412,39 @@ const MobileDropdownMenu = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) 
           </ul>
         </nav>
       </div>
-
       <style>{`
-        @keyframes slideDown {
-          from {
-            transform: translateY(-100%);
-            opacity: 0;
-          }
-          to {
-            transform: translateY(0);
-            opacity: 1;
-          }
+      @keyframes slideDown {
+        from {
+          transform: translateY(-100%);
+          opacity: 0;
         }
-        
-        @keyframes slideInLeft {
-          from {
-            transform: translateX(-20px);
-            opacity: 0;
-          }
-          to {
-            transform: translateX(0);
-            opacity: 1;
-          }
+        to {
+          transform: translateY(0);
+          opacity: 1;
         }
-        
-        .animate-slideDown {
-          animation: slideDown 0.3s ease-out;
-        }
-        
-        .animate-slideInLeft {
-          animation: slideInLeft 0.3s ease-out;
-        }
-      `}</style>
-    </>
-  )
-}
+      }
 
-export { Header, MobileDropdownMenu }
+      @keyframes slideInLeft {
+        from {
+          transform: translateX(-20px);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+
+      .animate-slideDown {
+        animation: slideDown 0.3s ease-out;
+      }
+
+      .animate-slideInLeft {
+        animation: slideInLeft 0.3s ease-out;
+      }
+    `}</style>
+    </>
+  );
+};
+
+export { Header, MobileDropdownMenu };

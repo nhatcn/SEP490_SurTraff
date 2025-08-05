@@ -3,6 +3,7 @@
 import { Bell, AlertTriangle, Clock, Shield } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import axios from "axios"
+import { useLocation } from "react-router-dom"
 import NewNotificationAlert from "./new-notification-alert"
 
 interface Notification {
@@ -43,6 +44,7 @@ const NotificationDropdown = () => {
   const [titleMarqueeIntervalId, setTitleMarqueeIntervalId] = useState<NodeJS.Timeout | null>(null)
   const titleMarqueeBaseText = useRef("🔔 You have new Violation/Accident")
   const currentMarqueeTitle = useRef("")
+  const location = useLocation()
 
   const stopTitleMarquee = () => {
     if (titleMarqueeIntervalId) {
@@ -69,10 +71,10 @@ const NotificationDropdown = () => {
       const res = await axios.get<Notification[]>(`http://localhost:8081/api/notifications/${userId}`)
       const currentUnread = res.data.filter((n) => !n.read)
 
-      // Tìm thông báo mới chưa hiển thị toast
+      // Find new notifications that haven't been shown as a toast yet
       const newUnshown = currentUnread.filter((n) => !shownToastIds.has(n.id))
 
-      // Lấy thông báo mới nhất trong danh sách chưa hiển thị
+      // Get the newest notification from the unshown list
       const newestNotification = newUnshown.reduce(
         (latest, n) => {
           return !latest || new Date(n.createdAt) > new Date(latest.createdAt) ? n : latest
@@ -86,8 +88,11 @@ const NotificationDropdown = () => {
         } else {
           stopTitleMarquee()
           if (newestNotification) {
-            setNewToast(newestNotification)
-            setShownToastIds((prev) => new Set(prev).add(newestNotification.id))
+            // Only show toast if NOT on the user traffic map page
+            if (location.pathname !== "/usermap") {
+              setNewToast(newestNotification)
+              setShownToastIds((prev) => new Set(prev).add(newestNotification.id))
+            }
           }
         }
       } else {
@@ -205,11 +210,7 @@ const NotificationDropdown = () => {
           )}
         </button>
         <div
-          className={`absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50 transition-all duration-300 ease-out transform ${
-            showNotifications
-              ? "opacity-100 translate-y-0 scale-100"
-              : "opacity-0 -translate-y-2 scale-95 pointer-events-none"
-          }`}
+          className={`absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50 transition-all duration-300 ease-out transform ${showNotifications ? "opacity-100 translate-y-0 scale-100" : "opacity-0 -translate-y-2 scale-95 pointer-events-none"}`}
         >
           <div className="px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-100">
             <div className="flex items-center justify-between">
@@ -248,9 +249,7 @@ const NotificationDropdown = () => {
               notifications.map((notification) => (
                 <div
                   key={notification.id}
-                  className={`px-4 py-3 cursor-pointer transition-colors duration-200 ${getNotificationBgColor(
-                    notification.notificationType,
-                  )}`}
+                  className={`px-4 py-3 cursor-pointer transition-colors duration-200 ${getNotificationBgColor(notification.notificationType)}`}
                   onClick={() => markAsRead(notification.id)}
                 >
                   <div className="flex items-start space-x-3">
