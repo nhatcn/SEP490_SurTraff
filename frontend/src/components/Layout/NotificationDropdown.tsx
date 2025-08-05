@@ -3,6 +3,7 @@
 import { Bell, AlertTriangle, Clock, Shield } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import axios from "axios"
+import NewNotificationAlert from "./new-notification-alert"
 
 interface Notification {
   id: number
@@ -20,16 +21,12 @@ function timeAgo(dateString: string) {
   const now = new Date()
   const past = new Date(dateString)
   const diffMs = now.getTime() - past.getTime()
-
   const seconds = Math.floor(diffMs / 1000)
   if (seconds < 60) return `${seconds} seconds ago`
-
   const minutes = Math.floor(seconds / 60)
   if (minutes < 60) return `${minutes} minutes ago`
-
   const hours = Math.floor(minutes / 60)
   if (hours < 24) return `${hours} hours ago`
-
   const days = Math.floor(hours / 24)
   return `${days} days ago`
 }
@@ -39,14 +36,13 @@ const NotificationDropdown = () => {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(false)
   const [newToast, setNewToast] = useState<Notification | null>(null)
+  const [shownToastIds, setShownToastIds] = useState<Set<number>>(new Set())
   const notificationRef = useRef<HTMLDivElement>(null)
   const userId = 9 // fake for testing
   const originalTitle = useRef(document.title)
-
-  // States for document.title marquee
   const [titleMarqueeIntervalId, setTitleMarqueeIntervalId] = useState<NodeJS.Timeout | null>(null)
   const titleMarqueeBaseText = useRef("🔔 You have new Violation/Accident")
-  const currentMarqueeTitle = useRef("") // To keep track of the current state of the scrolling title
+  const currentMarqueeTitle = useRef("")
 
   const stopTitleMarquee = () => {
     if (titleMarqueeIntervalId) {
@@ -62,56 +58,60 @@ const NotificationDropdown = () => {
       const interval = setInterval(() => {
         currentMarqueeTitle.current = currentMarqueeTitle.current.substring(1) + currentMarqueeTitle.current.charAt(0)
         document.title = currentMarqueeTitle.current
-      }, 300) // Adjust speed as needed
+      }, 300)
       setTitleMarqueeIntervalId(interval)
     }
   }
 
   const fetchNotifications = async () => {
+    setLoading(true)
     try {
       const res = await axios.get<Notification[]>(`http://localhost:8081/api/notifications/${userId}`)
       const currentUnread = res.data.filter((n) => !n.read)
 
-      // Identify truly new notifications that weren't in the previous state
-      const newlyArrivedNotifications = currentUnread.filter((n) => !notifications.some((p) => p.id === n.id))
+      // Tìm thông báo mới chưa hiển thị toast
+      const newUnshown = currentUnread.filter((n) => !shownToastIds.has(n.id))
+
+      // Lấy thông báo mới nhất trong danh sách chưa hiển thị
+      const newestNotification = newUnshown.reduce(
+        (latest, n) => {
+          return !latest || new Date(n.createdAt) > new Date(latest.createdAt) ? n : latest
+        },
+        null as Notification | null,
+      )
 
       if (currentUnread.length > 0) {
         if (document.hidden) {
-          // If tab is hidden and there are unread notifications, start marquee
           startTitleMarquee()
         } else {
-          // If tab is visible, ensure marquee is stopped
           stopTitleMarquee()
-          // Show toast ONLY if new notifications arrived WHILE the tab was visible
-          if (newlyArrivedNotifications.length > 0) {
-            setNewToast(newlyArrivedNotifications[0])
-            setTimeout(() => setNewToast(null), 5000)
+          if (newestNotification) {
+            setNewToast(newestNotification)
+            setShownToastIds((prev) => new Set(prev).add(newestNotification.id))
           }
         }
       } else {
-        // No unread notifications, stop marquee and reset title
         stopTitleMarquee()
       }
-      setNotifications(currentUnread) // Update state with current unread notifications
+      setNotifications(currentUnread)
     } catch (error) {
       console.error("Failed to fetch notifications", error)
+    } finally {
+      setLoading(false)
     }
   }
 
   useEffect(() => {
     fetchNotifications()
-    const interval = setInterval(fetchNotifications, 15000)
+    const interval = setInterval(fetchNotifications, 140000)
     return () => clearInterval(interval)
   }, [])
 
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        // Tab became visible
-        stopTitleMarquee() // Always stop marquee when visible
+        stopTitleMarquee()
       } else {
-        // Tab became hidden
-        // If there are unread notifications, start marquee
         if (notifications.length > 0) {
           startTitleMarquee()
         }
@@ -119,9 +119,8 @@ const NotificationDropdown = () => {
     }
     document.addEventListener("visibilitychange", handleVisibilityChange)
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange)
-  }, [notifications]) // Dependency on notifications to react to changes in unread count
+  }, [notifications])
 
-  // Cleanup for title marquee on component unmount
   useEffect(() => {
     return () => {
       stopTitleMarquee()
@@ -142,7 +141,6 @@ const NotificationDropdown = () => {
     try {
       await axios.put(`http://localhost:8081/api/notifications/read/${notificationId}`)
       setNotifications((prev) => prev.filter((n) => n.id !== notificationId))
-      // The next fetchNotifications will handle stopping the title marquee if no unread notifications remain
     } catch (error) {
       console.error("Failed to mark notification as read", error)
     }
@@ -154,24 +152,24 @@ const NotificationDropdown = () => {
       await Promise.all(notificationIds.map((id) => axios.put(`http://localhost:8081/api/notifications/read/${id}`)))
       setNotifications([])
       setShowNotifications(false)
-      stopTitleMarquee() // Explicitly stop marquee when all are read
+      stopTitleMarquee()
     } catch (error) {
       console.error("Failed to mark all notifications as read", error)
     }
   }
 
-  const getNotificationIcon = (type: string) => {
+  const getNotificationIcon = (type: string, size = 16) => {
     switch (type) {
       case "violation":
-        return <AlertTriangle size={16} className="text-red-500 mt-0.5 flex-shrink-0" />
+        return <AlertTriangle size={size} className="text-red-500 mt-0.5 flex-shrink-0" />
       case "accident":
-        return <AlertTriangle size={16} className="text-orange-500 mt-0.5 flex-shrink-0" />
+        return <AlertTriangle size={size} className="text-orange-500 mt-0.5 flex-shrink-0" />
       case "maintenance":
-        return <Clock size={16} className="text-blue-500 mt-0.5 flex-shrink-0" />
+        return <Clock size={size} className="text-blue-500 mt-0.5 flex-shrink-0" />
       case "security":
-        return <Shield size={16} className="text-green-500 mt-0.5 flex-shrink-0" />
+        return <Shield size={size} className="text-green-500 mt-0.5 flex-shrink-0" />
       default:
-        return <Bell size={16} className="text-gray-500 mt-0.5 flex-shrink-0" />
+        return <Bell size={size} className="text-gray-500 mt-0.5 flex-shrink-0" />
     }
   }
 
@@ -192,21 +190,7 @@ const NotificationDropdown = () => {
 
   return (
     <>
-      {/* New Toast notification */}
-      {newToast && (
-        <div
-          className="fixed top-4 right-4 z-[100] bg-white border-l-4 shadow-lg rounded-md p-4 animate-fade-in transition-all duration-300
-          w-80 text-sm flex items-start space-x-3 border-blue-500"
-        >
-          <div className="mt-0.5">{getNotificationIcon(newToast.notificationType)}</div>
-          <div>
-            <p className="text-gray-800 font-medium">{newToast.message}</p>
-            <p className="text-xs text-gray-500">{timeAgo(newToast.createdAt)}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Bell button and dropdown */}
+      {newToast && <NewNotificationAlert notification={newToast} onClose={() => setNewToast(null)} />}
       <div className="relative" ref={notificationRef}>
         <button
           className="relative p-2 rounded-full hover:bg-gray-100 transition-all duration-200 transform hover:scale-105"
@@ -220,7 +204,6 @@ const NotificationDropdown = () => {
             </span>
           )}
         </button>
-
         <div
           className={`absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50 transition-all duration-300 ease-out transform ${
             showNotifications
@@ -232,9 +215,10 @@ const NotificationDropdown = () => {
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-gray-800 flex items-center overflow-hidden flex-1 min-w-0">
                 <Bell size={16} className="mr-2 text-blue-600 flex-shrink-0" />
-                {/* Removed marquee refs and classes from here */}
                 <span className="whitespace-nowrap">
-                  {notifications.length > 0 ? `Notifications (${notifications.length})` : "Notifications"}
+                  {"Notifications ("}
+                  {notifications.length}
+                  {")"}
                 </span>
               </h3>
               {notifications.length > 0 && (
@@ -264,7 +248,9 @@ const NotificationDropdown = () => {
               notifications.map((notification) => (
                 <div
                   key={notification.id}
-                  className={`px-4 py-3 cursor-pointer transition-colors duration-200 ${getNotificationBgColor(notification.notificationType)}`}
+                  className={`px-4 py-3 cursor-pointer transition-colors duration-200 ${getNotificationBgColor(
+                    notification.notificationType,
+                  )}`}
                   onClick={() => markAsRead(notification.id)}
                 >
                   <div className="flex items-start space-x-3">
