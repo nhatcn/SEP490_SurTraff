@@ -4,7 +4,6 @@ import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, Camera, Clock, Calendar, AlertTriangle, Car, ArrowLeft } from "lucide-react";
-import { Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import axios, { AxiosError } from "axios";
 
@@ -53,7 +52,7 @@ interface ViolationsDTO {
     createdAt?: string;
     licensePlate?: string;
   }>;
-  status?: "Request" | "Approve" | "Reject" | "Pending";
+  status?: "Pending" | "Request" | "Approve" | "Reject" | "Processed";
 }
 
 interface VehicleDTO {
@@ -89,6 +88,7 @@ const ITEMS_PER_PAGE = 10;
 
 // RequestButton Component
 const RequestButton: React.FC<RequestButtonProps> = ({ violationId, onStatusUpdate }) => {
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -108,6 +108,7 @@ const RequestButton: React.FC<RequestButtonProps> = ({ violationId, onStatusUpda
         setViolationStatus(response.data.status?.toUpperCase() || null);
       } catch (err) {
         console.error("Error fetching violation status:", err);
+        setError("Failed to fetch violation status.");
         setViolationStatus(null);
       }
     };
@@ -160,10 +161,7 @@ const RequestButton: React.FC<RequestButtonProps> = ({ violationId, onStatusUpda
       if (error.response?.status === 404) {
         setError((error.response?.data as any)?.message || "Violation not found.");
       } else if (error.response?.status === 400) {
-        setError(
-          (error.response?.data as any)?.message ||
-            "Invalid status. Valid statuses: PENDING, REQUEST, RESOLVED, DISMISSED."
-        );
+        setError((error.response?.data as any)?.message || "Invalid request. Violation must be in APPROVE status.");
       } else {
         setError((error.response?.data as any)?.message || "An error occurred. Please try again.");
       }
@@ -173,27 +171,39 @@ const RequestButton: React.FC<RequestButtonProps> = ({ violationId, onStatusUpda
     }
   };
 
-  const isRequested = violationStatus === "REQUEST";
+  const handleViewDetails = () => {
+    navigate(`/violationsuser/${violationId}`);
+  };
+
+  const isRequestAllowed = violationStatus === "APPROVE";
+  const isProcessed = violationStatus === "PROCESSED";
   const buttonText = isLoading
     ? "Processing..."
     : success === true
     ? "Success"
     : success === false
     ? "Failed"
-    : isRequested
+    : violationStatus === "APPROVE"
+    ? "Send Request"
+    : violationStatus === "PROCESSED"
+    ? "View Details"
+    : violationStatus === "REQUEST"
     ? "Requested"
-    : "Send Request";
+    : violationStatus === "REJECT"
+    ? "Rejected"
+    : "Pending";
 
   return (
     <div className="flex flex-col items-center">
       <button
-        onClick={handleRequest}
-        disabled={isLoading || isRequested}
+        onClick={isProcessed ? handleViewDetails : handleRequest}
+        disabled={isLoading || (!isRequestAllowed && !isProcessed)}
         className={`
           relative px-6 py-3 rounded-lg font-semibold text-white 
           ${success === true ? "bg-green-600 hover:bg-green-700" : 
             success === false ? "bg-red-600 hover:bg-red-700" : 
-            isRequested ? "bg-gray-600 hover:bg-gray-700" : 
+            isProcessed ? "bg-purple-600 hover:bg-purple-700" : 
+            !isRequestAllowed ? "bg-gray-600 hover:bg-gray-700" : 
             "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"}
           transition-all duration-300 ease-in-out
           transform hover:scale-105 hover:shadow-xl
@@ -653,7 +663,7 @@ const SearchAndFilter: React.FC<{
 // ViolationRow Component
 const ViolationRow: React.FC<{
   violation: ViolationsDTO;
-  onStatusUpdate: (violationId: number, newStatus: "Approve" | "Reject" | "Request") => void;
+  onStatusUpdate: (violationId: number, newStatus: "Pending" | "Request" | "Approve" | "Reject" | "Processed") => void;
 }> = React.memo(({ violation, onStatusUpdate }) => {
   const detail = violation.violationDetails?.[0] || null;
 
@@ -678,6 +688,11 @@ const ViolationRow: React.FC<{
             }}
           />
         ),
+      },
+      Processed: {
+        bg: "bg-blue-100",
+        text: "text-blue-700",
+        icon: <div style={{ width: "0.5rem", height: "0.5rem", backgroundColor: "#3B82F6", borderRadius: "50%" }} />,
       },
       Approve: {
         bg: "bg-green-100",
@@ -758,7 +773,7 @@ const ViolationRow: React.FC<{
   }, []);
 
   const handleStatusUpdateFromButton = (updatedViolation: ViolationsDTO) => {
-    onStatusUpdate(violation.id, updatedViolation.status as "Approve" | "Reject" | "Request");
+    onStatusUpdate(violation.id, updatedViolation.status as "Pending" | "Request" | "Approve" | "Reject" | "Processed");
   };
 
   return (
@@ -1117,7 +1132,7 @@ export default function ViolationHistory() {
     setCurrentPage(1);
   }, [searchTerm, filterType, selectedLicensePlate]);
 
-  const handleStatusUpdate = useCallback((violationId: number, newStatus: "Approve" | "Reject" | "Request") => {
+  const handleStatusUpdate = useCallback((violationId: number, newStatus: "Pending" | "Request" | "Approve" | "Reject" | "Processed") => {
     setViolations((prev) => prev.map((v) => (v.id === violationId ? { ...v, status: newStatus } : v)));
   }, []);
 
