@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Pencil, Trash2, Save, X, Car, User, Settings, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react'
+import { Pencil, Trash2, Save, X, Car, AlertCircle, CheckCircle, ArrowLeft } from 'lucide-react'
 import Sidebar from '../../../components/Layout/Sidebar'
 import Header from '../../../components/Layout/Header'
 
@@ -27,6 +27,7 @@ interface FormErrors {
   vehicleTypeId?: string
   color?: string
   brand?: string
+  image?: string
 }
 
 const VehicleDetail = () => {
@@ -42,16 +43,19 @@ const VehicleDetail = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
   const [editForm, setEditForm] = useState({
     name: '',
     licensePlate: '',
     userId: '',
     vehicleTypeId: '',
     color: '',
-    brand: ''
+    brand: '',
+    image: null as File | null
   })
 
-  // Tải danh sách loại xe
+  // Fetch vehicle types
   useEffect(() => {
     const fetchVehicleTypes = async () => {
       try {
@@ -69,7 +73,7 @@ const VehicleDetail = () => {
     fetchVehicleTypes()
   }, [])
 
-  // Tải danh sách phương tiện
+  // Fetch vehicles
   useEffect(() => {
     const fetchVehicles = async () => {
       try {
@@ -87,7 +91,7 @@ const VehicleDetail = () => {
     fetchVehicles()
   }, [])
 
-  // Tải thông tin phương tiện
+  // Fetch vehicle details
   useEffect(() => {
     const fetchVehicle = async () => {
       if (!id || id === '0') return
@@ -105,7 +109,8 @@ const VehicleDetail = () => {
           userId: data.userId ? data.userId.toString() : '',
           vehicleTypeId: data.vehicleTypeId ? data.vehicleTypeId.toString() : '',
           color: data.color || '',
-          brand: data.brand || ''
+          brand: data.brand || '',
+          image: null
         })
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : 'Unknown error'
@@ -150,6 +155,17 @@ const VehicleDetail = () => {
     return Object.keys(newErrors).length === 0
   }
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setEditForm(prev => ({ ...prev, image: file }))
+      setErrors(prev => ({ ...prev, image: '' }))
+      const imageUrl = URL.createObjectURL(file)
+      setPreviewUrl(imageUrl)
+      setIsModalOpen(true)
+    }
+  }
+
   const handleSave = async () => {
     if (!validateForm()) return
 
@@ -157,22 +173,35 @@ const VehicleDetail = () => {
     setSuccessMessage('')
     setErrorMessage('')
     try {
+      const formData = new FormData()
+      const vehicleDTO = {
+        name: editForm.name,
+        licensePlate: editForm.licensePlate,
+        userId: parseInt(editForm.userId),
+        vehicleTypeId: parseInt(editForm.vehicleTypeId),
+        color: editForm.color,
+        brand: editForm.brand
+      }
+      formData.append('dto', new Blob([JSON.stringify(vehicleDTO)], { type: 'application/json' }))
+      if (editForm.image) {
+        formData.append('imageFile', editForm.image)
+      }
+
       const response = await fetch(`http://localhost:8081/api/vehicle/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...editForm,
-          userId: parseInt(editForm.userId),
-          vehicleTypeId: parseInt(editForm.vehicleTypeId)
-        })
+        body: formData
       })
-      if (!response.ok) throw new Error(`HTTP error: ${response.status}`)
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || `HTTP error: ${response.status}`)
+      }
       const updatedData: Vehicle = await response.json()
       setVehicle(updatedData)
       setVehicles(prev => prev.map(v => v.id === Number(id) ? updatedData : v))
       setSuccessMessage(`Vehicle ${updatedData.licensePlate} updated successfully!`)
       setIsEditing(false)
       setShowConfirm(false)
+      setPreviewUrl(null)
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error'
       setErrorMessage(`Error updating vehicle: ${message}`)
@@ -219,8 +248,10 @@ const VehicleDetail = () => {
         userId: vehicle.userId.toString(),
         vehicleTypeId: vehicle.vehicleTypeId.toString(),
         color: vehicle.color,
-        brand: vehicle.brand
+        brand: vehicle.brand,
+        image: null
       })
+      setPreviewUrl(null)
     }
     setErrors({})
   }
@@ -242,6 +273,11 @@ const VehicleDetail = () => {
     )
   }
 
+  const inputVariants = {
+    focused: { scale: 1.02, transition: { duration: 0.2 } },
+    unfocused: { scale: 1, transition: { duration: 0.2 } }
+  }
+
   return (
     <div className="flex h-screen bg-gray-50">
       <Sidebar />
@@ -249,7 +285,6 @@ const VehicleDetail = () => {
         <Header title={id === '0' ? 'Chọn Phương Tiện để Chỉnh Sửa' : `Chi tiết Phương Tiện #${id}`} />
         
         <div className="p-6 overflow-y-auto">
-          {/* Back Button */}
           <button
             onClick={() => navigate('/vehicle')}
             className="mb-6 flex items-center space-x-2 text-gray-600 hover:text-blue-600 transition-colors"
@@ -259,7 +294,6 @@ const VehicleDetail = () => {
           </button>
 
           <div className="bg-white shadow rounded-lg overflow-hidden max-w-4xl mx-auto">
-            {/* Header */}
             <div className="bg-blue-600 p-6 text-white">
               <div className="flex items-center space-x-3">
                 <Car size={24} />
@@ -271,7 +305,6 @@ const VehicleDetail = () => {
             </div>
 
             <div className="p-6">
-              {/* Vehicle Selector */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Chọn Phương Tiện
@@ -293,7 +326,6 @@ const VehicleDetail = () => {
 
               {id !== '0' && vehicle && (
                 <>
-                  {/* Action Buttons */}
                   <div className="flex justify-between items-center mb-6">
                     <h2 className="text-lg font-semibold text-gray-800">
                       Thông tin Phương Tiện
@@ -335,10 +367,8 @@ const VehicleDetail = () => {
                     )}
                   </div>
 
-                  {/* Vehicle Information */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Vehicle Name */}
-                    <div>
+                    <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Tên Phương Tiện
                       </label>
@@ -354,16 +384,22 @@ const VehicleDetail = () => {
                       ) : (
                         <p className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md">{vehicle.name}</p>
                       )}
-                      {errors.name && (
-                        <p className="text-red-500 text-xs mt-1 flex items-center">
-                          <AlertCircle size={12} className="mr-1" />
-                          {errors.name}
-                        </p>
-                      )}
-                    </div>
+                      <AnimatePresence>
+                        {errors.name && (
+                          <motion.p
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="text-red-500 text-xs flex items-center"
+                          >
+                            <AlertCircle size={12} className="mr-1" />
+                            {errors.name}
+                          </motion.p>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
 
-                    {/* License Plate */}
-                    <div>
+                    <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Biển Số
                       </label>
@@ -372,25 +408,29 @@ const VehicleDetail = () => {
                           name="licensePlate"
                           value={editForm.licensePlate}
                           onChange={handleChange}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono font-bold"
                           placeholder="e.g., 30A-12345"
                           disabled={isLoading}
                         />
                       ) : (
-                        <p className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md font-mono font-bold">
-                          {vehicle.licensePlate}
-                        </p>
+                        <p className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md font-mono font-bold">{vehicle.licensePlate}</p>
                       )}
-                      {errors.licensePlate && (
-                        <p className="text-red-500 text-xs mt-1 flex items-center">
-                          <AlertCircle size={12} className="mr-1" />
-                          {errors.licensePlate}
-                        </p>
-                      )}
-                    </div>
+                      <AnimatePresence>
+                        {errors.licensePlate && (
+                          <motion.p
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="text-red-500 text-xs flex items-center"
+                          >
+                            <AlertCircle size={12} className="mr-1" />
+                            {errors.licensePlate}
+                          </motion.p>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
 
-                    {/* User ID */}
-                    <div>
+                    <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         User ID
                       </label>
@@ -407,16 +447,22 @@ const VehicleDetail = () => {
                       ) : (
                         <p className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md">#{vehicle.userId}</p>
                       )}
-                      {errors.userId && (
-                        <p className="text-red-500 text-xs mt-1 flex items-center">
-                          <AlertCircle size={12} className="mr-1" />
-                          {errors.userId}
-                        </p>
-                      )}
-                    </div>
+                      <AnimatePresence>
+                        {errors.userId && (
+                          <motion.p
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="text-red-500 text-xs flex items-center"
+                          >
+                            <AlertCircle size={12} className="mr-1" />
+                            {errors.userId}
+                          </motion.p>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
 
-                    {/* Vehicle Type */}
-                    <div>
+                    <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Loại Xe
                       </label>
@@ -438,16 +484,22 @@ const VehicleDetail = () => {
                           {vehicleTypes.find(t => t.id === vehicle.vehicleTypeId)?.typeName || 'N/A'}
                         </p>
                       )}
-                      {errors.vehicleTypeId && (
-                        <p className="text-red-500 text-xs mt-1 flex items-center">
-                          <AlertCircle size={12} className="mr-1" />
-                          {errors.vehicleTypeId}
-                        </p>
-                      )}
-                    </div>
+                      <AnimatePresence>
+                        {errors.vehicleTypeId && (
+                          <motion.p
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="text-red-500 text-xs flex items-center"
+                          >
+                            <AlertCircle size={12} className="mr-1" />
+                            {errors.vehicleTypeId}
+                          </motion.p>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
 
-                    {/* Color */}
-                    <div>
+                    <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Màu Sắc
                       </label>
@@ -463,16 +515,22 @@ const VehicleDetail = () => {
                       ) : (
                         <p className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md">{vehicle.color}</p>
                       )}
-                      {errors.color && (
-                        <p className="text-red-500 text-xs mt-1 flex items-center">
-                          <AlertCircle size={12} className="mr-1" />
-                          {errors.color}
-                        </p>
-                      )}
-                    </div>
+                      <AnimatePresence>
+                        {errors.color && (
+                          <motion.p
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="text-red-500 text-xs flex items-center"
+                          >
+                            <AlertCircle size={12} className="mr-1" />
+                            {errors.color}
+                          </motion.p>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
 
-                    {/* Brand */}
-                    <div>
+                    <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Hãng
                       </label>
@@ -488,35 +546,139 @@ const VehicleDetail = () => {
                       ) : (
                         <p className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md">{vehicle.brand}</p>
                       )}
-                      {errors.brand && (
-                        <p className="text-red-500 text-xs mt-1 flex items-center">
-                          <AlertCircle size={12} className="mr-1" />
-                          {errors.brand}
-                        </p>
-                      )}
-                    </div>
+                      <AnimatePresence>
+                        {errors.brand && (
+                          <motion.p
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="text-red-500 text-xs flex items-center"
+                          >
+                            <AlertCircle size={12} className="mr-1" />
+                            {errors.brand}
+                          </motion.p>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
+
+                    {isEditing && (
+                      <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2 md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Hình Ảnh Phương Tiện
+                        </label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          id="vehicleImage"
+                          onChange={handleImageChange}
+                          className="hidden"
+                          disabled={isLoading}
+                        />
+                        {editForm.image ? (
+                          <div className="flex space-x-2 w-full">
+                            <label
+                              htmlFor="vehicleImage"
+                              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-teal-500 text-sm font-medium text-teal-700 bg-teal-50 hover:bg-teal-100 hover:text-teal-800 transition-all rounded-md cursor-pointer"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M12 12v9m0-9l3 3m-3-3l-3 3m6-8V5a2 2 0 00-2-2H8a2 2 0 00-2 2v4" />
+                              </svg>
+                              <span>Chọn ảnh khác</span>
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => setIsModalOpen(true)}
+                              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-red-500 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 hover:text-red-800 transition-all rounded-md"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M4 6h16M4 10h16M4 14h10M4 18h10" />
+                              </svg>
+                              <span>Xem trước ảnh</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <label
+                            htmlFor="vehicleImage"
+                            className={`flex items-center justify-center gap-2 w-full px-4 py-2 border border-teal-500 text-sm font-medium text-teal-700 bg-teal-50 hover:bg-teal-100 hover:text-teal-800 transition-all rounded-md cursor-pointer ${
+                              isLoading ? 'opacity-50 cursor-not-allowed' : ''
+                            }`}
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M12 12v9m0-9l3 3m-3-3l-3 3m6-8V5a2 2 0 00-2-2H8a2 2 0 00-2 2v4" />
+                            </svg>
+                            <span>Chọn ảnh</span>
+                          </label>
+                        )}
+                        <AnimatePresence>
+                          {errors.image && (
+                            <motion.p
+                              initial={{ opacity: 0, y: -10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -10 }}
+                              className="text-red-500 text-xs flex items-center"
+                            >
+                              <AlertCircle size={12} className="mr-1" />
+                              {errors.image}
+                            </motion.p>
+                          )}
+                        </AnimatePresence>
+                      </motion.div>
+                    )}
                   </div>
+
+                  {isModalOpen && previewUrl && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                      <div className="relative w-[90%] max-w-md bg-white rounded-2xl shadow-2xl border border-gray-100 p-4 transition-all duration-300">
+                        <button
+                          onClick={() => setIsModalOpen(false)}
+                          className="absolute top-3 right-3 text-gray-500 hover:text-red-500 transition-colors duration-200"
+                          aria-label="Close"
+                        >
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                        <div className="w-full h-[300px] flex items-center justify-center rounded-xl overflow-hidden bg-gray-50">
+                          <img
+                            src={previewUrl}
+                            alt="Preview"
+                            className="max-w-full max-h-full object-contain rounded-md"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
 
-              {/* Messages */}
-              {successMessage && (
-                <div className="mt-4 p-3 bg-green-50 border border-green-200 text-green-800 rounded-md flex items-center">
-                  <CheckCircle size={16} className="mr-2" />
-                  <span>{successMessage}</span>
-                </div>
-              )}
-              {errorMessage && (
-                <div className="mt-4 p-3 bg-red-50 border border-red-200 text-red-800 rounded-md flex items-center">
-                  <AlertCircle size={16} className="mr-2" />
-                  <span>{errorMessage}</span>
-                </div>
-              )}
+              <AnimatePresence>
+                {successMessage && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
+                    className="mt-4 p-3 bg-green-50 border border-green-200 text-green-800 rounded-md flex items-center"
+                  >
+                    <CheckCircle size={16} className="mr-2" />
+                    <span>{successMessage}</span>
+                  </motion.div>
+                )}
+                {errorMessage && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
+                    className="mt-4 p-3 bg-red-50 border border-red-200 text-red-800 rounded-md flex items-center"
+                  >
+                    <AlertCircle size={16} className="mr-2" />
+                    <span>{errorMessage}</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </div>
 
-        {/* Confirmation Modal */}
         {showConfirm && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
@@ -556,7 +718,6 @@ const VehicleDetail = () => {
           </div>
         )}
 
-        {/* Delete Confirmation Modal */}
         {showDeleteConfirm && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">

@@ -66,7 +66,7 @@ const RoutesConfig = () => {
       <Route path="/home" element={<CustomerHome />} />
       <Route path="/myprofile" element={<CustomerProfile />} />
       <Route path="/usermap" element={<UserTrafficMap />} />
-      <Route path="/addv" element={<AddVehicle />} />
+      <Route path="/addv:id" element={<AddVehicle />} />
       <Route path="/editv" element={<EditVehicle />} />
       <Route path="/v" element={<ViolationCustomerList />} />
       <Route path="/vehiclelistuser" element={<VehicleCustomerList />} />

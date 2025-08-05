@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Camera, Car, Clock, Calendar, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Camera, Car, Clock, Calendar, AlertTriangle, Film } from "lucide-react";
 import { format } from "date-fns";
 import axios, { AxiosError } from "axios";
 import jsPDF from "jspdf";
@@ -96,7 +96,7 @@ const ViolationDetailForUser: React.FC = () => {
     if (!violation) return;
 
     const doc = new jsPDF();
-    const detail = violation.violationDetails?.[0] || {} as ViolationDetail; // Explicitly type as ViolationDetail
+    const detail = violation.violationDetails?.[0] || {} as ViolationDetail;
     let y = 20;
 
     // Title
@@ -147,11 +147,18 @@ const ViolationDetailForUser: React.FC = () => {
         doc.addImage(img, "JPEG", 20, y, 160, 90);
         y += 100;
         doc.text("Violation Image", 105, y, { align: "center" });
+        y += 10;
       } catch (err) {
         console.warn("Failed to add image to PDF:", err);
         doc.text("Image not available (CORS or loading issue)", 20, y);
         y += 10;
       }
+    }
+
+    // Video URL (add as text, since jsPDF doesn't support embedding videos)
+    if (detail.videoUrl) {
+      doc.text(`Video URL: ${detail.videoUrl}`, 20, y, { maxWidth: 170 });
+      y += doc.getTextDimensions(`Video URL: ${detail.videoUrl}`, { maxWidth: 170 }).h + 10;
     }
 
     doc.save(`violation_${id}.pdf`);
@@ -190,7 +197,7 @@ const ViolationDetailForUser: React.FC = () => {
     );
   }
 
-  const detail = violation?.violationDetails?.[0] || {} as ViolationDetail; // Explicitly type as ViolationDetail
+  const detail = violation?.violationDetails?.[0] || {} as ViolationDetail;
 
   return (
     <div
@@ -268,7 +275,8 @@ const ViolationDetailForUser: React.FC = () => {
               </motion.button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
+              <div className="space-y-6">
+                {/* Image Section */}
                 {detail.imageUrl ? (
                   <img
                     src={detail.imageUrl}
@@ -279,6 +287,20 @@ const ViolationDetailForUser: React.FC = () => {
                 ) : (
                   <div className="w-full max-w-md h-64 flex items-center justify-center bg-gray-100 rounded-lg">
                     <Camera className="w-12 h-12 text-gray-400" />
+                    <span className="ml-2 text-gray-600">No Image Available</span>
+                  </div>
+                )}
+                {/* Video Section */}
+                {detail.videoUrl ? (
+                  <video
+                    src={detail.videoUrl}
+                    controls
+                    className="w-full max-w-md rounded-lg shadow-md"
+                  />
+                ) : (
+                  <div className="w-full max-w-md h-64 flex items-center justify-center bg-gray-100 rounded-lg">
+                    <Film className="w-12 h-12 text-gray-400" />
+                    <span className="ml-2 text-gray-600">No Video Available</span>
                   </div>
                 )}
               </div>
