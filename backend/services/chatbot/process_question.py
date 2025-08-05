@@ -1,7 +1,6 @@
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 from typing import List, Optional
-from process_question import process_question
 from surtraff_utils import detect_topic, save_feedback
 import logging
 from datetime import datetime
@@ -121,4 +120,5 @@ async def submit_feedback(data: FeedbackRequest):
                 "error": "Lỗi khi xử lý phản hồi, vui lòng thử lại sau!",
                 "suggestion": "Hãy cung cấp phản hồi đúng và liên quan đến giao thông/SurTraff!"
             }
+
         )
