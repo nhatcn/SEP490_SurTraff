@@ -77,7 +77,7 @@ export default function ViolationDetail() {
   const [detailFormData, setDetailFormData] = useState<Partial<ViolationDetail>>({});
   const [imageExpanded, setImageExpanded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8081";
+  const API_URL = "http://localhost:8081";
 
   useEffect(() => {
     if (!id || isNaN(Number(id))) {
@@ -107,16 +107,16 @@ export default function ViolationDetail() {
           speed: firstDetail.speed,
           additionalNotes: firstDetail.additionalNotes,
         });
-      } catch (err) {
+      } catch (err: any) {
         console.error("Error fetching data:", err);
-        setError("Unable to load data. Please try again.");
+        setError(err.response?.data?.message || "Unable to load data. Please try again.");
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, [id, API_URL]);
+  }, [id]);
 
   const handleViolationInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -125,11 +125,13 @@ export default function ViolationDetail() {
 
     if (name === "status") {
       setFormData((prev) => ({ ...prev, status: value }));
-    } else if (["licensePlate", "vehicleColor", "vehicleBrand"].includes(name)) {
+    } else if (["licensePlate", "vehicleColor", "vehicleBrand", "vehicleName", "userId"].includes(name)) {
       const vehicleFieldMap: Record<string, keyof Vehicle> = {
         licensePlate: "licensePlate",
         vehicleColor: "color",
         vehicleBrand: "brand",
+        vehicleName: "name",
+        userId: "userId",
       };
       const field = vehicleFieldMap[name];
       setFormData((prev) => ({
@@ -139,23 +141,48 @@ export default function ViolationDetail() {
           licensePlate: prev.vehicle?.licensePlate ?? "",
           color: prev.vehicle?.color ?? "",
           brand: prev.vehicle?.brand ?? "",
+          name: prev.vehicle?.name ?? "",
+          userId: prev.vehicle?.userId ?? undefined,
+          vehicleTypeId: prev.vehicle?.vehicleTypeId ?? prev.vehicleType?.id ?? undefined,
           [field]: value,
         },
+      }));
+    } else if (name === "cameraId") {
+      setFormData((prev) => ({
+        ...prev,
+        camera: { ...prev.camera, id: Number(value) } as Camera,
+      }));
+    } else if (name === "vehicleTypeId") {
+      const vehicleTypeId = Number(value);
+      setFormData((prev) => ({
+        ...prev,
+        vehicleType: { ...prev.vehicleType, id: vehicleTypeId } as VehicleType,
+        vehicle: {
+          ...prev.vehicle,
+          vehicleTypeId,
+        } as Vehicle,
       }));
     }
   };
 
-  const handleDetailInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = e.target;
-    setDetailFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
   const handleUpdateViolation = async () => {
     if (!id || !formData) return;
+
+    // Validate required fields
     if (!formData.vehicle?.licensePlate) {
-      toast.error("Please fill in all required fields (License Plate).");
+      toast.error("License Plate is required.");
+      return;
+    }
+    if (!formData.vehicleType?.id) {
+      toast.error("Vehicle Type is required.");
+      return;
+    }
+    if (!formData.vehicle?.vehicleTypeId || formData.vehicle.vehicleTypeId !== formData.vehicleType.id) {
+      toast.error("Vehicle Type ID must match the selected Vehicle Type.");
+      return;
+    }
+    if (!formData.camera?.id) {
+      toast.error("Camera is required.");
       return;
     }
 
@@ -167,21 +194,34 @@ export default function ViolationDetail() {
         vehicleType: formData.vehicleType ? { id: formData.vehicleType.id } : null,
         vehicle: formData.vehicle
           ? {
-              id: formData.vehicle.id,
+              id: formData.vehicle.id || 0,
+              name: formData.vehicle.name || null,
               licensePlate: formData.vehicle.licensePlate,
-              color: formData.vehicle.color,
-              brand: formData.vehicle.brand,
+              userId: formData.vehicle.userId || null,
+              vehicleTypeId: formData.vehicle.vehicleTypeId || formData.vehicleType?.id,
+              color: formData.vehicle.color || null,
+              brand: formData.vehicle.brand || null,
             }
           : null,
-        status: formData.status,
+        // Exclude status from this update, as it's handled by handleUpdateStatus
       };
-      const updatedViolation = await axios.put(`${API_URL}/api/violations/${id}`, updateData);
-      setViolation(updatedViolation.data);
+      const response = await axios.put(`${API_URL}/api/violations/${id}`, updateData);
+      setViolation(response.data);
+      setFormData((prev) => ({
+        ...prev,
+        camera: response.data.camera,
+        vehicleType: response.data.vehicleType,
+        vehicle: response.data.vehicle,
+      }));
       setIsEditingViolation(false);
-      toast.success("Violation updated successfully!");
-    } catch (err) {
+      toast.success("Violation information updated successfully!");
+    } catch (err: any) {
       console.error("Error updating violation:", err);
-      toast.error("Unable to update violation. Please try again.");
+      const errorMessage =
+        err.response?.data?.message ||
+        err.response?.data?.errors?.join(", ") ||
+        "Unable to update violation. Please check your input and try again.";
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -192,20 +232,59 @@ export default function ViolationDetail() {
 
     try {
       setLoading(true);
-      const response = await axios.patch(`${API_URL}/api/violations/${id}/status`, null, {
-        params: { status: newStatus },
-        headers: { Accept: "application/json" },
-      });
+      let response;
+      const statusUpper = newStatus.toUpperCase();
+
+      switch (statusUpper) {
+        case "REQUESTED":
+          response = await axios.post(`${API_URL}/api/violations/${id}/request`);
+          break;
+        case "PROCESSED":
+          response = await axios.post(`${API_URL}/api/violations/${id}/process`);
+          break;
+        case "APPROVED":
+          response = await axios.post(`${API_URL}/api/violations/${id}/approve`);
+          break;
+        case "REJECTED":
+          response = await axios.post(`${API_URL}/api/violations/${id}/reject`);
+          break;
+        case "PENDING":
+          response = await axios.put(`${API_URL}/api/violations/${id}`, {
+            id: Number(id),
+            camera: formData.camera ? { id: formData.camera.id } : null,
+            vehicleType: formData.vehicleType ? { id: formData.vehicleType.id } : null,
+            vehicle: formData.vehicle
+              ? {
+                  id: formData.vehicle.id,
+                  name: formData.vehicle.name,
+                  licensePlate: formData.vehicle.licensePlate,
+                  userId: formData.vehicle.userId,
+                  vehicleTypeId: formData.vehicle.vehicleTypeId,
+                  color: formData.vehicle.color,
+                  brand: formData.vehicle.brand,
+                }
+              : null,
+            status: "PENDING",
+          });
+          break;
+        default:
+          throw new Error("Invalid status");
+      }
+
       setViolation(response.data);
       setFormData((prev) => ({ ...prev, status: response.data.status }));
-      if (newStatus.toUpperCase() === "APPROVE") {
+      if (statusUpper === "APPROVED") {
         toast.success("Violation approved! An email with the violation report has been sent.");
       } else {
-        toast.success(`Violation status updated to ${newStatus}!`);
+        toast.success(`Violation status updated to ${statusUpper}!`);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error updating status:", err);
-      toast.error("Unable to update status. Please try again.");
+      const errorMessage =
+        err.response?.data?.message ||
+        err.response?.data?.errors?.join(", ") ||
+        "Unable to update status. Please try again.";
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -214,7 +293,7 @@ export default function ViolationDetail() {
   const handleUpdateDetail = async () => {
     if (!id || !detailFormData || !violation?.violationDetails?.[0]?.id) return;
     if (!detailFormData.violationType?.id) {
-      toast.error("Please fill in all required fields (Violation Type).");
+      toast.error("Violation Type is required.");
       return;
     }
 
@@ -240,12 +319,27 @@ export default function ViolationDetail() {
       }));
       setIsEditingDetail(false);
       toast.success("Violation detail updated successfully!");
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error updating violation detail:", err);
-      toast.error("Unable to update violation detail. Please try again.");
+      const errorMessage =
+        err.response?.data?.message ||
+        err.response?.data?.errors?.join(", ") ||
+        "Unable to update violation detail. Please try again.";
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDetailInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+
+    setDetailFormData((prev) => ({
+      ...prev,
+      [name]: name === "speed" ? (value ? Number(value) : null) : value,
+    }));
   };
 
   const getSeverityBadge = (typeName: string) => {
@@ -263,11 +357,10 @@ export default function ViolationDetail() {
   const getStatusColor = (status: string) => {
     const statusMap: { [key: string]: { bg: string; text: string; icon: React.ReactNode } } = {
       pending: { bg: "bg-gray-100", text: "text-gray-500", icon: <div className="w-2 h-2 bg-gray-400 rounded-full" /> },
-      request: { bg: "bg-yellow-100", text: "text-yellow-700", icon: <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" /> },
-      approve: { bg: "bg-green-100", text: "text-green-700", icon: <CheckCircle2 className="text-green-500" size={14} /> },
-      reject: { bg: "bg-red-100", text: "text-red-700", icon: <XCircle className="text-red-500" size={14} /> },
-      resolved: { bg: "bg-teal-100", text: "text-teal-700", icon: <CheckCircle2 className="text-teal-500" size={14} /> },
-      dismissed: { bg: "bg-blue-100", text: "text-blue-700", icon: <XCircle className="text-blue-500" size={14} /> },
+      requested: { bg: "bg-yellow-100", text: "text-yellow-700", icon: <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" /> },
+      approved: { bg: "bg-green-100", text: "text-green-700", icon: <CheckCircle2 className="text-green-500" size={14} /> },
+      rejected: { bg: "bg-red-100", text: "text-red-700", icon: <XCircle className="text-red-500" size={14} /> },
+      processed: { bg: "bg-blue-100", text: "text-blue-700", icon: <XCircle className="text-blue-500" size={14} /> },
     };
     return statusMap[status.toLowerCase()] || { bg: "bg-gray-100", text: "text-gray-500", icon: <div className="w-2 h-2 bg-gray-400 rounded-full" /> };
   };
@@ -294,13 +387,17 @@ export default function ViolationDetail() {
         additionalNotes: firstDetail.additionalNotes,
       });
       toast.success("Data refreshed successfully!");
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error refreshing data:", err);
-      toast.error("Unable to refresh data. Please try again.");
+      const errorMessage =
+        err.response?.data?.message ||
+        err.response?.data?.errors?.join(", ") ||
+        "Unable to refresh data. Please try again.";
+      toast.error(errorMessage);
     } finally {
       setRefreshing(false);
     }
-  }, [id, API_URL]);
+  }, [id]);
 
   if (loading) {
     return (
@@ -643,11 +740,10 @@ export default function ViolationDetail() {
                       disabled={loading}
                     >
                       <option value="PENDING">Pending</option>
-                      <option value="REQUEST">Request</option>
-                      <option value="APPROVE">Approve</option>
-                      <option value="REJECT">Reject</option>
-                      <option value="RESOLVED">Resolved</option>
-                      <option value="DISMISSED">Dismissed</option>
+                      <option value="REQUESTED">Requested</option>
+                      <option value="PROCESSED">Processed</option>
+                      <option value="APPROVED">Approved</option>
+                      <option value="REJECTED">Rejected</option>
                     </select>
                   </div>
                   <button
@@ -868,9 +964,44 @@ export default function ViolationDetail() {
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
                       <span className="text-blue-700 font-medium">Vehicle Type:</span>
-                      <span className="font-semibold text-blue-900 bg-blue-100/80 px-3 py-1 rounded-xl">
-                        {violation.vehicleType?.typeName || "N/A"}
-                      </span>
+                      {isEditingViolation ? (
+                        <select
+                          name="vehicleTypeId"
+                          value={formData.vehicleType?.id || ""}
+                          onChange={handleViolationInputChange}
+                          className="border border-blue-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/70 backdrop-blur-sm transition-all duration-300"
+                        >
+                          <option value="" disabled>
+                            Select Vehicle Type
+                          </option>
+                          {/* Replace with actual vehicle types from API if available */}
+                          <option value="1">Car</option>
+                          <option value="2">Truck</option>
+                          <option value="3">Motorcycle</option>
+                        </select>
+                      ) : (
+                        <span className="font-semibold text-blue-900 bg-blue-100/80 px-3 py-1 rounded-xl">
+                          {violation.vehicleType?.typeName || "N/A"}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <span className="text-blue-700 font-medium">Vehicle Name:</span>
+                      {isEditingViolation ? (
+                        <input
+                          type="text"
+                          name="vehicleName"
+                          value={formData.vehicle?.name || ""}
+                          onChange={handleViolationInputChange}
+                          className="border border-blue-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/70 backdrop-blur-sm transition-all duration-300"
+                          placeholder="Enter vehicle name"
+                        />
+                      ) : (
+                        <span className="font-semibold text-blue-900 bg-blue-100/80 px-3 py-1 rounded-xl">
+                          {violation.vehicle?.name || "N/A"}
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex justify-between items-center">
@@ -887,6 +1018,24 @@ export default function ViolationDetail() {
                       ) : (
                         <span className="font-semibold text-blue-900 font-mono bg-blue-100/80 px-3 py-1 rounded-xl">
                           {violation.vehicle?.licensePlate || "N/A"}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <span className="text-blue-700 font-medium">User ID:</span>
+                      {isEditingViolation ? (
+                        <input
+                          type="number"
+                          name="userId"
+                          value={formData.vehicle?.userId || ""}
+                          onChange={handleViolationInputChange}
+                          className="border border-blue-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/70 backdrop-blur-sm transition-all duration-300"
+                          placeholder="Enter user ID"
+                        />
+                      ) : (
+                        <span className="font-semibold text-blue-900 bg-blue-100/80 px-3 py-1 rounded-xl">
+                          {violation.vehicle?.userId || "N/A"}
                         </span>
                       )}
                     </div>
@@ -926,6 +1075,30 @@ export default function ViolationDetail() {
                         </span>
                       )}
                     </div>
+
+                    <div className="flex justify-between items-center">
+                      <span className="text-blue-700 font-medium">Camera:</span>
+                      {isEditingViolation ? (
+                        <select
+                          name="cameraId"
+                          value={formData.camera?.id || ""}
+                          onChange={handleViolationInputChange}
+                          className="border border-blue-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/70 backdrop-blur-sm transition-all duration-300"
+                        >
+                          <option value="" disabled>
+                            Select Camera
+                          </option>
+                          {/* Replace with actual cameras from API if available */}
+                          <option value="1">Camera 1</option>
+                          <option value="2">Camera 2</option>
+                          <option value="3">Camera 3</option>
+                        </select>
+                      ) : (
+                        <span className="font-semibold text-blue-900 bg-blue-100/80 px-3 py-1 rounded-xl">
+                          {violation.camera?.name || "N/A"}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </motion.div>
 
@@ -959,13 +1132,30 @@ export default function ViolationDetail() {
                       <label className="block text-blue-700 font-medium mb-1">
                         Violation Type:
                       </label>
-                      <span
-                        className={`px-4 py-2 rounded-xl text-sm font-semibold transform hover:scale-105 transition-all duration-300 ${getSeverityBadge(
-                          violation.violationDetails[0].violationType?.typeName || ""
-                        )}`}
-                      >
-                        {violation.violationDetails[0].violationType?.typeName || "N/A"}
-                      </span>
+                      {isEditingDetail ? (
+                        <select
+                          name="violationTypeId"
+                          value={detailFormData.violationType?.id || ""}
+                          onChange={handleDetailInputChange}
+                          className="w-full border border-blue-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/70 backdrop-blur-sm transition-all duration-300"
+                        >
+                          <option value="" disabled>
+                            Select Violation Type
+                          </option>
+                          {/* Replace with actual violation types from API if available */}
+                          <option value="1">Red Light</option>
+                          <option value="2">Overspeed</option>
+                          <option value="3">Parking Violation</option>
+                        </select>
+                      ) : (
+                        <span
+                          className={`px-4 py-2 rounded-xl text-sm font-semibold transform hover:scale-105 transition-all duration-300 ${getSeverityBadge(
+                            violation.violationDetails[0].violationType?.typeName || ""
+                          )}`}
+                        >
+                          {violation.violationDetails[0].violationType?.typeName || "N/A"}
+                        </span>
+                      )}
                     </div>
 
                     <div>
