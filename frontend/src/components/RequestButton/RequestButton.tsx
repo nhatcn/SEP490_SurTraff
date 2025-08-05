@@ -74,6 +74,7 @@ const RequestButton: React.FC<RequestButtonProps> = ({ violationId, onStatusUpda
         setViolationStatus(response.data.status?.toUpperCase() || null);
       } catch (err) {
         console.error('Error fetching violation status:', err);
+        setError('Failed to fetch violation status.');
         setViolationStatus(null);
       }
     };
@@ -97,20 +98,17 @@ const RequestButton: React.FC<RequestButtonProps> = ({ violationId, onStatusUpda
     setError(null);
 
     try {
-      const response = await axios.patch<ViolationsDTO>(
-        `http://localhost:8081/api/violations/${violationId}/status`,
+      const response = await axios.post<ViolationsDTO>(
+        `http://localhost:8081/api/violations/${violationId}/request`,
         null,
         {
-          params: {
-            status: 'REQUEST',
-          },
           headers: {
             Accept: 'application/json',
           },
         }
       );
       onStatusUpdate(response.data);
-      setViolationStatus(response.data.status?.toUpperCase() || 'REQUEST');
+      setViolationStatus(response.data.status?.toUpperCase() || 'REQUESTED');
       setSuccess(true);
     } catch (err) {
       const error = err as AxiosError;
@@ -120,17 +118,14 @@ const RequestButton: React.FC<RequestButtonProps> = ({ violationId, onStatusUpda
         headers: error.response?.headers,
         request: {
           url: error.config?.url,
-          params: error.config?.params,
+          method: error.config?.method,
           headers: error.config?.headers,
         },
       });
       if (error.response?.status === 404) {
         setError((error.response?.data as any)?.message || 'Violation not found.');
       } else if (error.response?.status === 400) {
-        setError(
-          (error.response?.data as any)?.message ||
-            'Invalid status. Valid statuses: PENDING, REQUEST, RESOLVED, DISMISSED, APPROVE, REJECT.'
-        );
+        setError((error.response?.data as any)?.message || 'Invalid request. Violation must be in PENDING status.');
       } else {
         setError((error.response?.data as any)?.message || 'An error occurred. Please try again.');
       }
@@ -148,16 +143,14 @@ const RequestButton: React.FC<RequestButtonProps> = ({ violationId, onStatusUpda
     ? 'Success'
     : success === false
     ? 'Failed'
-    : violationStatus === 'APPROVE'
+    : violationStatus === 'APPROVED'
     ? 'Approved'
-    : violationStatus === 'REJECT'
+    : violationStatus === 'REJECTED'
     ? 'Rejected'
-    : violationStatus === 'REQUEST'
+    : violationStatus === 'REQUESTED'
     ? 'Requested'
-    : violationStatus === 'RESOLVED'
-    ? 'Resolved'
-    : violationStatus === 'DISMISSED'
-    ? 'Dismissed'
+    : violationStatus === 'PROCESSED'
+    ? 'Processed'
     : 'Send Request';
 
   return (

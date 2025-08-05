@@ -77,7 +77,7 @@ export default function ViolationDetail() {
   const [detailFormData, setDetailFormData] = useState<Partial<ViolationDetail>>({});
   const [imageExpanded, setImageExpanded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8081";
+  const API_URL = "http://localhost:8081";
 
   useEffect(() => {
     if (!id || isNaN(Number(id))) {
@@ -116,7 +116,7 @@ export default function ViolationDetail() {
     };
 
     fetchData();
-  }, [id, API_URL]);
+  }, [id]);
 
   const handleViolationInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -192,16 +192,49 @@ export default function ViolationDetail() {
 
     try {
       setLoading(true);
-      const response = await axios.patch(`${API_URL}/api/violations/${id}/status`, null, {
-        params: { status: newStatus },
-        headers: { Accept: "application/json" },
-      });
+      let response;
+      const statusUpper = newStatus.toUpperCase();
+
+      switch (statusUpper) {
+        case "REQUESTED":
+          response = await axios.post(`${API_URL}/api/violations/${id}/request`);
+          break;
+        case "PROCESSED":
+          response = await axios.post(`${API_URL}/api/violations/${id}/process`);
+          break;
+        case "APPROVED":
+          response = await axios.post(`${API_URL}/api/violations/${id}/approve`);
+          break;
+        case "REJECTED":
+          response = await axios.post(`${API_URL}/api/violations/${id}/reject`);
+          break;
+        case "PENDING":
+          // Since PENDING is the default state for new violations, use PUT to update status
+          response = await axios.put(`${API_URL}/api/violations/${id}`, {
+            id: Number(id),
+            camera: formData.camera ? { id: formData.camera.id } : null,
+            vehicleType: formData.vehicleType ? { id: formData.vehicleType.id } : null,
+            vehicle: formData.vehicle
+              ? {
+                  id: formData.vehicle.id,
+                  licensePlate: formData.vehicle.licensePlate,
+                  color: formData.vehicle.color,
+                  brand: formData.vehicle.brand,
+                }
+              : null,
+            status: "PENDING",
+          });
+          break;
+        default:
+          throw new Error("Invalid status");
+      }
+
       setViolation(response.data);
       setFormData((prev) => ({ ...prev, status: response.data.status }));
-      if (newStatus.toUpperCase() === "APPROVE") {
+      if (statusUpper === "APPROVED") {
         toast.success("Violation approved! An email with the violation report has been sent.");
       } else {
-        toast.success(`Violation status updated to ${newStatus}!`);
+        toast.success(`Violation status updated to ${statusUpper}!`);
       }
     } catch (err) {
       console.error("Error updating status:", err);
@@ -263,11 +296,10 @@ export default function ViolationDetail() {
   const getStatusColor = (status: string) => {
     const statusMap: { [key: string]: { bg: string; text: string; icon: React.ReactNode } } = {
       pending: { bg: "bg-gray-100", text: "text-gray-500", icon: <div className="w-2 h-2 bg-gray-400 rounded-full" /> },
-      request: { bg: "bg-yellow-100", text: "text-yellow-700", icon: <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" /> },
-      approve: { bg: "bg-green-100", text: "text-green-700", icon: <CheckCircle2 className="text-green-500" size={14} /> },
-      reject: { bg: "bg-red-100", text: "text-red-700", icon: <XCircle className="text-red-500" size={14} /> },
-      resolved: { bg: "bg-teal-100", text: "text-teal-700", icon: <CheckCircle2 className="text-teal-500" size={14} /> },
-      dismissed: { bg: "bg-blue-100", text: "text-blue-700", icon: <XCircle className="text-blue-500" size={14} /> },
+      requested: { bg: "bg-yellow-100", text: "text-yellow-700", icon: <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" /> },
+      approved: { bg: "bg-green-100", text: "text-green-700", icon: <CheckCircle2 className="text-green-500" size={14} /> },
+      rejected: { bg: "bg-red-100", text: "text-red-700", icon: <XCircle className="text-red-500" size={14} /> },
+      processed: { bg: "bg-blue-100", text: "text-blue-700", icon: <XCircle className="text-blue-500" size={14} /> },
     };
     return statusMap[status.toLowerCase()] || { bg: "bg-gray-100", text: "text-gray-500", icon: <div className="w-2 h-2 bg-gray-400 rounded-full" /> };
   };
@@ -300,7 +332,7 @@ export default function ViolationDetail() {
     } finally {
       setRefreshing(false);
     }
-  }, [id, API_URL]);
+  }, [id]);
 
   if (loading) {
     return (
@@ -643,11 +675,10 @@ export default function ViolationDetail() {
                       disabled={loading}
                     >
                       <option value="PENDING">Pending</option>
-                      <option value="REQUEST">Request</option>
-                      <option value="APPROVE">Approve</option>
-                      <option value="REJECT">Reject</option>
-                      <option value="RESOLVED">Resolved</option>
-                      <option value="DISMISSED">Dismissed</option>
+                      <option value="REQUESTED">Requested</option>
+                      <option value="PROCESSED">Processed</option>
+                      <option value="APPROVED">Approved</option>
+                      <option value="REJECTED">Rejected</option>
                     </select>
                   </div>
                   <button

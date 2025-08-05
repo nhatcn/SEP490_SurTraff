@@ -32,6 +32,7 @@ import AddVehicle from '../Pages/Vehicle/AddVehicle';
 import EditVehicle from '../Pages/Vehicle/EditVehicle';
 import ViolationCustomerList from '../Pages/Violations/ViolationCustomerList';
 import VehicleCustomerList from '../Pages/Violations/VehicleCustomerList';
+import ViolationDetailForUser from '../Pages/Violations/ViolationDetailForUser';
 
 
 
@@ -69,6 +70,8 @@ const RoutesConfig = () => {
       <Route path="/editv" element={<EditVehicle />} />
       <Route path="/v" element={<ViolationCustomerList />} />
       <Route path="/vehiclelistuser" element={<VehicleCustomerList />} />
+      <Route path="/violationsuser/:id" element={<ViolationDetailForUser />} />
+
     </Routes>
   );
 };

@@ -5,7 +5,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 const EditVehicle = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const userId = 3; // Hardcode userId=3
+  const userId = 3; // Hardcoded userId=3
   const [formData, setFormData] = useState({
     id: '',
     name: '',
@@ -13,7 +13,8 @@ const EditVehicle = () => {
     userId: '',
     vehicleTypeId: '',
     color: '',
-    brand: ''
+    brand: '',
+    image: null,
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -28,7 +29,7 @@ const EditVehicle = () => {
     const fetchVehicleTypes = async () => {
       try {
         const response = await fetch('http://localhost:8081/api/vehicle-types', {
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 'Content-Type': 'application/json' },
         });
         if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
         const data = await response.json();
@@ -45,12 +46,12 @@ const EditVehicle = () => {
     const fetchVehicles = async () => {
       try {
         const response = await fetch(`http://localhost:8081/api/vehicle/user/${userId}`, {
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 'Content-Type': 'application/json' },
         });
         if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
         const data = await response.json();
         setVehicles(data);
-        setExistingPlates(data.map(vehicle => vehicle.licensePlate));
+        setExistingPlates(data.map((vehicle) => vehicle.licensePlate));
       } catch (error) {
         setErrorMessage(`Error loading vehicles: ${error.message}`);
       }
@@ -68,7 +69,7 @@ const EditVehicle = () => {
       setIsLoading(true);
       try {
         const response = await fetch(`http://localhost:8081/api/vehicle/${id}`, {
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 'Content-Type': 'application/json' },
         });
         if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
         const data = await response.json();
@@ -79,7 +80,8 @@ const EditVehicle = () => {
           userId: data.userId ? data.userId.toString() : '',
           vehicleTypeId: data.vehicleTypeId ? data.vehicleTypeId.toString() : '',
           color: data.color || '',
-          brand: data.brand || ''
+          brand: data.brand || '',
+          image: null,
         });
       } catch (error) {
         setErrorMessage(`Error loading vehicle details: ${error.message}`);
@@ -88,7 +90,7 @@ const EditVehicle = () => {
       }
     };
     fetchVehicle();
-  }, [id]);
+  }, [id]); // Added id to dependency array
 
   const validateForm = () => {
     const newErrors = {};
@@ -101,7 +103,10 @@ const EditVehicle = () => {
       newErrors.licensePlate = 'License plate is required';
     } else if (!plateRegex.test(formData.licensePlate)) {
       newErrors.licensePlate = 'Invalid format (e.g., 30A-12345 or 30AB-12345)';
-    } else if (existingPlates.includes(formData.licensePlate) && formData.licensePlate !== vehicles.find(v => v.id === parseInt(id))?.licensePlate) {
+    } else if (
+      existingPlates.includes(formData.licensePlate) &&
+      formData.licensePlate !== vehicles.find((v) => v.id === parseInt(id))?.licensePlate
+    ) {
       newErrors.licensePlate = 'License plate already exists';
     }
     if (!formData.userId) {
@@ -134,25 +139,32 @@ const EditVehicle = () => {
     if (!validateForm()) return;
 
     setIsLoading(true);
+    const formDataToSend = new FormData();
+    formDataToSend.append('id', parseInt(id));
+    formDataToSend.append('name', formData.name);
+    formDataToSend.append('licensePlate', formData.licensePlate);
+    formDataToSend.append('userId', parseInt(formData.userId));
+    formDataToSend.append('vehicleTypeId', parseInt(formData.vehicleTypeId));
+    formDataToSend.append('color', formData.color);
+    formDataToSend.append('brand', formData.brand);
+    if (formData.image) {
+      formDataToSend.append('imageFile', formData.image);
+    }
+
     try {
       const response = await fetch(`http://localhost:8081/api/vehicle/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: parseInt(id),
-          name: formData.name,
-          licensePlate: formData.licensePlate,
-          userId: parseInt(formData.userId),
-          vehicleTypeId: parseInt(formData.vehicleTypeId),
-          color: formData.color,
-          brand: formData.brand
-        })
+        body: formDataToSend,
       });
       if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
       const data = await response.json();
       setSuccessMessage(`Vehicle ${data.licensePlate} updated successfully!`);
-      setVehicles(prev => prev.map(v => v.id === parseInt(id) ? data : v));
-      setExistingPlates(prev => prev.map(p => p === vehicles.find(v => v.id === parseInt(id))?.licensePlate ? data.licensePlate : p));
+      setVehicles((prev) => prev.map((v) => (v.id === parseInt(id) ? data : v)));
+      setExistingPlates((prev) =>
+        prev.map((p) =>
+          p === vehicles.find((v) => v.id === parseInt(id))?.licensePlate ? data.licensePlate : p
+        )
+      );
       setTimeout(() => setSuccessMessage(''), 5000);
     } catch (error) {
       setErrorMessage(`Error: ${error.message}`);
@@ -174,13 +186,13 @@ const EditVehicle = () => {
     try {
       const response = await fetch(`http://localhost:8081/api/vehicle/${id}`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
       if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
       setSuccessMessage('Vehicle deleted successfully!');
-      setFormData({ id: '', name: '', licensePlate: '', userId: '', vehicleTypeId: '', color: '', brand: '' });
-      setVehicles(prev => prev.filter(v => v.id !== parseInt(id)));
-      setExistingPlates(prev => prev.filter(p => p !== formData.licensePlate));
+      setFormData({ id: '', name: '', licensePlate: '', userId: '', vehicleTypeId: '', color: '', brand: '', image: null });
+      setVehicles((prev) => prev.filter((v) => v.id !== parseInt(id)));
+      setExistingPlates((prev) => prev.filter((p) => p !== formData.licensePlate));
       setTimeout(() => navigate('/vehicle/add'), 2000);
     } catch (error) {
       setErrorMessage(`Error: ${error.message}`);
@@ -192,13 +204,19 @@ const EditVehicle = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    setErrors(prev => ({ ...prev, [name]: '' }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    setErrors((prev) => ({ ...prev, [name]: '' }));
+  };
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    setFormData((prev) => ({ ...prev, image: file }));
+    setErrors((prev) => ({ ...prev, image: '' }));
   };
 
   const inputVariants = {
     focused: { scale: 1.02, transition: { duration: 0.2 } },
-    unfocused: { scale: 1, transition: { duration: 0.2 } }
+    unfocused: { scale: 1, transition: { duration: 0.2 } },
   };
 
   return (
@@ -261,7 +279,7 @@ const EditVehicle = () => {
               disabled={isLoading}
             >
               <option value="0">Select a vehicle</option>
-              {vehicles.map(vehicle => (
+              {vehicles.map((vehicle) => (
                 <option key={vehicle.id} value={vehicle.id}>
                   {vehicle.licensePlate} - {vehicle.name}
                 </option>
@@ -450,8 +468,10 @@ const EditVehicle = () => {
                     disabled={isLoading}
                   >
                     <option value="">Select vehicle type</option>
-                    {vehicleTypes.map(type => (
-                      <option key={type.id} value={type.id}>{type.typeName}</option>
+                    {vehicleTypes.map((type) => (
+                      <option key={type.id} value={type.id}>
+                        {type.typeName}
+                      </option>
                     ))}
                   </select>
                   <AnimatePresence>
@@ -560,6 +580,49 @@ const EditVehicle = () => {
                           />
                         </svg>
                         <span>{errors.brand}</span>
+                      </motion.p>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+
+                {/* Image Upload */}
+                <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2 md:col-span-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    <div className="flex items-center space-x-2">
+                      <svg className="w-4 h-4 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                        />
+                      </svg>
+                      <span>Vehicle Image</span>
+                    </div>
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-100 transition-all duration-300 bg-gray-50/50 hover:bg-white"
+                    disabled={isLoading}
+                  />
+                  <AnimatePresence>
+                    {errors.image && (
+                      <motion.p
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="text-red-500 text-xs flex items-center space-x-1"
+                      >
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                          <path
+                            fillRule="evenodd"
+                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        <span>{errors.image}</span>
                       </motion.p>
                     )}
                   </AnimatePresence>

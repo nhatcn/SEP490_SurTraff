@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 import atexit
 from contextlib import ExitStack
 from utils.yt_stream import get_stream_url
+import requests
 
 # Constants
 VIOLATIONS_DIR = "violations"
@@ -173,7 +174,8 @@ def stream_no_helmet_service(youtube_url: str, camera_id: int):
                 elif class_name == "LP":
                     plate_boxes.append(results.boxes[i])
 
-            license_plate_text = "Unknown"  # Placeholder since EasyOCR is disabled
+            # Set license plate text to "Not Found" if no license plate is detected
+            license_plate_text = "Not Found" if not plate_boxes else "Unknown"  # Default to "Not Found" if no LP detected
 
             for x1, y1, x2, y2, track_id in rider_boxes:
                 head_height = int((y2 - y1) / 3 * ROI_SCALE)
@@ -225,7 +227,7 @@ def stream_no_helmet_service(youtube_url: str, camera_id: int):
                         "status": "PENDING",
                         "violationDetails": [
                             {
-                                "violationTypeId": 5,  # Giả định ID 1 cho NO_HELMET
+                                "violationTypeId": 5,  # Giả định ID 5 cho NO_HELMET
                                 "location": "Unknown",
                                 "violationTime": datetime.now().isoformat(),
                                 "additionalNotes": f"Track ID: {track_id}"
