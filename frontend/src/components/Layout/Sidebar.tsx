@@ -117,19 +117,13 @@ export default function Sidebar({ defaultActiveItem = "dashboard" }: SidebarProp
     },
     {
       id: "alerts",
-      name: "Alerts",
-      icon: <Bell size={20} />,
-      path: "/alerts",
-      description: "System Notifications",
+      name: "Tracking",
+      icon: <Car size={20} />,
+      path: "/tracks",
+      description: "Tracking Multiple Camera",
       badge: "3",
     },
-    {
-      id: "settings",
-      name: "Settings",
-      icon: <Settings size={20} />,
-      path: "/settings",
-      description: "System Configuration",
-    },
+
   ]
 
   const handleItemClick = (itemId: string, path: string) => {

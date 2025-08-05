@@ -228,7 +228,7 @@ export default function UserProfile() {
 
     try {
       const formData = new FormData()
-      formData.append("fullName", updateForm.name) 
+      formData.append("fullName", updateForm.name)
       formData.append("userName", updateForm.userName)
       formData.append("email", updateForm.email)
       formData.append("phone", updateForm.phoneNumber)
@@ -237,10 +237,10 @@ export default function UserProfile() {
 
       // Only append avatar if a new file was selected
       if (updateForm.avatar instanceof File) {
-        formData.append("avatarFile", updateForm.avatar) 
+        formData.append("avatarFile", updateForm.avatar)
       }
 
-      const response = await fetch(`http://localhost:8081/api/users/${user?.userId}`, {
+      const response = await fetch(`http://localhost:8081/api/users/update/${user?.userId}`, {
         method: "PUT",
         body: formData,
       })
@@ -320,7 +320,7 @@ export default function UserProfile() {
     setErrors({})
 
     try {
-      const response = await fetch(`http://localhost:8081/api/users/${user?.userId}`, {
+      const response = await fetch(`http://localhost:8081/api/users/update/${user?.userId}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -412,7 +412,7 @@ export default function UserProfile() {
                 <LogIn className="w-5 h-5" />
                 Sign In
               </button>
-              
+
               <button
                 onClick={() => window.location.href = '/home'}
                 className="w-full bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 text-gray-700 font-medium py-3 px-6 rounded-xl transition-all duration-200 flex items-center justify-center gap-3 hover:shadow-md"
@@ -492,12 +492,13 @@ export default function UserProfile() {
       {/* Profile Header Card */}
       <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 overflow-hidden">
         {/* Cover Background */}
-        <div className="relative h-32 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700">
-          <div className="absolute inset-0 bg-black/10"></div>
-          <div className="absolute top-4 right-4 flex items-center gap-2 bg-white/20 backdrop-blur-xl rounded-lg px-3 py-1">
-            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-            <span className="text-white text-sm font-medium">Online</span>
-          </div>
+        <div className="relative h-32 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700" style={{
+          backgroundImage: `url('/traffic-camera.webp')`,
+          backgroundBlendMode: 'overlay',
+          backgroundColor: 'rgba(0,0,0,0.1)'
+        }}>
+
+
         </div>
 
         {/* Profile Content */}
@@ -511,7 +512,7 @@ export default function UserProfile() {
               >
                 <img
                   src={avatarPreview || user.avatar || "/api/placeholder/96/96"}
-                 
+
                   className="w-full h-full object-cover"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement
@@ -541,8 +542,8 @@ export default function UserProfile() {
               <div className="flex items-center gap-3">
                 <span
                   className={`px-3 py-1 rounded-full text-xs font-medium ${user.status
-                      ? "bg-green-100 text-green-700 border border-green-200"
-                      : "bg-red-100 text-red-700 border border-red-200"
+                    ? "bg-green-100 text-green-700 border border-green-200"
+                    : "bg-red-100 text-red-700 border border-red-200"
                     }`}
                 >
                   {user.status ? "Active" : "Inactive"}
@@ -626,7 +627,7 @@ export default function UserProfile() {
                     {user.address || "Not provided"}
                   </div>
                 </div>
-                
+
               </div>
             ) : (
               <div className="space-y-4">
@@ -759,94 +760,8 @@ export default function UserProfile() {
             )}
           </div>
 
-          
-          {/* Vehicle Information */}
-          <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-3">
-                <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-red-600 rounded-lg flex items-center justify-center">
-                  <Car className="w-4 h-4 text-white" />
-                </div>
-                Vehicle Information
-              </h2>
-              <button className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200">
-                <Edit3 className="w-4 h-4 text-gray-600" />
-              </button>
-            </div>
 
-            {vehicleLoading ? (
-              <div className="flex justify-center items-center h-32">
-                <div className="w-8 h-8 border-2 border-orange-200 border-t-orange-600 rounded-full animate-spin"></div>
-              </div>
-            ) : vehicle ? (
-              <div className="space-y-6">
-                {/* Vehicle Overview */}
-                <div className="bg-gradient-to-br from-orange-50 to-red-50 rounded-xl p-4 border border-orange-100">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center text-xl">
-                      {getVehicleTypeIcon(vehicle.vehicleTypeId)}
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-gray-900">{vehicle.name}</h3>
-                      <p className="text-orange-600 font-bold">{vehicle.licensePlate}</p>
-                      <div className="flex items-center gap-1 mt-1">
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <span className="text-xs font-medium text-green-700">Active</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Vehicle Details */}
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wider flex items-center gap-1">
-                      <Tag className="w-3 h-3" />
-                      Vehicle Name
-                    </label>
-                    <div className="text-sm font-medium text-gray-900 bg-gray-50 rounded-lg p-3">{vehicle.name}</div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wider flex items-center gap-1">
-                      <Hash className="w-3 h-3" />
-                      License Plate
-                    </label>
-                    <div className="text-sm font-medium text-gray-900 bg-gray-50 rounded-lg p-3 font-mono">
-                      {vehicle.licensePlate}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wider flex items-center gap-1">
-                      <Award className="w-3 h-3" />
-                      Brand
-                    </label>
-                    <div className="text-sm font-medium text-gray-900 bg-gray-50 rounded-lg p-3">{vehicle.brand}</div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wider flex items-center gap-1">
-                      <Palette className="w-3 h-3" />
-                      Color
-                    </label>
-                    <div className="text-sm font-medium text-gray-900 bg-gray-50 rounded-lg p-3 flex items-center gap-2">
-                      {getColorEmoji(vehicle.color)}
-                      <span className="capitalize">{vehicle.color}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Car className="w-8 h-8 text-gray-400" />
-                </div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">No Vehicle Registered</h3>
-                <p className="text-gray-600 mb-4 text-sm">Register your vehicle for traffic monitoring.</p>
-                <button className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 text-sm">
-                  Register Vehicle
-                </button>
-              </div>
-            )}
-          </div>
         </div>
 
         {/* Security Settings */}
@@ -875,8 +790,8 @@ export default function UserProfile() {
                   <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Status</label>
                   <div
                     className={`text-sm font-medium rounded-lg p-3 ${user.status
-                        ? "text-green-700 bg-green-50 border border-green-200"
-                        : "text-red-700 bg-red-50 border border-red-200"
+                      ? "text-green-700 bg-green-50 border border-green-200"
+                      : "text-red-700 bg-red-50 border border-red-200"
                       }`}
                   >
                     {user.status ? "✅ Active & Secure" : "🔒 Account Locked"}
