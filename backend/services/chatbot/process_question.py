@@ -1,124 +1,168 @@
-from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, Field
-from typing import List, Optional
-from surtraff_utils import detect_topic, save_feedback
-import logging
-from datetime import datetime
+from typing import List, Dict, Optional
+from services.chatbot.surtraff_utils import *
 
-# Cấu hình logging
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-router = APIRouter(prefix="/chatbot", tags=["chatbot"])
-
-class HistoryTurn(BaseModel):
-    sentence: str = Field(..., min_length=1, max_length=500, description="Câu hỏi hoặc câu nói trong lịch sử hội thoại")
-    response: str = Field(..., min_length=1, max_length=1000, description="Câu trả lời từ chatbot")
-    type: str = Field(..., description="Loại câu hỏi (traffic_law, plate_violation, traffic_external, method_violation, social, general)")
-    lang: str = Field(..., description="Ngôn ngữ của câu hỏi và trả lời (vi hoặc en)")
-
-class QueryRequest(BaseModel):
-    sentence: str = Field(..., min_length=1, max_length=500, description="Câu hỏi hoặc câu nói từ người dùng")
-    lang: str = Field(default="vi", description="Ngôn ngữ trả lời (vi hoặc en)")
-    history: List[HistoryTurn] = Field(default=[], max_items=5, description="Lịch sử hội thoại, tối đa 5 lượt")
-
-class FeedbackRequest(BaseModel):
-    question: str = Field(..., min_length=1, max_length=500, description="Câu hỏi liên quan đến phản hồi")
-    corrected_answer: str = Field(..., min_length=1, max_length=1000, description="Câu trả lời sửa đổi từ người dùng")
-    lang: str = Field(default="vi", description="Ngôn ngữ của phản hồi (vi hoặc en)")
-
-@router.post("/", response_model=dict)
-async def query_chatbot(data: QueryRequest):
-    """
-    Xử lý câu hỏi từ người dùng, chỉ trả lời trong chủ đề giao thông/SurTraff.
-    """
-    try:
-        # Kiểm tra chủ đề câu hỏi
-        topic = detect_topic(data.sentence)
-        if topic == "General" and not any(keyword in data.sentence.lower() for keyword in ["surtraff", "giao thông", "traffic"]):
-            logger.warning(f"Off-topic question: {data.sentence[:50]}...")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={
-                    "error": "Câu hỏi không liên quan đến giao thông hoặc SurTraff.",
-                    "suggestion": "Hãy thử hỏi về SurTraff, vi phạm giao thông, hoặc tình hình giao thông ở một địa điểm cụ thể (như Cần Thơ, Hà Nội)!"
-                }
-            )
-
-        # Kiểm tra kích thước lịch sử hội thoại
-        if len(data.history) > 5:
-            logger.warning("History exceeds limit, truncating to last 5 turns")
-            data.history = data.history[-5:]
-
-        # Gọi hàm process_question từ process_question.py
-        response = await process_question(
-            question=data.sentence,
-            history=[h.dict() for h in data.history],
-            lang=data.lang
-        )
-
-        # Ghi log yêu cầu
-        logger.info(f"Query processed: Q={data.sentence[:30]}..., Response={response['response'][:30]}..., Type={response['type']}")
-
+# Hàm xử lý câu hỏi
+async def process_question(question: str, history: List[Dict], lang: str = "vi") -> Dict[str, str]:
+    if not question or not isinstance(question, str) or not is_safe_input(question):
         return {
-            "response": response["response"],
-            "suggestion": response["suggestion"],
-            "type": response["type"],
-            "lang": response["lang"],
-            "timestamp": datetime.now().isoformat()
+            "response": "Câu hỏi không hợp lệ, vui lòng thử lại! 😔" if lang == "vi" else "Invalid question, please try again! 😔",
+            "suggestion": "Hỏi về giao thông hoặc SurTraff nhé! 😊" if lang == "vi" else "Ask about traffic or SurTraff! 😊",
+            "type": "error",
+            "lang": lang
         }
-
-    except Exception as e:
-        logger.error(f"Error processing query: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={
-                "error": "Lỗi khi xử lý câu hỏi, vui lòng thử lại sau!",
-                "suggestion": "Hãy thử hỏi về SurTraff hoặc giao thông, ví dụ: 'SurTraff phát hiện vượt đèn đỏ thế nào?'"
-            }
-        )
-
-@router.post("/feedback", response_model=dict)
-async def submit_feedback(data: FeedbackRequest):
-    """
-    Nhận và xác minh phản hồi từ người dùng, chỉ chấp nhận phản hồi liên quan đến giao thông/SurTraff.
-    """
-    try:
-        # Kiểm tra chủ đề của phản hồi
-        topic = detect_topic(data.question)
-        if topic == "General" and not any(keyword in data.question.lower() for keyword in ["surtraff", "giao thông", "traffic"]):
-            logger.warning(f"Off-topic feedback question: {data.question[:50]}...")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={
-                    "error": "Phản hồi không liên quan đến giao thông hoặc SurTraff.",
-                    "suggestion": "Hãy cung cấp phản hồi về SurTraff hoặc giao thông, ví dụ: 'SurTraff đo tốc độ bằng radar và camera.'"
-                }
-            )
-
-        # Gọi hàm save_feedback để lưu phản hồi
-        save_feedback(
-            question=data.question,
-            response=data.corrected_answer,
-            lang=data.lang
-        )
-
-        # Ghi log phản hồi
-        response = "Phản hồi của bạn đã được ghi nhận, cảm ơn bạn! 😊"
-        logger.info(f"Feedback processed: Q={data.question[:30]}..., A={data.corrected_answer[:30]}..., Response={response[:30]}...")
-
+    
+    question = clean_question(question)
+    if not question:
+        return {
+            "response": "Câu hỏi không hợp lệ, vui lòng thử lại! 😔" if lang == "vi" else "Invalid question, please try again! 😔",
+            "suggestion": "Hỏi về giao thông hoặc SurTraff nhé! 😊" if lang == "vi" else "Ask about traffic or SurTraff! 😊",
+            "type": "error",
+            "lang": lang
+        }
+    
+    detected_lang = await detect_language(question, history)
+    if detected_lang == "en" and lang == "vi":
+        question = await translate_en2vi(question)
+    elif detected_lang == "vi" and lang == "en":
+        question = await translate_vi2en(question)
+    
+    plate = extract_plate(question)
+    location = next((place for place in PLACE_NAMES if place.lower() in normalize_unicode(question.lower())), None)
+    time_of_day = get_time_of_day()
+    emotion = detect_emotion(question)
+    question_type = classify_question_type(question, history)
+    history_summary = await summarize_context(history)
+    parsed_info = parse_question(question)
+    
+    if question_type == "social":
+        response = await get_social_response(question, lang, time_of_day, history, emotion)
+        suggestion = await generate_suggested_questions(history, "General", lang)
+        log_chat(question, response, lang, question_type)
+        save_feedback(question, response, lang)
         return {
             "response": response,
-            "timestamp": datetime.now().isoformat()
+            "suggestion": suggestion,
+            "type": question_type,
+            "lang": lang
         }
-
-    except Exception as e:
-        logger.error(f"Error processing feedback: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={
-                "error": "Lỗi khi xử lý phản hồi, vui lòng thử lại sau!",
-                "suggestion": "Hãy cung cấp phản hồi đúng và liên quan đến giao thông/SurTraff!"
+    
+    if question_type == "plate_violation" and plate:
+        cache_key = f"plate_violation:{plate}:{lang}"
+        cached_response = check_similar_question(question, semantic_cache["plate_violation"])
+        if cached_response:
+            suggestion = await generate_suggested_questions(history, question_type, lang)
+            log_chat(question, cached_response, lang, question_type, plate)
+            return {
+                "response": cached_response,
+                "suggestion": suggestion,
+                "type": question_type,
+                "lang": lang
             }
-
-        )
+        
+        response = await fetch_violation_data(plate=plate, lang=lang)
+        suggestion = await generate_suggested_questions(history, question_type, lang)
+        quality_score = await check_answer_quality(question, response, lang)
+        if quality_score < 0.8:
+            response = f"😔 Không có thông tin chi tiết cho biển số {plate}. Hỏi thêm nhé!" if lang == "vi" else f"😔 No detailed information for plate {plate}. Ask more!"
+        semantic_cache["plate_violation"][cache_key] = response
+        log_chat(question, response, lang, question_type, plate)
+        save_feedback(question, response, lang)
+        return {
+            "response": response,
+            "suggestion": suggestion,
+            "type": question_type,
+            "lang": lang
+        }
+    
+    if question_type == "traffic_external" and location:
+        cache_key = f"traffic_external:{location}:{lang}"
+        cached_response = check_similar_question(question, semantic_cache["traffic_external"])
+        if cached_response:
+            suggestion = await generate_suggested_questions(history, question_type, lang)
+            log_chat(question, cached_response, lang, question_type)
+            return {
+                "response": cached_response,
+                "suggestion": suggestion,
+                "type": question_type,
+                "lang": lang
+            }
+        
+        response = await fetch_external_traffic_data(question, lang, history)
+        suggestion = await generate_suggested_questions(history, question_type, lang)
+        quality_score = await check_answer_quality(question, response, lang)
+        if quality_score < 0.8:
+            response = f"😔 Không có thông tin chi tiết về giao thông tại {location}. Hỏi thêm nhé!" if lang == "vi" else f"😔 No detailed traffic information for {location}. Ask more!"
+        semantic_cache["traffic_external"][cache_key] = response
+        log_chat(question, response, lang, question_type)
+        save_feedback(question, response, lang)
+        return {
+            "response": response,
+            "suggestion": suggestion,
+            "type": question_type,
+            "lang": lang
+        }
+    
+    if question_type == "method_violation":
+        cache_key = f"method_violation:{question}:{lang}"
+        cached_response = check_similar_question(question, semantic_cache["method_violation"])
+        if cached_response:
+            suggestion = await generate_suggested_questions(history, question_type, lang)
+            log_chat(question, cached_response, lang, question_type)
+            return {
+                "response": cached_response,
+                "suggestion": suggestion,
+                "type": question_type,
+                "lang": lang
+            }
+        
+        topic = detect_topic(question)
+        response = surtraff_details.get(topic, f"😔 Không có thông tin chi tiết về cách phát hiện vi phạm này. Hỏi thêm nhé!" if lang == "vi" else f"😔 No detailed information on this violation detection method. Ask more!")
+        if lang == "en" and topic in surtraff_details:
+            response = await translate_vi2en(response)
+        suggestion = await generate_suggested_questions(history, question_type, lang)
+        quality_score = await check_answer_quality(question, response, lang)
+        if quality_score < 0.8:
+            response = f"😔 Không có thông tin chi tiết về cách phát hiện vi phạm này. Hỏi thêm nhé!" if lang == "vi" else f"😔 No detailed information on this violation detection method. Ask more!"
+        semantic_cache["method_violation"][cache_key] = response
+        log_chat(question, response, lang, question_type)
+        save_feedback(question, response, lang)
+        return {
+            "response": response,
+            "suggestion": suggestion,
+            "type": question_type,
+            "lang": lang
+        }
+    
+    cache_key = f"{question_type}:{question}:{lang}"
+    cached_response = check_similar_question(question, semantic_cache[question_type])
+    if cached_response:
+        suggestion = await generate_suggested_questions(history, question_type, lang)
+        log_chat(question, cached_response, lang, question_type)
+        return {
+            "response": cached_response,
+            "suggestion": suggestion,
+            "type": question_type,
+            "lang": lang
+        }
+    
+    context_docs = await semantic_search(question, question_type)
+    context = "\n".join(context_docs) if context_docs else ""
+    if not context:
+        context = surtraff_details.get(detect_topic(question), "")
+    
+    response = await format_response(context, question, history_summary, emotion, lang, parsed_info)
+    suggestion = await generate_suggested_questions(history, question_type, lang)
+    quality_score = await check_answer_quality(question, response, lang)
+    if quality_score < 0.8:
+        response = f"😔 Không có thông tin chi tiết, hỏi thêm nhé!" if lang == "vi" else f"😔 No detailed information, ask more!"
+    
+    semantic_cache[question_type][cache_key] = response
+    log_chat(question, response, lang, question_type, plate)
+    save_feedback(question, response, lang)
+    
+    return {
+        "response": response,
+        "suggestion": suggestion,
+        "type": question_type,
+        "lang": lang
+    }
