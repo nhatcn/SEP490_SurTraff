@@ -2,7 +2,7 @@ import asyncio
 import pickle
 import faiss
 from typing import List, Dict, Optional
-from surtraff_utils import *
+from services.chatbot.surtraff_utils import *
 
 # Khởi tạo surtraff_details
 surtraff_details = build_surtraff_details()
