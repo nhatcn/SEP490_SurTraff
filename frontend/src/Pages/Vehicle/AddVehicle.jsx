@@ -5,10 +5,11 @@ const AddVehicle = () => {
   const [formData, setFormData] = useState({
     name: '',
     licensePlate: '',
-    userId: '3',
+    userId: '',
     vehicleTypeId: '',
     color: '',
     brand: '',
+    image: null,
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -16,18 +17,18 @@ const AddVehicle = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [vehicleTypes, setVehicleTypes] = useState([]);
   const [existingPlates, setExistingPlates] = useState([]);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Fetch userId automatically
   useEffect(() => {
     const fetchUserId = async () => {
       try {
-        // Simulated API call to get current user ID (replace with actual authentication endpoint)
         const response = await fetch('http://localhost:8081/api/auth/current-user', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
-            // Add authorization header if needed
-            // 'Authorization': `Bearer ${yourToken}`
+            // 'Authorization': `Bearer ${yourToken}` // Uncomment if authentication is required
           },
         });
         if (!response.ok) throw new Error('Failed to fetch user ID');
@@ -115,21 +116,24 @@ const AddVehicle = () => {
     if (!validateForm()) return;
 
     setIsLoading(true);
+    const formDataToSend = new FormData();
+    const vehicleDTO = {
+      name: formData.name,
+      licensePlate: formData.licensePlate,
+      userId: parseInt(formData.userId),
+      vehicleTypeId: parseInt(formData.vehicleTypeId),
+      color: formData.color,
+      brand: formData.brand,
+    };
+    formDataToSend.append('dto', new Blob([JSON.stringify(vehicleDTO)], { type: 'application/json' }));
+    if (formData.image) {
+      formDataToSend.append('imageFile', formData.image);
+    }
+
     try {
       const response = await fetch('http://localhost:8081/api/vehicle', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          id: 0,
-          name: formData.name,
-          licensePlate: formData.licensePlate,
-          userId: parseInt(formData.userId),
-          vehicleTypeId: parseInt(formData.vehicleTypeId),
-          color: formData.color,
-          brand: formData.brand,
-        }),
+        body: formDataToSend,
       });
 
       if (!response.ok) {
@@ -142,13 +146,14 @@ const AddVehicle = () => {
       setFormData({
         name: '',
         licensePlate: '',
-        userId: formData.userId, // Keep userId
+        userId: formData.userId,
         vehicleTypeId: '',
         color: '',
         brand: '',
+        image: null,
       });
+      setPreviewUrl(null);
       setExistingPlates((prev) => [...prev, newVehicle.licensePlate]);
-
       setTimeout(() => setSuccessMessage(''), 5000);
     } catch (error) {
       setErrorMessage(`Error: ${error.message}`);
@@ -161,6 +166,18 @@ const AddVehicle = () => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
     setErrors((prev) => ({ ...prev, [name]: '' }));
+  };
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    setFormData((prev) => ({ ...prev, image: file }));
+    setErrors((prev) => ({ ...prev, image: '' }));
+
+    if (file) {
+      const imageUrl = URL.createObjectURL(file);
+      setPreviewUrl(imageUrl);
+      setIsModalOpen(true);
+    }
   };
 
   const inputVariants = {
@@ -429,6 +446,118 @@ const AddVehicle = () => {
                     </motion.p>
                   )}
                 </AnimatePresence>
+              </motion.div>
+
+              <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2 md:col-span-2">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <div className="flex items-center space-x-2">
+                    <svg className="w-4 h-4 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
+                    </svg>
+                    <span>Vehicle Image</span>
+                  </div>
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  id="vehicleImage"
+                  onChange={handleImageChange}
+                  className="hidden"
+                  disabled={isLoading}
+                />
+                {formData.image ? (
+                  <div className="flex space-x-2 w-full">
+                    <label
+                      htmlFor="vehicleImage"
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-teal-500 text-sm font-medium text-teal-700 bg-teal-50 hover:bg-teal-100 hover:text-teal-800 transition-all duration-300 cursor-pointer"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M12 12v9m0-9l3 3m-3-3l-3 3m6-8V5a2 2 0 00-2-2H8a2 2 0 00-2 2v4"
+                        />
+                      </svg>
+                      <span>Choose another image</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setIsModalOpen(true)}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-red-500 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 hover:text-red-800 transition-all duration-300"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M4 6h16M4 10h16M4 14h10M4 18h10"
+                        />
+                      </svg>
+                      <span>Preview image</span>
+                    </button>
+                  </div>
+                ) : (
+                  <label
+                    htmlFor="vehicleImage"
+                    className={`flex items-center justify-center gap-2 w-full px-4 py-3 rounded-xl border-2 border-teal-500 text-sm font-medium text-teal-700 bg-teal-50 hover:bg-teal-100 hover:text-teal-800 transition-all duration-300 cursor-pointer ${
+                      isLoading ? 'opacity-50 cursor-not-allowed' : 'focus:outline-none focus:ring-4 focus:ring-teal-200'
+                    }`}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M12 12v9m0-9l3 3m-3-3l-3 3m6-8V5a2 2 0 00-2-2H8a2 2 0 00-2 2v4"
+                      />
+                    </svg>
+                    <span>Choose Image</span>
+                  </label>
+                )}
+                <AnimatePresence>
+                  {errors.image && (
+                    <motion.p
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="text-red-500 text-xs flex items-center space-x-1"
+                    >
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path
+                          fillRule="evenodd"
+                          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      <span>{errors.image}</span>
+                    </motion.p>
+                  )}
+                </AnimatePresence>
+                {isModalOpen && previewUrl && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/10 backdrop-blur-sm">
+                    <div className="relative w-[90%] max-w-md bg-white rounded-2xl shadow-2xl border border-gray-100 p-4 transition-all duration-300">
+                      <button
+                        onClick={() => setIsModalOpen(false)}
+                        className="absolute top-3 right-3 text-gray-500 hover:text-red-500 transition-colors duration-200"
+                        aria-label="Close"
+                      >
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                      <div className="w-full h-[300px] flex items-center justify-center rounded-xl overflow-hidden bg-gray-50">
+                        <img
+                          src={previewUrl}
+                          alt="Preview"
+                          className="max-w-full max-h-full object-contain rounded-md"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </motion.div>
             </div>
 
