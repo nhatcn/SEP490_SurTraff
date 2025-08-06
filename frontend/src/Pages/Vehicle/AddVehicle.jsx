@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { getCookie } from '../../utils/cookieUtils'; // Adjust the import path based on your project structure
+import { getCookie } from "../../utils/cookieUltil"
 
 const AddVehicle = () => {
   const navigate = useNavigate();
