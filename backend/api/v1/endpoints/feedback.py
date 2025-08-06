@@ -10,7 +10,7 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-router = APIRouter(prefix="/", tags=["chatbot"])
+router = APIRouter()
 
 class HistoryTurn(BaseModel):
     sentence: str = Field(..., min_length=1, max_length=500, description="Câu hỏi hoặc câu nói trong lịch sử hội thoại")
