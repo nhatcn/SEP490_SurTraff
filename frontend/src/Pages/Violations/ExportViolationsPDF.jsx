@@ -1,11 +1,12 @@
-
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
+import logoImage from "../../asset/logo/screenshot_1749087176-removebg-preview.png"
 
-const ExportViolationsPDF = ({ violations}) => {
+const ExportViolationsPDF = ({ violations }) => {
   const [isExporting, setIsExporting] = useState(false)
   const [exportProgress, setExportProgress] = useState(0)
   const title = "List of traffic violations"
+
   const handleExportPDF = async () => {
     setIsExporting(true)
     setExportProgress(0)
@@ -42,7 +43,7 @@ const ExportViolationsPDF = ({ violations}) => {
         text: [31, 41, 55],        // Gray-800
         lightText: [107, 114, 128], // Gray-500
         border: [209, 213, 219],   // Gray-300
-        background: [249, 250, 251] // Gray-50
+        background: [255, 255, 255] // White
       }
 
       const currentDate = new Intl.DateTimeFormat('en-GB', {
@@ -68,20 +69,15 @@ const ExportViolationsPDF = ({ violations}) => {
       }
 
       const addHeader = (pageNumber) => {
-        // Header background
-        doc.setFillColor(colors.primary[0], colors.primary[1], colors.primary[2])
+        // Header background (white)
+        doc.setFillColor(colors.background[0], colors.background[1], colors.background[2])
         doc.rect(0, 0, 210, 45, 'F')
         
-        // Logo placeholder with modern design
-        doc.setFillColor(255, 255, 255)
-        doc.roundedRect(15, 12, 25, 20, 3, 3, 'F')
-        doc.setTextColor(colors.primary[0], colors.primary[1], colors.primary[2])
-        doc.setFontSize(12)
-        doc.setFont('helvetica', 'bold')
-        doc.text('LOGO', 27.5, 25, { align: 'center' })
+        // Add logo
+        doc.addImage(logoImage, 'PNG', 15, 12, 25, 20)
 
         // Title and system info
-        doc.setTextColor(255, 255, 255)
+        doc.setTextColor(colors.text[0], colors.text[1], colors.text[2])
         doc.setFontSize(20)
         doc.setFont('helvetica', 'bold')
         doc.text(title, 50, 20)
@@ -94,10 +90,10 @@ const ExportViolationsPDF = ({ violations}) => {
         doc.text(`Generated: ${currentDate}`, 50, 35)
         
         // Page number with modern styling
-        doc.setFillColor(255, 255, 255)
+        doc.setFillColor(colors.background[0], colors.background[1], colors.background[2])
         doc.roundedRect(170, 8, 25, 12, 2, 2, 'F')
         doc.setTextColor(colors.primary[0], colors.primary[1], colors.primary[2])
-        doc.setFontSize(10)
+        doc.setFontSize.dissection(10)
         doc.setFont('helvetica', 'bold')
         doc.text(`Page ${pageNumber}`, 182.5, 16, { align: 'center' })
       }
@@ -118,8 +114,8 @@ const ExportViolationsPDF = ({ violations}) => {
         doc.text('support@traffic-system.com', 195, 290, { align: 'right' })
       }
 
-      // Prepare table data with enhanced formatting
-      const tableData = violations.map((violation, index) => {
+      // Prepare table data without ID column
+      const tableData = violations.map(violation => {
         const detail = violation.violationDetails?.[0] || {}
         const violationTime = detail.violationTime 
           ? new Intl.DateTimeFormat('en-GB', {
@@ -132,7 +128,6 @@ const ExportViolationsPDF = ({ violations}) => {
           : 'N/A'
 
         return [
-          (index + 1).toString().padStart(3, '0'),
           violation.vehicle?.licensePlate || 'N/A',
           detail.violationType?.typeName || 'N/A',
           detail.location || 'N/A',
@@ -170,11 +165,10 @@ const ExportViolationsPDF = ({ violations}) => {
 
       setExportProgress(50)
 
-      // Enhanced table
+      // Enhanced table without ID column
       autoTable(doc, {
         startY: 85,
         head: [[
-          'No.',
           'License Plate',
           'Violation Type',
           'Location',
@@ -203,13 +197,12 @@ const ExportViolationsPDF = ({ violations}) => {
           fillColor: colors.background 
         },
         columnStyles: {
-          0: { halign: 'center', cellWidth: 15 },
-          1: { halign: 'center', cellWidth: 25 },
-          2: { cellWidth: 35 },
-          3: { cellWidth: 40 },
-          4: { halign: 'center', cellWidth: 20 },
-          5: { halign: 'center', cellWidth: 30 },
-          6: { halign: 'center', cellWidth: 20 }
+          0: { halign: 'center', cellWidth: 30 },
+          1: { cellWidth: 40 },
+          2: { cellWidth: 45 },
+          3: { halign: 'center', cellWidth: 25 },
+          4: { halign: 'center', cellWidth: 30 },
+          5: { halign: 'center', cellWidth: 20 }
         },
         margin: { top: 85, left: 15, right: 15 },
         didDrawPage: (data) => {
@@ -221,7 +214,7 @@ const ExportViolationsPDF = ({ violations}) => {
         },
         didParseCell: (data) => {
           // Highlight critical violations
-          if (data.column.index === 6 && data.cell.text[0] === 'Critical') {
+          if (data.column.index === 5 && data.cell.text[0] === 'Critical') {
             data.cell.styles.textColor = [220, 38, 38] // Red-600
             data.cell.styles.fontStyle = 'bold'
           }
