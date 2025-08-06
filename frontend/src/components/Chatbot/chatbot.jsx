@@ -31,7 +31,56 @@ const Chatbot = () => {
   }
 
   const sendMessage = async (text = input, retryCount = 0) => {
-    if (!text.trim()) return
+    if (!text.trim() || text.length > 500) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          text: lang === "vi" ? "⚠️ Câu hỏi phải từ 1-500 ký tự." : "⚠️ Question must be 1-500 characters.",
+          sender: "bot",
+          timestamp: new Date(),
+          type: "error",
+          lang,
+        },
+      ])
+      return
+    }
+    if (lang !== "vi" && lang !== "en") {
+      setMessages((prev) => [
+        ...prev,
+        {
+          text: lang === "vi" ? "⚠️ Ngôn ngữ không hợp lệ." : "⚠️ Invalid language.",
+          sender: "bot",
+          timestamp: new Date(),
+          type: "error",
+          lang,
+        },
+      ])
+      return
+    }
+
+    const history = messages
+      .filter((msg) => msg.sender === "user" || (msg.sender === "bot" && !msg.text.includes("Hỏi thêm nhé")))
+      .slice(-5) // Ensure max 5 history items
+      .map((msg) => ({
+        sentence: msg.text,
+        response: msg.sender === "bot" ? msg.text : "",
+        type: msg.type || "general",
+        lang: msg.lang || "vi",
+      }))
+
+    if (history.length > 5) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          text: lang === "vi" ? "⚠️ Lịch sử hội thoại vượt quá 5 lượt." : "⚠️ Chat history exceeds 5 turns.",
+          sender: "bot",
+          timestamp: new Date(),
+          type: "error",
+          lang,
+        },
+      ])
+      return
+    }
 
     const userMessage = { text, sender: "user", timestamp: new Date(), type: "general", lang }
     setMessages((prev) => [...prev, userMessage])
@@ -39,15 +88,6 @@ const Chatbot = () => {
     setInput("")
 
     try {
-      const history = messages
-        .filter((msg) => msg.sender === "user" || (msg.sender === "bot" && !msg.text.includes("Hỏi thêm nhé")))
-        .map((msg) => ({
-          sentence: msg.text,
-          response: msg.sender === "bot" ? msg.text : "",
-          type: msg.type || "general",
-          lang: msg.lang || "vi",
-        }))
-
       const response = await fetch("http://localhost:8000/api/query", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -59,7 +99,8 @@ const Chatbot = () => {
       })
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        const errorData = await response.json()
+        throw new Error(errorData.detail?.error || `HTTP error! status: ${response.status}`)
       }
 
       const data = await response.json()
@@ -82,26 +123,40 @@ const Chatbot = () => {
         setTimeout(() => sendMessage(text, retryCount + 1), 1000)
         return
       }
-      const botMessage = {
-        text: lang === "vi" ? "⚠️ Không thể kết nối máy chủ. Vui lòng kiểm tra mạng hoặc thử lại sau." : "⚠️ Could not connect to server. Please check network or try again.",
-        sender: "bot",
-        timestamp: new Date(),
-        type: "error",
-        lang,
-      }
-      setMessages((prev) => [...prev, botMessage])
+      setMessages((prev) => [
+        ...prev,
+        {
+          text: lang === "vi" ? `⚠️ Lỗi: ${error.message}. Vui lòng thử lại sau.` : `⚠️ Error: ${error.message}. Please try again later.`,
+          sender: "bot",
+          timestamp: new Date(),
+          type: "error",
+          lang,
+        },
+      ])
     } finally {
       setIsLoading(false)
     }
   }
 
   const submitFeedback = async () => {
-    if (!feedbackInput.trim() || feedbackMessageId === null) return
+    if (!feedbackInput.trim() || feedbackInput.length > 1000 || feedbackMessageId === null) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          text: lang === "vi" ? "⚠️ Phản hồi phải từ 1-1000 ký tự." : "⚠️ Feedback must be 1-1000 characters.",
+          sender: "bot",
+          timestamp: new Date(),
+          type: "error",
+          lang,
+        },
+      ])
+      return
+    }
 
     setIsFeedbackLoading(true)
     try {
       const question = messages[feedbackMessageId].text
-      const response = await fetch("http://localhost:8000/api/chatbot/feedback", {
+      const response = await fetch("http://localhost:8000/api/feedback/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -112,7 +167,8 @@ const Chatbot = () => {
       })
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        const errorData = await response.json()
+        throw new Error(errorData.detail?.error || `HTTP error! status: ${response.status}`)
       }
 
       const data = await response.json()
@@ -131,7 +187,7 @@ const Chatbot = () => {
       setMessages((prev) => [
         ...prev,
         {
-          text: lang === "vi" ? "⚠️ Lỗi khi gửi phản hồi. Vui lòng thử lại." : "⚠️ Error sending feedback. Please try again.",
+          text: lang === "vi" ? `⚠️ Lỗi khi gửi phản hồi: ${error.message}. Vui lòng thử lại.` : `⚠️ Error sending feedback: ${error.message}. Please try again.`,
           sender: "bot",
           timestamp: new Date(),
           type: "error",
@@ -161,8 +217,8 @@ const Chatbot = () => {
     const timeout = setTimeout(() => {
       recognition.stop()
       setIsRecording(false)
-      alert(lang === "vi" ? "Hết thời gian ghi âm. Vui lòng thử lại." : "Recording timeout. Please try again.")
-    }, 10000)
+      alert(lang === "vi" ? "Hết thời gian ghi âm (15 giây). Vui lòng thử lại." : "Recording timeout (15 seconds). Please try again.")
+    }, 15000)
 
     recognition.onresult = (event) => {
       clearTimeout(timeout)
@@ -263,6 +319,7 @@ const Chatbot = () => {
               transition: "all 0.2s ease-in-out",
               ...opt.style,
             }}
+            aria-label={opt.label}
           >
             <span style={{ marginRight: "0.25rem" }}>{opt.icon}</span>
             {opt.label}
@@ -364,6 +421,7 @@ const Chatbot = () => {
         <div style={{ position: "relative" }}>
           <motion.button
             onClick={toggleChat}
+            aria-label={isOpen ? (lang === "vi" ? "Đóng chatbot" : "Close chatbot") : (lang === "vi" ? "Mở chatbot" : "Open chatbot")}
             style={{
               position: "relative",
               width: "64px",
@@ -525,6 +583,7 @@ const Chatbot = () => {
                         cursor: "pointer",
                       }}
                       title={lang === "vi" ? "Hướng dẫn sử dụng" : "User Guide"}
+                      aria-label={lang === "vi" ? "Mở hướng dẫn sử dụng" : "Open user guide"}
                     >
                       <Info size={20} />
                     </motion.button>
@@ -547,6 +606,7 @@ const Chatbot = () => {
                         cursor: "pointer",
                       }}
                       title={lang === "vi" ? "Xóa cuộc trò chuyện" : "Clear Chat"}
+                      aria-label={lang === "vi" ? "Xóa cuộc trò chuyện" : "Clear chat"}
                     >
                       <Trash2 size={20} />
                     </motion.button>
@@ -574,6 +634,7 @@ const Chatbot = () => {
                     outline: "none",
                   }}
                   className="focus-ring-indigo-500"
+                  aria-label={lang === "vi" ? "Chọn ngôn ngữ" : "Select language"}
                 >
                   <option value="vi">🇻🇳 Tiếng Việt</option>
                   <option value="en">🇺🇳 English</option>
@@ -660,6 +721,7 @@ const Chatbot = () => {
                                 cursor: "pointer",
                               }}
                               title={lang === "vi" ? "Gửi phản hồi" : "Send Feedback"}
+                              aria-label={lang === "vi" ? "Gửi phản hồi cho tin nhắn này" : "Send feedback for this message"}
                             >
                               <Edit size={16} />
                             </motion.button>
@@ -826,6 +888,7 @@ const Chatbot = () => {
                     }}
                     className="custom-scrollbar focus-ring-indigo-500"
                     placeholder={lang === "vi" ? "Nhập câu hỏi của bạn..." : "Enter your question..."}
+                    aria-label={lang === "vi" ? "Nhập câu hỏi giao thông" : "Enter traffic question"}
                   />
                   <motion.button
                     whileHover={{ scale: 1.05 }}
@@ -843,6 +906,7 @@ const Chatbot = () => {
                     }}
                     className={isRecording ? "animate-pulse" : ""}
                     title={isRecording ? (lang === "vi" ? "Đang ghi âm..." : "Recording...") : (lang === "vi" ? "Nhấn để nói" : "Click to speak")}
+                    aria-label={isRecording ? (lang === "vi" ? "Đang ghi âm" : "Recording") : (lang === "vi" ? "Bắt đầu ghi âm" : "Start recording")}
                   >
                     <Mic size={20} />
                   </motion.button>
@@ -864,6 +928,7 @@ const Chatbot = () => {
                       pointerEvents: !input.trim() || isLoading ? "none" : "auto",
                     }}
                     className="focus-ring-indigo-500"
+                    aria-label={lang === "vi" ? "Gửi câu hỏi" : "Send question"}
                   >
                     <Send size={20} />
                   </motion.button>
@@ -942,6 +1007,7 @@ const Chatbot = () => {
                       e.currentTarget.style.backgroundColor = "transparent"
                       e.currentTarget.style.color = "#9CA3AF"
                     }}
+                    aria-label={lang === "vi" ? "Đóng cửa sổ phản hồi" : "Close feedback window"}
                   >
                     <X size={20} />
                   </button>
@@ -961,6 +1027,7 @@ const Chatbot = () => {
                   }}
                   className="focus-ring-indigo-500"
                   placeholder={lang === "vi" ? "Nhập câu trả lời đúng hoặc phản hồi của bạn..." : "Enter the correct answer or your feedback..."}
+                  aria-label={lang === "vi" ? "Nhập phản hồi" : "Enter feedback"}
                 />
                 <div
                   style={{
@@ -985,6 +1052,7 @@ const Chatbot = () => {
                     }}
                     onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#E5E7EB")}
                     onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#F3F4F6")}
+                    aria-label={lang === "vi" ? "Hủy phản hồi" : "Cancel feedback"}
                   >
                     {lang === "vi" ? "Hủy" : "Cancel"}
                   </motion.button>
@@ -1004,6 +1072,7 @@ const Chatbot = () => {
                       opacity: !feedbackInput.trim() || isFeedbackLoading ? 0.5 : 1,
                       pointerEvents: !feedbackInput.trim() || isFeedbackLoading ? "none" : "auto",
                     }}
+                    aria-label={lang === "vi" ? "Gửi phản hồi" : "Send feedback"}
                   >
                     {isFeedbackLoading ? (
                       <div
@@ -1111,6 +1180,7 @@ const Chatbot = () => {
                         e.currentTarget.style.backgroundColor = "transparent"
                         e.currentTarget.style.color = "#9CA3AF"
                       }}
+                      aria-label={lang === "vi" ? "Đóng hướng dẫn sử dụng" : "Close user guide"}
                     >
                       <X size={20} />
                     </button>

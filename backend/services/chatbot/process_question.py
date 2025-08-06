@@ -1,5 +1,6 @@
 from typing import List, Dict, Optional
 from services.chatbot.surtraff_utils import *
+from services.chatbot.surtraff_chatbot import *
 
 # Hàm xử lý câu hỏi
 async def process_question(question: str, history: List[Dict], lang: str = "vi") -> Dict[str, str]:
