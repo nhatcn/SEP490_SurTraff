@@ -32,8 +32,8 @@ ocr_reader = easyocr.Reader(['en'], gpu=True)
 # Constants
 VIOLATIONS_DIR = "violations"
 os.makedirs(VIOLATIONS_DIR, exist_ok=True)
-YOLO_SCORE_TH = 0.3
-REID_SCORE_TH = 0.5
+YOLO_SCORE_TH = 0.4  # Updated to match run_inference.py
+REID_SCORE_TH = 0.5  # Updated to match run_inference.py
 FPS = 30
 
 # Thread pool for async processing
@@ -42,7 +42,7 @@ tracking_executor = ThreadPoolExecutor(max_workers=5)
 class VehicleReID0001:
     def __init__(self, model_path, score_th=0.5):
         self.score_th = score_th
-        self.session = ort.InferenceSession(model_path, providers=["CPUExecutionProvider"])
+        self.session = ort.InferenceSession(model_path, providers=["CUDAExecutionProvider"])  # Updated to use CUDA
         self.input_name = self.session.get_inputs()[0].name
         self.gallery = {}  # {global_id: feature}
 
@@ -56,7 +56,7 @@ class VehicleReID0001:
             else:
                 crop = cv2.resize(crop, (128, 256))
             crop = crop.astype(np.float32)
-            crop -= np.array([123.675, 116.28, 103.53], dtype=np.float32)
+            crop -= np.array([123.675, 116.28, 103.53], dtype=np.float32)  # Same preprocessing as run_inference.py
             crop /= np.array([58.395, 57.12, 57.375], dtype=np.float32)
             crop = crop.transpose(2, 0, 1)
             crops.append(crop)
@@ -167,10 +167,24 @@ def stream_vehicle_tracking_service(camera_id: int, vehicle_info: VehicleInfo, s
             search_img = cv2.imdecode(np.frombuffer(search_image, np.uint8), cv2.IMREAD_COLOR)
             if search_img is not None:
                 # Extract features from entire search image (assuming it contains the vehicle)
-                h, w = search_img.shape[:2]
-                search_bbox = [[0, 0, w, h]]  # Use entire image as bounding box
-                search_features = reid.extract_features(search_img, search_bbox)
-                logger.info("Search image features extracted successfully")
+                results_query = model_vehicle.predict(search_img, conf=YOLO_SCORE_TH, iou=0.45, device='cuda')[0]
+                boxes_query, scores_query, class_ids_query = [], [], []
+                for box in results_query.boxes:
+                    cls = int(box.cls.item())
+                    if cls in target_ids:
+                        boxes_query.append(box.xyxy[0].cpu().numpy())
+                        scores_query.append(float(box.conf.item()))
+                        class_ids_query.append(cls)
+                if boxes_query:
+                    max_score_idx = np.argmax(scores_query)
+                    selected_box = boxes_query[max_score_idx]
+                    search_features = reid.extract_features(search_img, [selected_box])
+                    if len(search_features) > 0:
+                        search_features = search_features[0]
+                        search_features /= np.linalg.norm(search_features, axis=0, keepdims=True) + 1e-8
+                        logger.info("Search image features extracted successfully")
+                else:
+                    logger.warning("No vehicles detected in search image")
         
         h, w = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)), int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         frame_buffer = deque(maxlen=30)
@@ -236,7 +250,7 @@ def stream_vehicle_tracking_service(camera_id: int, vehicle_info: VehicleInfo, s
                     
                     # Match by image features
                     if search_features is not None and len(search_features) > 0:
-                        similarity = np.dot(feats[i], search_features[0])
+                        similarity = np.dot(feats[i], search_features)
                         if similarity > REID_SCORE_TH:
                             is_target_vehicle = True
                             match_score = max(match_score, similarity)
@@ -244,7 +258,6 @@ def stream_vehicle_tracking_service(camera_id: int, vehicle_info: VehicleInfo, s
                     
                     # Match by vehicle info (brand, color) - simplified matching
                     if vehicle_info.brand or vehicle_info.color:
-                        # This is a simplified implementation - in reality you'd need more sophisticated matching
                         if not is_target_vehicle:
                             match_score = 0.3  # Low confidence match based on metadata
                             match_reason = "Vehicle Info Match (Low Confidence)"

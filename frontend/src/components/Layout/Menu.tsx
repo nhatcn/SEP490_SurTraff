@@ -1,9 +1,10 @@
+
 "use client"
 
 import type React from "react"
-
-import { User, ChevronDown, Menu, X, Shield, LogOut, Eye, Search } from "lucide-react"
+import { Search, Bell, User, ChevronDown, Menu, X, Shield, LogOut, Eye } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
+import { useNavigate } from "react-router-dom"
 import Logo from "../../components/Logo/Logo"
 import NotificationDropdown from "./NotificationDropdown"
 import { eraseCookie } from "../../utils/cookieUltil"
@@ -27,21 +28,18 @@ const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
   const [userData, setUserData] = useState<UserData | null>(null)
   const [loading, setLoading] = useState(true)
   const userMenuRef = useRef<HTMLDivElement>(null)
+  const navigate = useNavigate()
 
-
-  const userId = localStorage.getItem("userId")
   // Handle sign out
   const handleSignOut = () => {
     // Erase userId cookie
     eraseCookie('userId')
-    
     // Remove items from localStorage
     localStorage.removeItem('token')
     localStorage.removeItem('role')
     localStorage.removeItem('userId')
-    
-    // Redirect to login page
-    window.location.href = '/login'
+    // Navigate to login page
+    navigate('/login')
   }
 
   // Close user dropdown when clicking outside
@@ -55,20 +53,16 @@ const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
-  // Fetch user data - same logic as Header.tsx
+  // Fetch user data
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        
+        const userId = localStorage.getItem("userId")
         const role = localStorage.getItem("role") || "Admin"
 
         if (!userId) {
-          setUserData({
-            id: "",
-            name: "Admin",
-            email: "admin@system.com",
-            role: role,
-          })
+          // No userId, set userData to null to show "Login"
+          setUserData(null)
           setLoading(false)
           return
         }
@@ -107,7 +101,7 @@ const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
     fetchUserData()
   }, [])
 
-  // Get avatar initials - same logic as Header.tsx
+  // Get avatar initials
   const getAvatarInitials = (user: UserData) => {
     if (user.name) {
       const words = user.name.split(" ").filter((word) => word.length > 0)
@@ -118,23 +112,6 @@ const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
     }
     return "AD"
   }
-
-  const userMenuItems = [
-    {
-      id: "profile",
-      name: "Your Profile",
-      icon: <User size={16} />,
-      description: "Personal Information",
-      href: "#"
-    },
-    {
-      id: "settings", 
-      name: "Settings",
-      icon: <Shield size={16} />,
-      description: "System Configuration",
-      href: "#"
-    }
-  ]
 
   return (
     <header className="bg-white border-b border-gray-200 py-4 px-6 flex items-center justify-between shadow-sm relative z-50">
@@ -164,31 +141,31 @@ const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
 
       <div className="flex items-center space-x-4">
         <nav className="hidden lg:flex space-x-6 mr-8">
-          <a href="home" className="text-blue-700 font-medium hover:text-blue-900 transition-colors duration-200">
+          <a href="/home" className="text-blue-700 font-medium hover:text-blue-900 transition-colors duration-200">
             Home
           </a>
-          <a href="#" className="text-gray-500 hover:text-gray-800 transition-colors duration-200">
+          <a href="/search" className="text-gray-500 hover:text-gray-800 transition-colors duration-200">
             Search Violations
           </a>
-          <a href="#" className="text-gray-600 hover:text-gray-800 transition-colors duration-200">
+          <a href="/help" className="text-gray-600 hover:text-gray-800 transition-colors duration-200">
             Help
           </a>
-          <a href="#" className="text-gray-600 hover:text-gray-800 transition-colors duration-200">
+          <a href="/contact" className="text-gray-600 hover:text-gray-800 transition-colors duration-200">
             Contact
           </a>
         </nav>
 
         {/* Notification Component */}
-        <NotificationDropdown />
+        {userData && <NotificationDropdown />}
 
-        {/* User Dropdown - Updated with dynamic user data */}
+        {/* User Dropdown */}
         <div className="relative" ref={userMenuRef}>
           <button
             className="flex items-center space-x-2 rounded-lg hover:bg-gray-100 py-2 px-3 transition-all duration-200 transform hover:scale-105"
-            onClick={() => setShowUserMenu(!showUserMenu)}
+            onClick={() => (userData ? setShowUserMenu(!showUserMenu) : navigate('/login'))}
             aria-label="Toggle user menu"
           >
-            {/* Avatar - Updated logic */}
+            {/* Avatar */}
             <div className="relative">
               {userData?.avatar ? (
                 <img
@@ -207,14 +184,16 @@ const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
                   userData?.avatar ? "hidden" : ""
                 }`}
               >
-                {loading ? "..." : userData ? getAvatarInitials(userData) : "AD"}
+                {loading ? "..." : userData ? getAvatarInitials(userData) : "LI"}
               </div>
-              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 rounded-full border-2 border-white" />
+              {userData && (
+                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 rounded-full border-2 border-white" />
+              )}
             </div>
-            
-            {/* User name - Updated */}
+
+            {/* User name or Login */}
             <span className="text-sm text-gray-700 font-medium hidden sm:block max-w-24 truncate">
-              {loading ? "Loading..." : userData?.name || userData?.role || "Admin"}
+              {loading ? "Loading..." : userData?.name || userData?.role || "Login"}
             </span>
             <ChevronDown
               size={16}
@@ -222,8 +201,8 @@ const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
             />
           </button>
 
-          {/* User Dropdown - Updated with sign out functionality */}
-          {showUserMenu && (
+          {/* User Dropdown */}
+          {showUserMenu && userData && (
             <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
               <div className="px-4 py-3 border-b border-gray-100">
                 <p className="font-medium text-gray-800">{loading ? "Loading..." : userData?.name || userData?.role || "Admin"}</p>
@@ -231,13 +210,16 @@ const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
               </div>
 
               <div className="py-1">
-                <a href="myprofile" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                <a href="/myprofile" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                   <User size={16} className="mr-2" />
                   Your Profile
                 </a>
-
+                <a href="/settings" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                  <Shield size={16} className="mr-2" />
+                  Settings
+                </a>
                 <div className="border-t border-gray-100 my-1"></div>
-                <button 
+                <button
                   onClick={handleSignOut}
                   className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-gray-100 transition-colors duration-200"
                 >
@@ -262,23 +244,18 @@ const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
 
 // MobileDropdownMenu component
 const MobileDropdownMenu = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
-  // Function to erase cookie
-  const eraseCookie = (name: string) => {
-    document.cookie = `${name}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;`
-  }
+  const navigate = useNavigate()
 
   // Handle sign out for mobile menu
   const handleSignOut = () => {
     // Erase userId cookie
     eraseCookie('userId')
-    
     // Remove items from localStorage
     localStorage.removeItem('token')
     localStorage.removeItem('role')
     localStorage.removeItem('userId')
-    
-    // Redirect to login page
-    window.location.href = '/login'
+    // Navigate to login page
+    navigate('/login')
   }
 
   const menuItems = [
@@ -316,8 +293,9 @@ const MobileDropdownMenu = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) 
                     setShowMobileMenu(false)
                     if (item.id === "logout") {
                       handleSignOut()
+                    } else {
+                      navigate(item.path)
                     }
-                    // Add navigation logic for other items here if needed
                   }}
                   className={`w-full flex items-center py-3 px-6 transition-all duration-200 relative group
                     ${
