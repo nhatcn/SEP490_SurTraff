@@ -1,11 +1,14 @@
+
+"use client"
+
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useParams, useNavigate } from 'react-router-dom';
+import { getCookie } from "../../utils/cookieUltil" // Adjust the import path based on your project structure
 
 const EditVehicle = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const userId = 3; // Hardcoded userId=3
   const [formData, setFormData] = useState({
     id: '',
     name: '',
@@ -23,12 +26,55 @@ const EditVehicle = () => {
   const [vehicleTypes, setVehicleTypes] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [existingPlates, setExistingPlates] = useState([]);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const API_URL = "http://localhost:8081";
+
+  // Fetch userId using cookie and localStorage
+  useEffect(() => {
+    const fetchUserData = async () => {
+      setIsLoading(true);
+      try {
+        const userId = getCookie('userId');
+        if (!userId) {
+          setFormData((prev) => ({ ...prev, userId: "" }));
+          setErrorMessage("No user ID found in cookies");
+          setIsLoading(false);
+          return;
+        }
+
+        const response = await fetch(`${API_URL}/api/users/${userId}`);
+        if (response.ok) {
+          const user = await response.json();
+          setFormData((prev) => ({ ...prev, userId: user.id.toString() }));
+        } else {
+          const localStorageUserId = localStorage.getItem("userId");
+          if (localStorageUserId) {
+            setFormData((prev) => ({ ...prev, userId: localStorageUserId }));
+            setErrorMessage("Failed to fetch user data, using localStorage userId");
+          } else {
+            setErrorMessage("No user ID found");
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+        const localStorageUserId = localStorage.getItem("userId") || "";
+        setFormData((prev) => ({ ...prev, userId: localStorageUserId }));
+        setErrorMessage("Error fetching user data, using localStorage userId");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUserData();
+  }, [API_URL]);
 
   // Fetch vehicle types
   useEffect(() => {
     const fetchVehicleTypes = async () => {
       try {
-        const response = await fetch('http://localhost:8081/api/vehicle-types', {
+        const response = await fetch(`${API_URL}/api/violations/vehicle-types`, {
           headers: { 'Content-Type': 'application/json' },
         });
         if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
@@ -39,13 +85,13 @@ const EditVehicle = () => {
       }
     };
     fetchVehicleTypes();
-  }, []);
+  }, [API_URL]);
 
   // Fetch vehicles for specific user
   useEffect(() => {
     const fetchVehicles = async () => {
       try {
-        const response = await fetch(`http://localhost:8081/api/vehicle/user/${userId}`, {
+        const response = await fetch(`${API_URL}/api/vehicle/user/${formData.userId}`, {
           headers: { 'Content-Type': 'application/json' },
         });
         if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
@@ -56,8 +102,10 @@ const EditVehicle = () => {
         setErrorMessage(`Error loading vehicles: ${error.message}`);
       }
     };
-    fetchVehicles();
-  }, [userId]);
+    if (formData.userId) {
+      fetchVehicles();
+    }
+  }, [API_URL, formData.userId]);
 
   // Fetch vehicle details
   useEffect(() => {
@@ -68,7 +116,7 @@ const EditVehicle = () => {
       }
       setIsLoading(true);
       try {
-        const response = await fetch(`http://localhost:8081/api/vehicle/${id}`, {
+        const response = await fetch(`${API_URL}/api/vehicle/${id}`, {
           headers: { 'Content-Type': 'application/json' },
         });
         if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
@@ -77,29 +125,33 @@ const EditVehicle = () => {
           id: data.id ? data.id.toString() : '',
           name: data.name || '',
           licensePlate: data.licensePlate || '',
-          userId: data.userId ? data.userId.toString() : '',
+          userId: data.userId ? data.id.toString() : formData.userId,
           vehicleTypeId: data.vehicleTypeId ? data.vehicleTypeId.toString() : '',
           color: data.color || '',
           brand: data.brand || '',
           image: null,
         });
+        if (data.imageUrl) {
+          setPreviewUrl(data.imageUrl);
+        }
       } catch (error) {
         setErrorMessage(`Error loading vehicle details: ${error.message}`);
       } finally {
         setIsLoading(false);
       }
     };
-    fetchVehicle();
-  }, [id]);
+    if (id) {
+      fetchVehicle();
+    }
+  }, [API_URL, id, formData.userId]);
 
   const validateForm = () => {
     const newErrors = {};
     const plateRegex = /^\d{2}[A-Z]{1,2}-\d{4,5}$/;
-    const textRegex = /^[a-zA-Z\s]+$/; // Allow only letters and spaces
+    const textRegex = /^[a-zA-Z\s]+$/;
     const specialCharRegex = /[!@#$%^&*(),.?":{}|<>]/;
     const numberRegex = /^\d+$/;
 
-    // Validate name
     if (!formData.name || formData.name.trim() === '') {
       newErrors.name = 'Vehicle name is required';
     } else if (specialCharRegex.test(formData.name)) {
@@ -108,7 +160,6 @@ const EditVehicle = () => {
       newErrors.name = 'Vehicle name must contain only letters and spaces';
     }
 
-    // Validate license plate
     if (!formData.licensePlate || formData.licensePlate.trim() === '') {
       newErrors.licensePlate = 'License plate is required';
     } else if (!plateRegex.test(formData.licensePlate)) {
@@ -120,19 +171,16 @@ const EditVehicle = () => {
       newErrors.licensePlate = 'License plate already exists';
     }
 
-    // Validate user ID
     if (!formData.userId || formData.userId.trim() === '') {
       newErrors.userId = 'User ID is required';
     } else if (!numberRegex.test(formData.userId)) {
       newErrors.userId = 'User ID must be a number';
     }
 
-    // Validate vehicle type
     if (!formData.vehicleTypeId || formData.vehicleTypeId.trim() === '') {
       newErrors.vehicleTypeId = 'Vehicle type is required';
     }
 
-    // Validate color
     if (!formData.color || formData.color.trim() === '') {
       newErrors.color = 'Vehicle color is required';
     } else if (specialCharRegex.test(formData.color)) {
@@ -141,7 +189,6 @@ const EditVehicle = () => {
       newErrors.color = 'Color must contain only letters and spaces';
     }
 
-    // Validate brand
     if (!formData.brand || formData.brand.trim() === '') {
       newErrors.brand = 'Vehicle brand is required';
     } else if (specialCharRegex.test(formData.brand)) {
@@ -168,23 +215,29 @@ const EditVehicle = () => {
 
     setIsLoading(true);
     const formDataToSend = new FormData();
-    formDataToSend.append('id', parseInt(id));
-    formDataToSend.append('name', formData.name);
-    formDataToSend.append('licensePlate', formData.licensePlate);
-    formDataToSend.append('userId', parseInt(formData.userId));
-    formDataToSend.append('vehicleTypeId', parseInt(formData.vehicleTypeId));
-    formDataToSend.append('color', formData.color);
-    formDataToSend.append('brand', formData.brand);
+    const vehicleDTO = {
+      id: parseInt(id),
+      name: formData.name,
+      licensePlate: formData.licensePlate,
+      userId: parseInt(formData.userId),
+      vehicleTypeId: parseInt(formData.vehicleTypeId),
+      color: formData.color,
+      brand: formData.brand,
+    };
+    formDataToSend.append('dto', new Blob([JSON.stringify(vehicleDTO)], { type: 'application/json' }));
     if (formData.image) {
       formDataToSend.append('imageFile', formData.image);
     }
 
     try {
-      const response = await fetch(`http://localhost:8081/api/vehicle/${id}`, {
+      const response = await fetch(`${API_URL}/api/vehicle/${id}`, {
         method: 'PUT',
         body: formDataToSend,
       });
-      if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `HTTP error: ${response.status}`);
+      }
       const data = await response.json();
       setSuccessMessage(`Vehicle ${data.licensePlate} updated successfully!`);
       setVehicles((prev) => prev.map((v) => (v.id === parseInt(id) ? data : v)));
@@ -193,6 +246,9 @@ const EditVehicle = () => {
           p === vehicles.find((v) => v.id === parseInt(id))?.licensePlate ? data.licensePlate : p
         )
       );
+      if (data.imageUrl) {
+        setPreviewUrl(data.imageUrl);
+      }
       setTimeout(() => setSuccessMessage(''), 5000);
     } catch (error) {
       setErrorMessage(`Error: ${error.message}`);
@@ -212,16 +268,17 @@ const EditVehicle = () => {
     setSuccessMessage('');
     setErrorMessage('');
     try {
-      const response = await fetch(`http://localhost:8081/api/vehicle/${id}`, {
+      const response = await fetch(`${API_URL}/api/vehicle/${id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
       });
       if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
       setSuccessMessage('Vehicle deleted successfully!');
-      setFormData({ id: '', name: '', licensePlate: '', userId: '', vehicleTypeId: '', color: '', brand: '', image: null });
+      setFormData({ id: '', name: '', licensePlate: '', userId: formData.userId, vehicleTypeId: '', color: '', brand: '', image: null });
+      setPreviewUrl(null);
       setVehicles((prev) => prev.filter((v) => v.id !== parseInt(id)));
       setExistingPlates((prev) => prev.filter((p) => p !== formData.licensePlate));
-      setTimeout(() => navigate('/vehicle/add'), 2000);
+      setTimeout(() => navigate('/vehiclelistuser'), 2000); // Redirect to vehicle list after deletion
     } catch (error) {
       setErrorMessage(`Error: ${error.message}`);
       setTimeout(() => setErrorMessage(''), 5000);
@@ -240,6 +297,11 @@ const EditVehicle = () => {
     const file = e.target.files[0];
     setFormData((prev) => ({ ...prev, image: file }));
     setErrors((prev) => ({ ...prev, image: '' }));
+    if (file) {
+      const imageUrl = URL.createObjectURL(file);
+      setPreviewUrl(imageUrl);
+      setIsModalOpen(true);
+    }
   };
 
   const inputVariants = {
@@ -255,7 +317,6 @@ const EditVehicle = () => {
         transition={{ duration: 0.6, ease: 'easeOut' }}
         className="max-w-2xl mx-auto"
       >
-        {/* Header */}
         <div className="text-center mb-8">
           <motion.div
             initial={{ scale: 0 }}
@@ -278,14 +339,12 @@ const EditVehicle = () => {
           <p className="text-gray-600 text-lg">Update your vehicle information</p>
         </div>
 
-        {/* Form Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3, duration: 0.5 }}
           className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-white/20 p-8 hover:shadow-3xl transition-shadow duration-300"
         >
-          {/* Vehicle Selection */}
           <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2 mb-6">
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               <div className="flex items-center space-x-2">
@@ -338,7 +397,6 @@ const EditVehicle = () => {
           {id !== '0' && (
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Vehicle Name */}
                 <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     <div className="flex items-center space-x-2">
@@ -383,7 +441,6 @@ const EditVehicle = () => {
                   </AnimatePresence>
                 </motion.div>
 
-                {/* License Plate */}
                 <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     <div className="flex items-center space-x-2">
@@ -428,7 +485,6 @@ const EditVehicle = () => {
                   </AnimatePresence>
                 </motion.div>
 
-                {/* User ID */}
                 <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     <div className="flex items-center space-x-2">
@@ -473,7 +529,6 @@ const EditVehicle = () => {
                   </AnimatePresence>
                 </motion.div>
 
-                {/* Vehicle Type */}
                 <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     <div className="flex items-center space-x-2">
@@ -523,7 +578,6 @@ const EditVehicle = () => {
                   </AnimatePresence>
                 </motion.div>
 
-                {/* Color */}
                 <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     <div className="flex items-center space-x-2">
@@ -535,7 +589,7 @@ const EditVehicle = () => {
                           d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zM21 5a2 2 0 00-2-2h-4a2 2 0 00-2 2v12a4 4 0 004 4h4a2 2 0 002-2V5z"
                         />
                       </svg>
-                      <span>Vehicle Color</span>
+                      <span>Color</span>
                     </div>
                   </label>
                   <input
@@ -568,7 +622,6 @@ const EditVehicle = () => {
                   </AnimatePresence>
                 </motion.div>
 
-                {/* Brand */}
                 <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     <div className="flex items-center space-x-2">
@@ -580,7 +633,7 @@ const EditVehicle = () => {
                           d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"
                         />
                       </svg>
-                      <span>Vehicle Brand</span>
+                      <span>Brand</span>
                     </div>
                   </label>
                   <input
@@ -613,7 +666,6 @@ const EditVehicle = () => {
                   </AnimatePresence>
                 </motion.div>
 
-                {/* Image Upload */}
                 <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2 md:col-span-2">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     <div className="flex items-center space-x-2">
@@ -631,10 +683,58 @@ const EditVehicle = () => {
                   <input
                     type="file"
                     accept="image/*"
+                    id="vehicleImage"
                     onChange={handleImageChange}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-100 transition-all duration-300 bg-gray-50/50 hover:bg-white"
+                    className="hidden"
                     disabled={isLoading}
                   />
+                  {formData.image || previewUrl ? (
+                    <div className="flex space-x-2 w-full">
+                      <label
+                        htmlFor="vehicleImage"
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-teal-500 text-sm font-medium text-teal-700 bg-teal-50 hover:bg-teal-100 hover:text-teal-800 transition-all duration-300 cursor-pointer"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M12 12v9m0-9l3 3m-3-3l-3 3m6-8V5a2 2 0 00-2-2H8a2 2 0 00-2 2v4"
+                          />
+                        </svg>
+                        <span>Choose another image</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setIsModalOpen(true)}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-red-500 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 hover:text-red-800 transition-all duration-300"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M4 6h16M4 10h16M4 14h10M4 18h10"
+                          />
+                        </svg>
+                        <span>Preview image</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <label
+                      htmlFor="vehicleImage"
+                      className={`flex items-center justify-center gap-2 w-full px-4 py-3 rounded-xl border-2 border-teal-500 text-sm font-medium text-teal-700 bg-teal-50 hover:bg-teal-100 hover:text-teal-800 transition-all duration-300 cursor-pointer ${
+                        isLoading ? 'opacity-50 cursor-not-allowed' : 'focus:outline-none focus:ring-4 focus:ring-teal-200'
+                      }`}
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M12 12v9m0-9l3 3m-3-3l-3 3m6-8V5a2 2 0 00-2-2H8a2 2 0 00-2 2v4"
+                        />
+                      </svg>
+                      <span>Choose Image</span>
+                    </label>
+                  )}
                   <AnimatePresence>
                     {errors.image && (
                       <motion.p
@@ -654,10 +754,31 @@ const EditVehicle = () => {
                       </motion.p>
                     )}
                   </AnimatePresence>
+                  {isModalOpen && previewUrl && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/10 backdrop-blur-sm">
+                      <div className="relative w-[90%] max-w-md bg-white rounded-2xl shadow-2xl border border-gray-100 p-4 transition-all duration-300">
+                        <button
+                          onClick={() => setIsModalOpen(false)}
+                          className="absolute top-3 right-3 text-gray-500 hover:text-red-500 transition-colors duration-200"
+                          aria-label="Close"
+                        >
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                        <div className="w-full h-[300px] flex items-center justify-center rounded-xl overflow-hidden bg-gray-50">
+                          <img
+                            src={previewUrl}
+                            alt="Preview"
+                            className="max-w-full max-h-full object-contain rounded-md"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </motion.div>
               </div>
 
-              {/* Buttons */}
               <motion.button
                 type="submit"
                 disabled={isLoading}
@@ -718,7 +839,6 @@ const EditVehicle = () => {
             </form>
           )}
 
-          {/* Messages */}
           <AnimatePresence mode="wait">
             {successMessage && (
               <motion.div
