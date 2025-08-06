@@ -2,6 +2,7 @@
 import { Car, Clock, MapPin, AlertTriangle, CheckCircle, XCircle, Activity } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
+import { getCookie } from "../utils/cookieUltil"
 
 interface Violation {
   id: number
@@ -9,8 +10,8 @@ interface Violation {
   violationType: string
   location: string
   time: string
-  status: string // This will be the original status from the API
-  displayStatus: string // This will be the status displayed on screen
+  status: string
+  displayStatus: string
   image: string
 }
 
@@ -40,7 +41,11 @@ export default function RecentViolationsSection({
       setIsLoadingRecentViolations(true)
       setErrorRecentViolations(null)
       try {
-        const response = await fetch("http://localhost:8081/api/accident/user/9")
+        const userId = getCookie("userId") // Get userId from cookie
+        if (!userId) {
+          throw new Error("User ID not found in cookie")
+        }
+        const response = await fetch(`http://localhost:8081/api/accident/user/${userId}`)
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`)
         }
@@ -56,9 +61,9 @@ export default function RecentViolationsSection({
               plateNumber: item.licensePlate,
               violationType: item.description,
               location: item.location,
-              time: new Date(item.accidentTime).toLocaleString(), // Format date/time
-              status: item.status, // Keep original status for filtering
-              displayStatus: displayStatusText, // Status to display
+              time: new Date(item.accidentTime).toLocaleString(),
+              status: item.status,
+              displayStatus: displayStatusText,
               image: item.imageUrl || "/placeholder.svg",
             }
           })
@@ -68,7 +73,7 @@ export default function RecentViolationsSection({
               violation.status === "Requested" ||
               violation.status === "Processed" ||
               violation.status === "Rejected",
-          ) // Filter for specific statuses
+          )
         setRecentViolations(transformedData)
       } catch (error) {
         console.error("Failed to fetch recent violations:", error)
@@ -79,19 +84,17 @@ export default function RecentViolationsSection({
     }
 
     fetchRecentViolations()
-  }, []) // Empty dependency array means this runs once on mount
+  }, [])
 
   const handleRequestToView = async (id: number) => {
     setRequestingId(id)
-    setRequestMessage(null) // Clear previous message
+    setRequestMessage(null)
     try {
       const response = await fetch(`http://localhost:8081/api/accident/${id}/request`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          // Add any necessary authentication headers here
         },
-        // body: JSON.stringify({ userId: 7 }), // If the API expects a body, uncomment and adjust
       })
 
       if (!response.ok) {
@@ -100,12 +103,11 @@ export default function RecentViolationsSection({
       }
 
       setRequestMessage("Request Sent Successfully! Reloading page...")
-      // Reload the page to fetch updated data and reflect status change
-      setTimeout(() => window.location.reload(), 1500) // Reload after a short delay to show message
+      setTimeout(() => window.location.reload(), 1500)
     } catch (error: any) {
       console.error("Failed to send request:", error)
       setRequestMessage(`Failed to send request: ${error.message}`)
-      setTimeout(() => setRequestMessage(null), 3000) // Clear message after 3 seconds if error
+      setTimeout(() => setRequestMessage(null), 3000)
     } finally {
       setRequestingId(null)
     }
@@ -124,7 +126,7 @@ export default function RecentViolationsSection({
       case "Rejected":
         return "bg-red-100 text-red-800 border border-red-200"
       default:
-        return "bg-gray-100 text-gray-800 border border-gray-200" // Fallback for unexpected statuses
+        return "bg-gray-100 text-gray-800 border border-gray-200"
     }
   }
 
@@ -210,7 +212,7 @@ export default function RecentViolationsSection({
                       </div>
                       {violation.status === "Processed" ? (
                         <button
-                          onClick={() => navigate(`/accidents/${violation.id}`)}
+                          onClick={() => navigate(`/accidentsdetails/${violation.id}`)}
                           className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3 px-6 rounded-2xl transition-all duration-300 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105"
                         >
                           View Full Details
@@ -224,7 +226,6 @@ export default function RecentViolationsSection({
                           {requestingId === violation.id ? "Sending Request..." : "Request to View"}
                         </button>
                       ) : (
-                        // For Requested and Rejected statuses, no button is displayed
                         <div className="h-12 flex items-center justify-center text-gray-500 text-sm">
                           No action available
                         </div>
@@ -333,7 +334,6 @@ export default function RecentViolationsSection({
                               {requestingId === violation.id ? "Sending Request..." : "Request to View"}
                             </button>
                           ) : (
-                            // For Requested and Rejected statuses, no button is displayed
                             <div className="h-10 flex items-center justify-center text-gray-500 text-sm">—</div>
                           )}
                         </td>
