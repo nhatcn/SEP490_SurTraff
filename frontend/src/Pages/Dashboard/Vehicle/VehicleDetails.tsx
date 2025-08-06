@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useParams, useNavigate } from 'react-router-dom'
@@ -27,8 +26,9 @@ interface Vehicle {
   vehicleTypeId: number
   color: string
   brand: string
-  imageUrl: string | null
+  image: string | null
   isDelete: boolean | null
+  userId: number | null
 }
 
 interface FormErrors {
@@ -74,18 +74,24 @@ const VehicleDetail = () => {
     image: null
   })
 
-  // Preload vehicle image to avoid lazy-loading issues
+  // Preload vehicle image
   useEffect(() => {
-    if (!vehicle?.imageUrl) return undefined // Explicitly return undefined if no imageUrl
+    if (!vehicle?.image) {
+      console.log('No image to preload: vehicle.image is null or undefined') // Debug
+      return undefined
+    }
+    const cacheBuster = `?t=${new Date().getTime()}`
+    const imageUrl = `${vehicle.image}${cacheBuster}`
+    console.log('Preloading image:', imageUrl) // Debug
     const link = document.createElement('link')
     link.rel = 'preload'
-    link.href = vehicle.imageUrl
+    link.href = imageUrl
     link.as = 'image'
     document.head.appendChild(link)
     return () => {
       document.head.removeChild(link)
     }
-  }, [vehicle?.imageUrl])
+  }, [vehicle?.image])
 
   // Fetch vehicle types
   const fetchVehicleTypes = useCallback(async () => {
@@ -127,6 +133,7 @@ const VehicleDetail = () => {
       })
       if (!response.ok) throw new Error(`HTTP error: ${response.status}`)
       const data: Vehicle = await response.json()
+      console.log('Fetched vehicle:', data) // Debug
       setVehicle(data)
       setEditForm({
         name: data.name || '',
@@ -136,7 +143,8 @@ const VehicleDetail = () => {
         brand: data.brand || '',
         image: null
       })
-      setPreviewUrl(data.imageUrl || null)
+      setPreviewUrl(data.image || null)
+      console.log('Set previewUrl:', data.image || 'null') // Debug
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error'
       setErrorMessage(`Error loading vehicle: ${message}`)
@@ -154,7 +162,7 @@ const VehicleDetail = () => {
   const validateForm = () => {
     const newErrors: FormErrors = {}
     const plateRegex = /^\d{2}[A-Z]{1,2}-\d{4,5}$/
-    const textRegex = /^[a-zA-Z\s]+$/
+    const textRegex = /^[a-zA-Z0-9\s]+$/
     const specialCharRegex = /[!@#$%^&*(),.?":{}|<>]/
 
     if (!editForm.name || editForm.name.trim() === '') {
@@ -162,7 +170,7 @@ const VehicleDetail = () => {
     } else if (specialCharRegex.test(editForm.name)) {
       newErrors.name = 'Vehicle name must not contain special characters'
     } else if (!textRegex.test(editForm.name)) {
-      newErrors.name = 'Vehicle name must contain only letters and spaces'
+      newErrors.name = 'Vehicle name must contain only letters, numbers, and spaces'
     }
 
     if (!editForm.licensePlate || editForm.licensePlate.trim() === '') {
@@ -186,7 +194,7 @@ const VehicleDetail = () => {
     } else if (specialCharRegex.test(editForm.color)) {
       newErrors.color = 'Color must not contain special characters'
     } else if (!textRegex.test(editForm.color)) {
-      newErrors.color = 'Color must contain only letters and spaces'
+      newErrors.color = 'Color must contain only letters, numbers, and spaces'
     }
 
     if (!editForm.brand || editForm.brand.trim() === '') {
@@ -194,7 +202,7 @@ const VehicleDetail = () => {
     } else if (specialCharRegex.test(editForm.brand)) {
       newErrors.brand = 'Brand must not contain special characters'
     } else if (!textRegex.test(editForm.brand)) {
-      newErrors.brand = 'Brand must contain only letters and spaces'
+      newErrors.brand = 'Brand must contain only letters, numbers, and spaces'
     }
 
     setErrors(newErrors)
@@ -203,10 +211,12 @@ const VehicleDetail = () => {
 
   const handleImageChange = debounce((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
+    console.log('Selected file:', file) // Debug
     if (file) {
       setEditForm(prev => ({ ...prev, image: file }))
       setErrors(prev => ({ ...prev, image: '' }))
       const imageUrl = URL.createObjectURL(file)
+      console.log('Preview URL:', imageUrl) // Debug
       setPreviewUrl(imageUrl)
       setIsModalOpen(true)
     }
@@ -224,14 +234,16 @@ const VehicleDetail = () => {
         throw new Error('Invalid vehicle type ID')
       }
 
-      const formData = new FormData()
       const vehicleDTO = {
         name: editForm.name,
         licensePlate: editForm.licensePlate,
         vehicleTypeId: vehicleTypeIdNum,
         color: editForm.color,
-        brand: editForm.brand
+        brand: editForm.brand,
+        userId: vehicle?.userId ?? null // Preserve userId
       }
+      console.log('Sending vehicleDTO:', vehicleDTO) // Debug userId
+      const formData = new FormData()
       formData.append('dto', new Blob([JSON.stringify(vehicleDTO)], { type: 'application/json' }))
       if (editForm.image) {
         formData.append('imageFile', editForm.image)
@@ -246,12 +258,17 @@ const VehicleDetail = () => {
         throw new Error(errorData.message || `HTTP error: ${response.status}`)
       }
       const updatedData: Vehicle = await response.json()
+      console.log('Updated vehicle:', updatedData) // Debug userId and image
+      if (updatedData.userId === null && vehicle?.userId !== null) {
+        console.warn('Backend overwrote userId to null! Expected:', vehicle?.userId) // Debug
+      }
       setVehicle(updatedData)
       setVehicles(prev => prev.map(v => v.id === Number(id) ? updatedData : v))
       setSuccessMessage(`Vehicle ${updatedData.licensePlate} updated successfully!`)
       setIsEditing(false)
       setShowConfirm(false)
-      setPreviewUrl(updatedData.imageUrl || null)
+      setPreviewUrl(updatedData.image || null)
+      console.log('Set previewUrl after save:', updatedData.image || 'null') // Debug
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error'
       setErrorMessage(`Error updating vehicle: ${message}`)
@@ -300,70 +317,84 @@ const VehicleDetail = () => {
         brand: vehicle.brand,
         image: null
       })
-      setPreviewUrl(vehicle.imageUrl || null)
+      setPreviewUrl(vehicle.image || null)
+      console.log('Reset previewUrl on cancel:', vehicle.image || 'null') // Debug
     }
     setErrors({})
   }
 
-  const MemoizedImage = React.memo(() => (
-    <motion.div 
-      className="bg-gradient-to-br from-white/95 to-blue-100/95 forced-colors:bg-[Canvas] backdrop-blur-md p-6 rounded-2xl shadow-xl border border-blue-200/50 forced-colors:border-[CanvasText] transform hover:scale-[1.02] transition-all duration-300"
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.5 }}
-    >
-      <h3 className="text-xl font-bold bg-gradient-to-r from-blue-800 to-cyan-600 bg-clip-text text-transparent forced-colors:text-[CanvasText] mb-4 flex items-center">
-        <div className="w-6 h-6 mr-3 bg-gradient-to-r from-blue-500 to-cyan-500 forced-colors:bg-[ButtonFace] rounded-lg flex items-center justify-center animate-pulse-slow">
-          <svg
-            className="w-4 h-4 text-white forced-colors:text-[CanvasText]"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+  const MemoizedImage = React.memo(() => {
+    const cacheBuster = `?t=${new Date().getTime()}`
+    const imageSrc = vehicle?.image ? `${vehicle.image}${cacheBuster}` : null
+    console.log('Rendering MemoizedImage with src:', imageSrc || 'null') // Debug
+
+    return (
+      <motion.div 
+        className="bg-gradient-to-br from-white/95 to-blue-100/95 forced-colors:bg-[Canvas] backdrop-blur-md p-6 rounded-2xl shadow-xl border border-blue-200/50 forced-colors:border-[CanvasText] transform hover:scale-[1.02] transition-all duration-300 h-full flex flex-col"
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.5 }}
+      >
+        <h3 className="text-xl font-bold bg-gradient-to-r from-blue-800 to-cyan-600 bg-clip-text text-transparent forced-colors:text-[CanvasText] mb-4 flex items-center">
+          <div className="w-6 h-6 mr-3 bg-gradient-to-r from-blue-500 to-cyan-500 forced-colors:bg-[ButtonFace] rounded-lg flex items-center justify-center animate-pulse-slow">
+            <svg
+              className="w-4 h-4 text-white forced-colors:text-[CanvasText]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+              />
+            </svg>
+          </div>
+          Vehicle Image
+        </h3>
+        {imageSrc ? (
+          <div className="relative group flex-grow flex items-center justify-center">
+            <img
+              src={imageSrc}
+              alt="Vehicle Image"
+              className="w-full h-auto max-h-[300px] object-contain rounded-xl border-2 border-blue-200/50 forced-colors:border-[CanvasText] cursor-pointer transition-all duration-300 group-hover:border-blue-400 forced-colors:group-hover:border-[CanvasText] group-hover:shadow-2xl group-hover:shadow-blue-400/40 forced-colors:group-hover:shadow-none"
+              onClick={() => setIsModalOpen(true)}
+              onError={(e) => {
+                console.error('Failed to load image:', imageSrc, 'Error:', e.currentTarget.onerror)
+                e.currentTarget.src = 'https://via.placeholder.com/300' // Fallback image
+              }}
+              onLoad={() => console.log('Image loaded successfully:', imageSrc)} // Debug
             />
-          </svg>
-        </div>
-        Vehicle Image
-      </h3>
-      {vehicle?.imageUrl ? (
-        <div className="relative group">
-          <img
-            src={vehicle.imageUrl}
-            alt="Vehicle Image"
-            className="w-full h-auto rounded-xl border-2 border-blue-200/50 forced-colors:border-[CanvasText] cursor-pointer transition-all duration-300 group-hover:border-blue-400 forced-colors:group-hover:border-[CanvasText] group-hover:shadow-2xl group-hover:shadow-blue-400/40 forced-colors:group-hover:shadow-none"
-            onClick={() => setIsModalOpen(true)}
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent rounded-xl opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center forced-colors:bg-[Canvas]">
-            <div className="bg-white/90 forced-colors:bg-[Canvas] backdrop-blur-sm rounded-full p-3 transform scale-90 group-hover:scale-100 transition-all duration-300">
-              <Eye className="w-8 h-8 text-blue-600 forced-colors:text-[CanvasText]" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent rounded-xl opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center forced-colors:bg-[Canvas]">
+              <div className="bg-white/90 forced-colors:bg-[Canvas] backdrop-blur-sm rounded-full p-3 transform scale-90 group-hover:scale-100 transition-all duration-300">
+                <Eye className="w-8 h-8 text-blue-600 forced-colors:text-[CanvasText]" />
+              </div>
             </div>
           </div>
-        </div>
-      ) : (
-        <div className="text-center py-16 text-gray-500 forced-colors:text-[CanvasText] bg-blue-50/80 forced-colors:bg-[Canvas] rounded-xl">
-          <svg
-            className="w-10 h-10 mx-auto mb-4 text-gray-400 forced-colors:text-[CanvasText]"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-            />
-          </svg>
-          <p className="font-medium">No image available</p>
-        </div>
-      )}
-    </motion.div>
-  ))
+        ) : (
+          <div className="text-center py-16 text-gray-500 forced-colors:text-[CanvasText] bg-blue-50/80 forced-colors:bg-[Canvas] rounded-xl flex-grow flex items-center justify-center">
+            <div>
+              <svg
+                className="w-10 h-10 mx-auto mb-4 text-gray-400 forced-colors:text-[CanvasText]"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                />
+              </svg>
+              <p className="font-medium">No image available</p>
+            </div>
+          </div>
+        )}
+      </motion.div>
+    )
+  })
 
   if (!vehicle && id !== '0') {
     return (
@@ -419,12 +450,11 @@ const VehicleDetail = () => {
                   Select Vehicle
                 </label>
                 <select
-                  value={id || '0'}
+                  value={id || ''}
                   onChange={(e) => navigate(`/vehicles/${e.target.value}`)}
                   className="w-full px-3 py-2 border border-gray-300 forced-colors:border-[CanvasText] rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 forced-colors:focus:border-[CanvasText]"
                   disabled={isLoading}
                 >
-                  <option value="0">Select a vehicle to view details</option>
                   {vehicles.map(v => (
                     <option key={v.id} value={v.id}>
                       {v.licensePlate} - {v.name} ({v.brand})
@@ -436,9 +466,9 @@ const VehicleDetail = () => {
               {id !== '0' && vehicle && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   {/* Vehicle Information */}
-                  <div className="lg:col-span-2 space-y-6">
+                  <div className="lg:col-span-2">
                     <motion.div 
-                      className="bg-gradient-to-br from-white/95 to-blue-100/95 forced-colors:bg-[Canvas] backdrop-blur-md p-6 rounded-2xl shadow-xl border border-blue-200/50 forced-colors:border-[CanvasText]"
+                      className="bg-gradient-to-br from-white/95 to-blue-100/95 forced-colors:bg-[Canvas] backdrop-blur-md p-6 rounded-2xl shadow-xl border border-blue-200/50 forced-colors:border-[CanvasText] h-full"
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ duration: 0.5 }}
@@ -495,7 +525,7 @@ const VehicleDetail = () => {
                               value={editForm.name}
                               onChange={handleChange}
                               className="w-full px-3 py-2 border border-gray-300 forced-colors:border-[CanvasText] rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 forced-colors:focus:border-[CanvasText]"
-                              placeholder="e.g., Toyota Camry"
+                              placeholder="e.g., Toyota Camry 2023"
                               disabled={isLoading}
                             />
                           ) : (
@@ -767,6 +797,8 @@ const VehicleDetail = () => {
                 alt="Vehicle Image"
                 className="max-w-full max-h-full object-contain rounded-xl border-2 border-blue-200/50 forced-colors:border-[CanvasText] shadow-2xl shadow-blue-400/40 forced-colors:shadow-none"
                 onClick={() => setIsModalOpen(false)}
+                onError={() => console.error('Failed to load preview image:', previewUrl)} // Debug
+                onLoad={() => console.log('Preview image loaded successfully:', previewUrl)} // Debug
               />
             </div>
           </div>
