@@ -1,3 +1,4 @@
+
 "use client"
 
 import type React from "react"
@@ -16,8 +17,9 @@ import {
   PlusCircle,
   Edit,
   Eye,
+  RefreshCw,
 } from "lucide-react"
-import { getCookie } from "../../utils/cookieUltil" // Adjust the import path based on your project structure
+import { getCookie } from "../../utils/cookieUltil"
 
 interface VehicleDTO {
   id: number
@@ -27,6 +29,8 @@ interface VehicleDTO {
   vehicleTypeId: number
   color: string
   brand: string
+  image: string
+  isDelete: boolean
 }
 
 interface ViolationDetail {
@@ -114,7 +118,7 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({ onBack }) => 
         const response = await fetch(`${API_URL}/api/users/${cookieUserId}`)
         if (response.ok) {
           const user = await response.json()
-          setUserId(user.id.toString())
+          setUserId(user.userId.toString())
         } else {
           const localStorageUserId = localStorage.getItem("userId")
           if (localStorageUserId) {
@@ -125,7 +129,7 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({ onBack }) => 
           }
         }
       } catch (error) {
-        console.error("Error fetching user data:", error)
+        console.error(`Error fetching user data: ${getCookie('userId')}`, error)
         const localStorageUserId = localStorage.getItem("userId")
         if (localStorageUserId) {
           setUserId(localStorageUserId)
@@ -140,18 +144,6 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({ onBack }) => 
 
     fetchUserData()
   }, [API_URL])
-
-  // Filter vehicles
-  const filteredVehicles = useMemo(() => {
-    return vehicles.filter((vehicle) => {
-      const matchesSearch =
-        !searchTerm ||
-        vehicle.licensePlate.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        vehicle.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        vehicle.brand.toLowerCase().includes(searchTerm.toLowerCase())
-      return matchesSearch
-    })
-  }, [vehicles, searchTerm])
 
   // Load vehicles list
   const loadVehicles = useCallback(async () => {
@@ -213,7 +205,9 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({ onBack }) => 
       setShowRobotMessage(true)
       setFirstViolatedPlate(null)
 
-      const violationPromises = vehicleList.map((vehicle) => checkViolations(vehicle.licensePlate))
+      const violationPromises = vehicleList
+        .filter((vehicle) => !vehicle.isDelete)
+        .map((vehicle) => checkViolations(vehicle.licensePlate))
 
       try {
         const allViolations = await Promise.all(violationPromises)
@@ -224,7 +218,7 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({ onBack }) => 
           if (v.length > 0) {
             totalViolations += v.length
             if (!foundFirstViolated) {
-              setFirstViolatedPlate(vehicleList[index].licensePlate)
+              setFirstViolatedPlate(vehicleList.filter((v) => !v.isDelete)[index].licensePlate)
               foundFirstViolated = true
             }
             return true
@@ -272,6 +266,36 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({ onBack }) => 
     }
   }, [vehicles, robotIsChecking, checkAllVehicleViolations])
 
+  // Activate a deleted vehicle
+  const handleActivate = useCallback(async (vehicleId: number) => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const response = await fetch(`${API_URL}/api/vehicle/${vehicleId}/activate`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      if (!response.ok) {
+        throw new Error("Failed to activate vehicle")
+      }
+      setVehicles((prev) =>
+        prev.map((v) => (v.id === vehicleId ? { ...v, isDelete: false } : v))
+      )
+      setRobotMessage("Vehicle activated successfully!")
+      setRobotMessageType("success")
+      setShowRobotMessage(true)
+      setTimeout(() => setShowRobotMessage(false), 5000)
+    } catch (err) {
+      setError("Error activating vehicle. Please try again.")
+      setRobotMessage("Error activating vehicle. Please try again.")
+      setRobotMessageType("error")
+      setShowRobotMessage(true)
+      setTimeout(() => setShowRobotMessage(false), 5000)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [API_URL])
+
   // Scroll to a specific vehicle row
   const scrollToVehicle = useCallback((licensePlate: string) => {
     const element = document.getElementById(`vehicle-${licensePlate}`)
@@ -280,6 +304,18 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({ onBack }) => 
       setShowRobotMessage(false)
     }
   }, [])
+
+  // Filter vehicles
+  const filteredVehicles = useMemo(() => {
+    return vehicles.filter((vehicle) => {
+      const matchesSearch =
+        !searchTerm ||
+        vehicle.licensePlate.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        vehicle.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        vehicle.brand.toLowerCase().includes(searchTerm.toLowerCase())
+      return matchesSearch
+    })
+  }, [vehicles, searchTerm])
 
   useEffect(() => {
     if (userId) {
@@ -500,12 +536,20 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({ onBack }) => 
                       <div className="text-sm text-gray-900">{vehicle.color}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                        Active
+                      <span
+                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          vehicle.isDelete
+                            ? "bg-red-100 text-red-800"
+                            : "bg-green-100 text-green-800"
+                        }`}
+                      >
+                        {vehicle.isDelete ? "Deleted" : "Active"}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {violations[vehicle.licensePlate] && violations[vehicle.licensePlate].length > 0 ? (
+                      {vehicle.isDelete ? (
+                        <span className="text-sm text-gray-500">No violations (Deleted)</span>
+                      ) : violations[vehicle.licensePlate] && violations[vehicle.licensePlate].length > 0 ? (
                         <div className="flex items-center">
                           <div className="w-2 h-2 bg-red-500 rounded-full mr-2"></div>
                           <span className="text-sm font-medium text-red-600">
@@ -516,26 +560,35 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({ onBack }) => 
                         <span className="text-sm text-green-600 font-medium">No violations</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end space-x-2">
-                        <button
-                          onClick={() => navigate(`/violations/history/${vehicle.licensePlate}`)}
-                          className="inline-flex items-center px-3 py-1 border border-gray-300 rounded-md text-sm text-gray-700 bg-white hover:bg-gray-50 transition-colors"
-                          title="View Details"
-                        >
-                          <Eye size={16} className="mr-1" />
-                          View
-                        </button>
-                        <button
-                          onClick={() => navigate(`/editv/${vehicle.id}`)}
-                          className="inline-flex items-center px-3 py-1 border border-blue-300 rounded-md text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
-                          title="Edit Vehicle"
-                        >
-                          <Edit size={16} className="mr-1" />
-                          Edit
-                        </button>
-                      </div>
-                    </td>
+<td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+  <div className="flex items-center justify-end space-x-2">
+    <button
+      onClick={() => navigate(`/violations/history/${vehicle.licensePlate}`)}
+      className="inline-flex items-center w-20 justify-center px-3 py-1 border border-gray-300 rounded-md text-sm text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+      title="View Details"
+    >
+      <Eye size={16} className="mr-1" />
+      View
+    </button>
+    {vehicle.isDelete ? (
+      <button
+        onClick={() => handleActivate(vehicle.id)}
+        className="inline-flex items-center w-20 justify-center px-3 py-1 border border-green-300 rounded-md text-sm text-green-700 bg-green-50 hover:bg-green-100 transition-colors"
+        title="Activate Vehicle"
+      >
+        <RefreshCw size={16} />
+      </button>
+    ) : (
+      <button
+        onClick={() => navigate(`/editv/${vehicle.id}`)}
+        className="inline-flex items-center w-20 justify-center px-3 py-1 border border-blue-300 rounded-md text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
+        title="Edit Vehicle"
+      >
+        <Edit size={16} />
+      </button>
+    )}
+  </div>
+</td>
                   </tr>
                 ))}
               </tbody>

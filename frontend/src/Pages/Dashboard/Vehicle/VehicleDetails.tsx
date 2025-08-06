@@ -77,12 +77,12 @@ const VehicleDetail = () => {
   // Preload vehicle image
   useEffect(() => {
     if (!vehicle?.image) {
-      console.log('No image to preload: vehicle.image is null or undefined') // Debug
+      console.log('No image to preload: vehicle.image is null or undefined')
       return undefined
     }
     const cacheBuster = `?t=${new Date().getTime()}`
     const imageUrl = `${vehicle.image}${cacheBuster}`
-    console.log('Preloading image:', imageUrl) // Debug
+    console.log('Preloading image:', imageUrl)
     const link = document.createElement('link')
     link.rel = 'preload'
     link.href = imageUrl
@@ -133,7 +133,7 @@ const VehicleDetail = () => {
       })
       if (!response.ok) throw new Error(`HTTP error: ${response.status}`)
       const data: Vehicle = await response.json()
-      console.log('Fetched vehicle:', data) // Debug
+      console.log('Fetched vehicle:', data)
       setVehicle(data)
       setEditForm({
         name: data.name || '',
@@ -144,7 +144,7 @@ const VehicleDetail = () => {
         image: null
       })
       setPreviewUrl(data.image || null)
-      console.log('Set previewUrl:', data.image || 'null') // Debug
+      console.log('Set previewUrl:', data.image || 'null')
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error'
       setErrorMessage(`Error loading vehicle: ${message}`)
@@ -211,12 +211,12 @@ const VehicleDetail = () => {
 
   const handleImageChange = debounce((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    console.log('Selected file:', file) // Debug
+    console.log('Selected file:', file)
     if (file) {
       setEditForm(prev => ({ ...prev, image: file }))
       setErrors(prev => ({ ...prev, image: '' }))
       const imageUrl = URL.createObjectURL(file)
-      console.log('Preview URL:', imageUrl) // Debug
+      console.log('Preview URL:', imageUrl)
       setPreviewUrl(imageUrl)
       setIsModalOpen(true)
     }
@@ -240,9 +240,9 @@ const VehicleDetail = () => {
         vehicleTypeId: vehicleTypeIdNum,
         color: editForm.color,
         brand: editForm.brand,
-        userId: vehicle?.userId ?? null // Preserve userId
+        userId: vehicle?.userId ?? null
       }
-      console.log('Sending vehicleDTO:', vehicleDTO) // Debug userId
+      console.log('Sending vehicleDTO:', vehicleDTO)
       const formData = new FormData()
       formData.append('dto', new Blob([JSON.stringify(vehicleDTO)], { type: 'application/json' }))
       if (editForm.image) {
@@ -258,9 +258,9 @@ const VehicleDetail = () => {
         throw new Error(errorData.message || `HTTP error: ${response.status}`)
       }
       const updatedData: Vehicle = await response.json()
-      console.log('Updated vehicle:', updatedData) // Debug userId and image
+      console.log('Updated vehicle:', updatedData)
       if (updatedData.userId === null && vehicle?.userId !== null) {
-        console.warn('Backend overwrote userId to null! Expected:', vehicle?.userId) // Debug
+        console.warn('Backend overwrote userId to null! Expected:', vehicle?.userId)
       }
       setVehicle(updatedData)
       setVehicles(prev => prev.map(v => v.id === Number(id) ? updatedData : v))
@@ -268,7 +268,7 @@ const VehicleDetail = () => {
       setIsEditing(false)
       setShowConfirm(false)
       setPreviewUrl(updatedData.image || null)
-      console.log('Set previewUrl after save:', updatedData.image || 'null') // Debug
+      console.log('Set previewUrl after save:', updatedData.image || 'null')
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error'
       setErrorMessage(`Error updating vehicle: ${message}`)
@@ -318,15 +318,15 @@ const VehicleDetail = () => {
         image: null
       })
       setPreviewUrl(vehicle.image || null)
-      console.log('Reset previewUrl on cancel:', vehicle.image || 'null') // Debug
+      console.log('Reset previewUrl on cancel:', vehicle.image || 'null')
     }
     setErrors({})
   }
 
   const MemoizedImage = React.memo(() => {
     const cacheBuster = `?t=${new Date().getTime()}`
-    const imageSrc = vehicle?.image ? `${vehicle.image}${cacheBuster}` : null
-    console.log('Rendering MemoizedImage with src:', imageSrc || 'null') // Debug
+    const imageSrc = previewUrl ? `${previewUrl}${previewUrl.includes('blob:') ? '' : cacheBuster}` : null
+    console.log('Rendering MemoizedImage with src:', imageSrc || 'null')
 
     return (
       <motion.div 
@@ -362,9 +362,9 @@ const VehicleDetail = () => {
               onClick={() => setIsModalOpen(true)}
               onError={(e) => {
                 console.error('Failed to load image:', imageSrc, 'Error:', e.currentTarget.onerror)
-                e.currentTarget.src = 'https://via.placeholder.com/300' // Fallback image
+                e.currentTarget.src = 'https://via.placeholder.com/300'
               }}
-              onLoad={() => console.log('Image loaded successfully:', imageSrc)} // Debug
+              onLoad={() => console.log('Image loaded successfully:', imageSrc)}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent rounded-xl opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center forced-colors:bg-[Canvas]">
               <div className="bg-white/90 forced-colors:bg-[Canvas] backdrop-blur-sm rounded-full p-3 transform scale-90 group-hover:scale-100 transition-all duration-300">
@@ -797,8 +797,8 @@ const VehicleDetail = () => {
                 alt="Vehicle Image"
                 className="max-w-full max-h-full object-contain rounded-xl border-2 border-blue-200/50 forced-colors:border-[CanvasText] shadow-2xl shadow-blue-400/40 forced-colors:shadow-none"
                 onClick={() => setIsModalOpen(false)}
-                onError={() => console.error('Failed to load preview image:', previewUrl)} // Debug
-                onLoad={() => console.log('Preview image loaded successfully:', previewUrl)} // Debug
+                onError={() => console.error('Failed to load preview image:', previewUrl)}
+                onLoad={() => console.log('Preview image loaded successfully:', previewUrl)}
               />
             </div>
           </div>
