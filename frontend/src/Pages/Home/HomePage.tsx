@@ -6,7 +6,8 @@ import { useState, useEffect } from "react"
 import { Header, MobileDropdownMenu } from "../../components/Layout/Menu"
 import Footer from "../../components/Layout/Footer"
 import { SearchBar } from "../../components/HomeSearch/search-bar"
-import RecentViolationsSection from "../../components/RecentViolationsSection" // Import the new component
+import RecentViolationsSection from "../../components/RecentViolationsSection"
+import { getCookie } from "../../utils/cookieUltil"
 
 interface StatCard {
   title: string
@@ -50,15 +51,13 @@ const statsData: StatCard[] = [
 // Background Slideshow Component
 function BackgroundSlideshow() {
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
-  // Array of background images - you can add more images here
   const backgroundImages = [
     "https://kajabi-storefronts-production.kajabi-cdn.com/kajabi-storefronts-production/file-uploads/blogs/22606/images/f082d2-6b14-c6a-8076-3304cc3a6c4_vlcsnap-error246.png",
-    // Add more images here if desired
   ]
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentImageIndex((prevIndex) => (prevIndex + 1) % backgroundImages.length)
-    }, 5000) // Change image every 5 seconds
+    }, 5000)
     return () => clearInterval(interval)
   }, [backgroundImages.length])
   return (
@@ -78,7 +77,6 @@ function BackgroundSlideshow() {
           />
         </div>
       ))}
-      {/* Slideshow indicators */}
       <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex space-x-2 z-50">
         {backgroundImages.map((_, index) => (
           <button
@@ -120,7 +118,11 @@ export default function CustomerHome() {
     setHasSearched(true)
 
     try {
-      const response = await fetch("http://localhost:8081/api/accident/user/9")
+      const userId = getCookie("userId") // Get userId from cookie
+      if (!userId) {
+        throw new Error("User ID not found in cookie")
+      }
+      const response = await fetch(`http://localhost:8081/api/accident/user/${userId}`)
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
@@ -164,23 +166,16 @@ export default function CustomerHome() {
       <Header showMobileMenu={showMobileMenu} setShowMobileMenu={setShowMobileMenu} />
       <MobileDropdownMenu showMobileMenu={showMobileMenu} setShowMobileMenu={setShowMobileMenu} />
       <main>
-        {/* Hero Section */}
         <div className="relative overflow-hidden min-h-[70vh]">
-          {" "}
-          {/* Added min-h-[70vh] */}
-          {/* Background Image Slideshow */}
           <div className="absolute inset-0">
             <div className="absolute inset-0 bg-gradient-to-br from-blue-700/10 via-indigo-900/20 to-purple-900/80 z-10"></div>
             <div className="absolute inset-0 bg-black/40 z-20"></div>
-            {/* Slideshow Container */}
             <div className="absolute inset-0 z-0">
               <BackgroundSlideshow />
             </div>
-            {/* Animated Elements */}
             <div className="absolute top-20 left-10 w-32 h-32 bg-blue-400/20 rounded-full blur-3xl animate-pulse z-30"></div>
             <div className="absolute top-40 right-20 w-48 h-48 bg-purple-400/20 rounded-full blur-3xl animate-pulse delay-1000 z-30"></div>
             <div className="absolute bottom-20 left-1/3 w-40 h-40 bg-cyan-400/20 rounded-full blur-3xl animate-pulse delay-500 z-30"></div>
-            {/* Grid Pattern */}
             <div className="absolute inset-0 opacity-10 z-30">
               <div
                 className="h-full w-full"
@@ -192,9 +187,7 @@ export default function CustomerHome() {
             </div>
           </div>
           <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-32 z-40">
-            {/* Rest of the hero content remains the same */}
             <div className="text-center">
-              {/* Live Status Indicator */}
               <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-xl rounded-full px-4 py-2 mb-8 border border-white/20">
                 <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                 <span className="text-white/90 text-sm font-medium">
@@ -206,11 +199,9 @@ export default function CustomerHome() {
                 Advanced AI-powered traffic violation detection and monitoring system. Search violations, track
                 compliance, and ensure road safety with real-time data.
               </p>
-              {/* Enhanced Search Interface - Replaced with SearchBar component */}
               <SearchBar onSearch={handleSearch} isSearching={isSearching} />
             </div>
           </div>
-          {/* Floating Elements */}
           <div className="absolute top-1/4 right-10 opacity-20 animate-bounce z-40">
             <Shield className="h-16 w-16 text-blue-300" />
           </div>
@@ -218,10 +209,7 @@ export default function CustomerHome() {
             <Eye className="h-20 w-20 text-purple-300" />
           </div>
         </div>
-        {/* Features Section */}
         <div className="py-20 bg-white/50 backdrop-blur-xl relative z-[10]">
-          {" "}
-          {/* Increased z-index */}
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-16">
               <h2 className="text-4xl font-bold text-gray-900 mb-4">Advanced Traffic Monitoring Features</h2>
@@ -264,7 +252,6 @@ export default function CustomerHome() {
             </div>
           </div>
         </div>
-        {/* Recent Violations Section (now a separate component) */}
         <RecentViolationsSection
           hasSearched={hasSearched}
           searchResults={searchResults}

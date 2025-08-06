@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react"
 import axios from "axios"
 import { useLocation } from "react-router-dom"
 import NewNotificationAlert from "./new-notification-alert"
+import { getCookie } from "../../utils/cookieUltil"
 
 interface Notification {
   id: number
@@ -39,7 +40,6 @@ const NotificationDropdown = () => {
   const [newToast, setNewToast] = useState<Notification | null>(null)
   const [shownToastIds, setShownToastIds] = useState<Set<number>>(new Set())
   const notificationRef = useRef<HTMLDivElement>(null)
-  const userId = 9 // fake for testing
   const originalTitle = useRef(document.title)
   const [titleMarqueeIntervalId, setTitleMarqueeIntervalId] = useState<NodeJS.Timeout | null>(null)
   const titleMarqueeBaseText = useRef("🔔 You have new Violation/Accident")
@@ -68,6 +68,10 @@ const NotificationDropdown = () => {
   const fetchNotifications = async () => {
     setLoading(true)
     try {
+      const userId = getCookie("userId") // Get userId from cookie
+      if (!userId) {
+        throw new Error("User ID not found in cookie")
+      }
       const res = await axios.get<Notification[]>(`http://localhost:8081/api/notifications/${userId}`)
       const currentUnread = res.data.filter((n) => !n.read)
 
@@ -87,12 +91,10 @@ const NotificationDropdown = () => {
           startTitleMarquee()
         } else {
           stopTitleMarquee()
-          if (newestNotification) {
-            // Only show toast if NOT on the user traffic map page
-            if (location.pathname !== "/usermap") {
-              setNewToast(newestNotification)
-              setShownToastIds((prev) => new Set(prev).add(newestNotification.id))
-            }
+          if (newestNotification && !location.pathname.startsWith("/accidentsdetails") && location.pathname !== "/usermap") {
+            // Only show toast if NOT on the accidentsdetails or usermap pages
+            setNewToast(newestNotification)
+            setShownToastIds((prev) => new Set(prev).add(newestNotification.id))
           }
         }
       } else {

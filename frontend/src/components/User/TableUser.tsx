@@ -1,11 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, ReactNode } from 'react';
 import { Trash2 } from 'lucide-react';
-import GenericTable, { TableColumn, TableAction, FilterConfig } from '../../components/Table/GenericTable';
+import GenericTable, { TableColumn, FilterConfig } from '../../components/Table/GenericTable';
 import ConfirmDialog from '../UI/PopUp/ConfirmDialog';
 import DeleteButton from '../Button/DeleteButton';
 import EditButton from '../Button/EditButton';
 
-// Giữ nguyên interfaces từ code cũ
+// Hàm helper để lấy cookie
+const getCookie = (name: string) => {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(';').shift();
+  return null;
+};
+
 interface User {
   userId: number;
   avatar: string;
@@ -28,8 +35,42 @@ interface FilterState {
   search: string;
 }
 
+// Define TableAction interface to match the expected type
+interface TableAction<T> {
+  key: string;
+  label: string;
+  icon?: ReactNode;
+  onClick: (record: T) => void;
+}
+
+// Extend GenericTableProps to include getRowClassName
+interface GenericTableProps<T> {
+  data: T[];
+  filteredData: T[];
+  columns: TableColumn<T>[];
+  rowKey: keyof T;
+  actions: TableAction<T>[];
+  filters: FilterConfig[];
+  filterValues: FilterState;
+  onFilterChange: (type: string, value: string) => void;
+  onResetFilters: () => void;
+  loading: boolean;
+  error: string | null;
+  onRetry: () => void;
+  emptyMessage: string;
+  pagination: {
+    enabled: boolean;
+    currentPage: number;
+    totalPages: number;
+    pageSize: number;
+    totalItems: number;
+    onPageChange: (page: number) => void;
+    onPageSizeChange: (pageSize: number) => void;
+  };
+  getRowClassName?: (record: T) => string;
+}
+
 export default function TableUser() {
-  // Giữ nguyên tất cả states từ code cũ
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
@@ -41,11 +82,8 @@ export default function TableUser() {
     status: '',
     search: ''
   });
-  
-  // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  
   const [confirmDialog, setConfirmDialog] = useState({
     isOpen: false,
     title: '',
@@ -54,6 +92,9 @@ export default function TableUser() {
     confirmButtonText: 'Confirm',
     confirmButtonColor: 'bg-red-500 hover:bg-red-600'
   });
+
+  // Lấy userId từ cookie
+  const currentUserId = getCookie('userId') && !isNaN(parseInt(getCookie('userId')!)) ? parseInt(getCookie('userId')!) : null;
 
   const API_BASE_URL = 'http://localhost:8081/api';
   const token = localStorage.getItem("token");
@@ -64,7 +105,6 @@ export default function TableUser() {
     },
   };
 
-  // Helper function để sắp xếp users theo userName
   const sortUsersByUserName = (userList: User[]) => {
     return [...userList].sort((a, b) => {
       const userNameA = (a.userName || '').toLowerCase();
@@ -101,7 +141,6 @@ export default function TableUser() {
       }
     }
 
-    // Sắp xếp theo userName sau khi filter
     return sortUsersByUserName(filtered);
   };
 
@@ -140,7 +179,7 @@ export default function TableUser() {
 
   const handlePageSizeChange = (newPageSize: number) => {
     setPageSize(newPageSize);
-    setCurrentPage(1); 
+    setCurrentPage(1);
   };
 
   const toggleUserActive = async (userId: number, currentStatus: boolean, index: number) => {
@@ -275,7 +314,6 @@ export default function TableUser() {
     }
   };
 
-  // Helper function để get role badge color
   const getRoleBadgeColor = (role: string) => {
     const colors = {
       'Admin': 'bg-red-100 text-red-800 border-red-200',
@@ -287,7 +325,6 @@ export default function TableUser() {
     return colors[role as keyof typeof colors] || 'bg-gray-100 text-gray-800 border-gray-200';
   };
 
-  // Fetch roles useEffect
   useEffect(() => {
     const fetchRoles = async () => {
       try {
@@ -314,7 +351,6 @@ export default function TableUser() {
     fetchRoles();
   }, []);
 
-  // Fetch users useEffect
   useEffect(() => {
     const fetchUsers = async () => {
       try {
@@ -357,7 +393,6 @@ export default function TableUser() {
           } as User;
         });
 
-        // Sắp xếp mặc định theo userName ngay khi fetch data
         const sortedUsers = sortUsersByUserName(usersWithRoles);
         setUsers(sortedUsers);
         setLoading(false);
@@ -373,7 +408,6 @@ export default function TableUser() {
     }
   }, [roleObjects]);
 
-  // Định nghĩa columns cho GenericTable với styling hiện đại
   const columns: TableColumn<User>[] = [
     {
       key: 'avatar',
@@ -391,6 +425,11 @@ export default function TableUser() {
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-gray-900 truncate">
               {record.fullName || "(unknown)"}
+              {record.userId === currentUserId && (
+                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  You
+                </span>
+              )}
             </p>
             <p className="text-sm text-gray-500 truncate">
               @{record.userName || "unknown"}
@@ -418,23 +457,28 @@ export default function TableUser() {
       title: 'ROLE',
       render: (value, record) => (
         <div className="space-y-3">
-
-          <div className="relative">
-            <select
-              className="appearance-none block w-full py-2.5 pl-4 pr-10 text-sm border border-gray-200 rounded-xl bg-white hover:border-blue-300 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 cursor-pointer shadow-sm"
-              value={value}
-              onChange={(e) => handleRoleChange(record.userId, e.target.value)}
-            >
-              {roles.map((role) => (
-                <option key={role} value={role} className="py-2">{role}</option>
-              ))}
-            </select>
-            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-              <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
+          {record.userId === currentUserId ? (
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getRoleBadgeColor(value)}`}>
+              {value}
+            </span>
+          ) : (
+            <div className="relative">
+              <select
+                className="appearance-none block w-full py-2.5 pl-4 pr-10 text-sm border border-gray-200 rounded-xl bg-white hover:border-blue-300 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 cursor-pointer shadow-sm"
+                value={value}
+                onChange={(e) => handleRoleChange(record.userId, e.target.value)}
+              >
+                {roles.map((role) => (
+                  <option key={role} value={role} className="py-2">{role}</option>
+                ))}
+              </select>
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )
     },
@@ -481,18 +525,21 @@ export default function TableUser() {
       icon: (
         <div className="p-2 rounded-lg hover:bg-red-50 transition-colors duration-200 group">
           <DeleteButton
-            onClick={() => {}}
+            onClick={() => {}} // Placeholder onClick to satisfy DeleteButtonProps
             size="md"
             variant="icon"
             className="text-red-500 hover:text-red-700 group-hover:scale-110 transition-transform duration-200"
           />
         </div>
       ),
-      onClick: (record) => handleDeleteUser(record.userId)
+      onClick: (record) => {
+        if (record.userId !== currentUserId) {
+          handleDeleteUser(record.userId);
+        }
+      }
     }
   ];
 
-  // Định nghĩa filters cho GenericTable
   const filterConfigs: FilterConfig[] = [
     {
       key: 'search',
@@ -542,6 +589,7 @@ export default function TableUser() {
           onPageChange: handlePageChange,
           onPageSizeChange: handlePageSizeChange
         }}
+      
       />
 
       <ConfirmDialog

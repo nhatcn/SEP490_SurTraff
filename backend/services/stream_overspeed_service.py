@@ -42,7 +42,7 @@ class_names = {
 }
 
 # Initialize EasyOCR
-ocr_reader = easyocr.Reader(['en'], gpu=False)
+ocr_reader = easyocr.Reader(['en'], gpu=True)
 
 # Initialize FastAPI
 app = FastAPI()

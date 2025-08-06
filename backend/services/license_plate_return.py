@@ -5,7 +5,7 @@ import easyocr
 
 # Initialize YOLOv8 model and EasyOCR reader
 model = YOLO('backend/best90.pt')
-reader = easyocr.Reader(['en'], gpu=False)
+reader = easyocr.Reader(['en'], gpu=True)
 
 def preprocess_plate_image(plate_img):
     # Convert to grayscale

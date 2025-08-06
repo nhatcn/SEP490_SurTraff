@@ -20,6 +20,24 @@ interface SearchBarProps {
   isSearching: boolean
 }
 
+// Helper to decode JWT token and get payload
+function parseJwt(token: string): any {
+  try {
+    const base64Url = token.split('.')[1]
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => `%${('00' + c.charCodeAt(0).toString(16)).slice(-2)}`)
+        .join('')
+    )
+    return JSON.parse(jsonPayload)
+  } catch (err) {
+    console.error('Error decoding token', err)
+    return null
+  }
+}
+
 export function SearchBar({ onSearch, initialSearchQuery = "", isSearching }: SearchBarProps) {
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery)
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
@@ -29,35 +47,47 @@ export function SearchBar({ onSearch, initialSearchQuery = "", isSearching }: Se
   const dropdownRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Fetch vehicles on component mount
   useEffect(() => {
     const fetchVehicles = async () => {
       setIsLoadingVehicles(true)
       try {
-        // Using a fixed userId of 7 as per the requirement
-        const response = await fetch("http://localhost:8081/api/vehicle/user/9")
+        const token = localStorage.getItem("token")
+        if (!token) {
+          throw new Error("No token found")
+        }
+
+        const payload = parseJwt(token)
+        const userId = payload?.userId
+        if (!userId) {
+          throw new Error("Invalid token: missing userId")
+        }
+
+        const response = await fetch(`http://localhost:8081/api/vehicle/user/${userId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`)
         }
+
         const data: Vehicle[] = await response.json()
         setVehicles(data)
       } catch (error) {
         console.error("Failed to fetch vehicles:", error)
-        // In a real application, you might want to display an error message to the user
       } finally {
         setIsLoadingVehicles(false)
       }
     }
+
     fetchVehicles()
   }, [])
 
-  // Filter plates based on search query whenever query or vehicles change
   useEffect(() => {
     if (searchQuery.trim() === "") {
-      // If search query is empty, show all license plates
       setFilteredPlates(vehicles.map((v) => v.licensePlate))
     } else {
-      // Filter plates that include the search query (case-insensitive)
       const filtered = vehicles
         .map((v) => v.licensePlate)
         .filter((plate) => plate.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -67,18 +97,18 @@ export function SearchBar({ onSearch, initialSearchQuery = "", isSearching }: Se
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value)
-    setShowDropdown(true) // Show dropdown on input change
+    setShowDropdown(true)
   }
 
   const handlePlateSelect = (plate: string) => {
     setSearchQuery(plate)
     setShowDropdown(false)
-    onSearch(plate) // Trigger search immediately when a plate is selected from the dropdown
+    onSearch(plate)
   }
 
   const handleSearchClick = () => {
     onSearch(searchQuery)
-    setShowDropdown(false) // Hide dropdown after search
+    setShowDropdown(false)
   }
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -87,7 +117,6 @@ export function SearchBar({ onSearch, initialSearchQuery = "", isSearching }: Se
     }
   }
 
-  // Close dropdown when clicking outside of the search bar or dropdown
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -99,6 +128,7 @@ export function SearchBar({ onSearch, initialSearchQuery = "", isSearching }: Se
         setShowDropdown(false)
       }
     }
+
     document.addEventListener("mousedown", handleClickOutside)
     return () => {
       document.removeEventListener("mousedown", handleClickOutside)
@@ -117,7 +147,7 @@ export function SearchBar({ onSearch, initialSearchQuery = "", isSearching }: Se
               className="w-full px-8 py-6 text-lg bg-white/90 backdrop-blur-xl border-0 rounded-2xl focus:ring-4 focus:ring-blue-500/30 focus:outline-none placeholder-gray-500 font-medium"
               value={searchQuery}
               onChange={handleInputChange}
-              onFocus={() => setShowDropdown(true)} // Show dropdown on focus
+              onFocus={() => setShowDropdown(true)}
               onKeyPress={handleKeyPress}
               aria-label="License plate search input"
             />
