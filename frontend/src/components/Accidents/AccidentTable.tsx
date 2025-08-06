@@ -939,18 +939,6 @@ export default function AccidentTable() {
                     <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                       {stats.totalAccidents}
                     </p>
-                    <div className="flex items-center space-x-1 mt-2">
-                      <TrendingUp size={14} className={stats.trendPercentage > 0 ? "text-red-500" : "text-green-500"} />
-                      <span
-                        className={`text-sm font-medium ${
-                          stats.trendPercentage > 0 ? "text-red-500" : "text-green-500"
-                        }`}
-                      >
-                        {stats.trendPercentage > 0 ? "+" : ""}
-                        {stats.trendPercentage.toFixed(1)}%
-                      </span>
-                      <span className="text-xs text-gray-500">vs last week</span>
-                    </div>
                   </div>
                   <div className="bg-gradient-to-r from-blue-500 to-purple-500 p-3 rounded-xl shadow-lg">
                     <AlertTriangle className="text-white" size={24} />

@@ -26,12 +26,12 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Cấu hình đường dẫn file
-KNOWLEDGE_TXT_PATH = "surtraff_knowledge.txt"
-SOCIAL_TXT_PATH = "social.txt"
-TRAFFIC_DIALOGS_PATH = "traffic_dialogs.txt"
-FEEDBACK_FILE = "custom_knowledge.jsonl"
-FAISS_INDEX_PATH = "faiss_index"
-CHAT_LOG_FILE = "chat_log.jsonl"
+KNOWLEDGE_TXT_PATH = "services/chatbot/surtraff_knowledge.txt"
+SOCIAL_TXT_PATH = "services/chatbot/social.txt"
+TRAFFIC_DIALOGS_PATH = "services/chatbot/traffic_dialogs.txt"
+FEEDBACK_FILE = "services/chatbot/custom_knowledge.jsonl"
+FAISS_INDEX_PATH = "services/chatbot/faiss_index"
+CHAT_LOG_FILE = "services/chatbot/chat_log.jsonl"
 LIMIT_FEEDBACK = 1000
 
 # Thiết lập API key

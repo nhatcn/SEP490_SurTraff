@@ -21,6 +21,7 @@ import {
   FileText,
   Sparkles,
   Eye,
+  AlertTriangle,
 } from "lucide-react"
 import { Button } from "../../components/UI/AccidentUI/button"
 import { Card, CardHeader, CardTitle, CardContent } from "../../components/UI/AccidentUI/card"
@@ -51,6 +52,24 @@ export default function AccidentDetailsTable() {
   const [imageLoading, setImageLoading] = useState(true)
   const [imageKey, setImageKey] = useState(Date.now())
   const [displayImageUrl, setDisplayImageUrl] = useState<string | null>(null)
+  const [descriptionError, setDescriptionError] = useState<string | null>(null)
+
+  // Validation function for description
+  const validateDescription = (desc: string): string | null => {
+    if (!desc.trim()) {
+      return "Description cannot be empty."
+    }
+    if (/^\d+$/.test(desc.trim())) {
+      return "Description cannot contain only numbers."
+    }
+    if (/[^a-zA-Z0-9\s,.!?-]/.test(desc)) {
+      return "Description cannot contain special characters (except ,.!?-)."
+    }
+    if (desc.length > 1000) {
+      return "Description cannot exceed 1000 characters."
+    }
+    return null
+  }
 
   useEffect(() => {
     setLoading(true)
@@ -85,6 +104,14 @@ export default function AccidentDetailsTable() {
 
   const handleSave = async () => {
     if (!accident) return
+
+    // Validate description before saving
+    const validationError = validateDescription(editDescription)
+    if (validationError) {
+      setDescriptionError(validationError)
+      return
+    }
+
     try {
       const updatedAccident = { description: editDescription }
       const res = await fetch(`http://localhost:8081/api/accident/${accident.id}`, {
@@ -94,7 +121,7 @@ export default function AccidentDetailsTable() {
       })
       const updatedData = await res.json()
       if (!res.ok) {
-        alert("Failed to update description.")
+        setDescriptionError("Failed to update description.")
         return
       }
       setAccident({
@@ -112,9 +139,10 @@ export default function AccidentDetailsTable() {
       })
       setIsEditing(false)
       setShowConfirm(false)
+      setDescriptionError(null)
     } catch (error) {
       console.error("Error saving description:", error)
-      alert("An error occurred while updating the description.")
+      setDescriptionError("An error occurred while updating the description.")
     }
   }
 
@@ -131,11 +159,11 @@ export default function AccidentDetailsTable() {
         updatedData = JSON.parse(responseText)
       } catch (jsonError) {
         console.error("JSON parse error:", jsonError)
-        alert("Invalid response from server.")
+        setDescriptionError("Invalid response from server.")
         return
       }
       if (!res.ok) {
-        alert("Failed to approve accident.")
+        setDescriptionError("Failed to approve accident.")
         return
       }
       setAccident({
@@ -154,7 +182,7 @@ export default function AccidentDetailsTable() {
       navigate("/accidentdashboard")
     } catch (error) {
       console.error("Error approving accident:", error)
-      alert("An error occurred while approving the accident.")
+      setDescriptionError("An error occurred while approving the accident.")
     }
   }
 
@@ -219,7 +247,14 @@ export default function AccidentDetailsTable() {
                   </Button>
                 ) : (
                   <div className="flex gap-2">
-                    <Button onClick={() => setShowConfirm(true)} variant="success" className="inline-flex items-center">
+                    <Button onClick={() => {
+                      const validationError = validateDescription(editDescription)
+                      if (validationError) {
+                        setDescriptionError(validationError)
+                      } else {
+                        setShowConfirm(true)
+                      }
+                    }} variant="success" className="inline-flex items-center">
                       <Save className="w-4 h-4 mr-2" />
                       Save
                     </Button>
@@ -227,6 +262,7 @@ export default function AccidentDetailsTable() {
                       onClick={() => {
                         setIsEditing(false)
                         setEditDescription(accident.description || "")
+                        setDescriptionError(null)
                       }}
                       variant="secondary"
                       className="inline-flex items-center"
@@ -239,6 +275,37 @@ export default function AccidentDetailsTable() {
             </div>
           </div>
         </motion.div>
+
+        {/* Error Notification Table */}
+        {descriptionError && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="mb-6"
+          >
+            <Card className="bg-red-50/95 border-2 border-red-300 rounded-2xl shadow-xl">
+              <CardHeader className="bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-t-2xl p-5">
+                <CardTitle className="flex items-center text-white text-xl">
+                  <div className="w-9 h-9 bg-white/20 rounded-lg flex items-center justify-center mr-3 shadow-inner">
+                    <AlertTriangle className="w-5 h-5" />
+                  </div>
+                  Validation Error
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="flex items-center space-x-3">
+                  <div className="w-11 h-11 bg-red-600 rounded-xl flex items-center justify-center shadow-md">
+                    <AlertTriangle className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-red-700 font-medium text-lg">{descriptionError}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column - Details */}
@@ -373,9 +440,15 @@ export default function AccidentDetailsTable() {
                   {isEditing ? (
                     <Textarea
                       value={editDescription}
-                      onChange={(e) => setEditDescription(e.target.value)}
+                      onChange={(e) => {
+                        setEditDescription(e.target.value)
+                        const validationError = validateDescription(e.target.value)
+                        setDescriptionError(validationError)
+                      }}
                       placeholder="Enter incident description..."
-                      className="min-h-[150px] resize-y focus:ring-4 focus:ring-blue-300 border-2 hover:border-blue-300 rounded-xl p-4 text-lg"
+                      className={`min-h-[150px] resize-y focus:ring-4 focus:ring-blue-300 border-2 rounded-xl p-4 text-lg ${
+                        descriptionError ? "border-red-300 focus:ring-red-300" : "hover:border-blue-300"
+                      }`}
                       rows={5}
                     />
                   ) : (
@@ -547,7 +620,7 @@ export default function AccidentDetailsTable() {
                     <Button
                       onClick={handleApprove}
                       variant="success"
-                      className="w-full shadow-xl hover:shadow-2xl bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:from-green-600 hover:to-emerald-600 text-lg py-3 flex items-center justify-center" // Added flex items-center justify-center
+                      className="w-full shadow-xl hover:shadow-2xl bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:from-green-600 hover:to-emerald-600 text-lg py-3 flex items-center justify-center"
                       size="lg"
                     >
                       Approve Accident
