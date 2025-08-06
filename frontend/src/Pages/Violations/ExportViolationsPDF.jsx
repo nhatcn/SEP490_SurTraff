@@ -68,36 +68,35 @@ const ExportViolationsPDF = ({ violations }) => {
         doc.restoreGraphicsState()
       }
 
-      const addHeader = (pageNumber) => {
-        // Header background (white)
-        doc.setFillColor(colors.background[0], colors.background[1], colors.background[2])
-        doc.rect(0, 0, 210, 45, 'F')
-        
-        // Add logo
-        doc.addImage(logoImage, 'PNG', 15, 12, 25, 20)
+     const addHeader = (pageNumber) => {
+  // Header background (white)
+  doc.setFillColor(colors.background[0], colors.background[1], colors.background[2])
+  doc.rect(0, 0, 210, 45, 'F')
+  
+  // Add logo
+  doc.addImage(logoImage, 'PNG', 15, 12, 25, 20)
 
-        // Title and system info
-        doc.setTextColor(colors.text[0], colors.text[1], colors.text[2])
-        doc.setFontSize(20)
-        doc.setFont('helvetica', 'bold')
-        doc.text(title, 50, 20)
-        
-        doc.setFontSize(12)
-        doc.setFont('helvetica', 'normal')
-        doc.text('Traffic Violation Management System', 50, 28)
-        
-        doc.setFontSize(10)
-        doc.text(`Generated: ${currentDate}`, 50, 35)
-        
-        // Page number with modern styling
-        doc.setFillColor(colors.background[0], colors.background[1], colors.background[2])
-        doc.roundedRect(170, 8, 25, 12, 2, 2, 'F')
-        doc.setTextColor(colors.primary[0], colors.primary[1], colors.primary[2])
-        doc.setFontSize.dissection(10)
-        doc.setFont('helvetica', 'bold')
-        doc.text(`Page ${pageNumber}`, 182.5, 16, { align: 'center' })
-      }
-
+  // Title and system info
+  doc.setTextColor(colors.text[0], colors.text[1], colors.text[2])
+  doc.setFontSize(20)
+  doc.setFont('helvetica', 'bold')
+  doc.text(title, 50, 20)
+  
+  doc.setFontSize(12)
+  doc.setFont('helvetica', 'normal')
+  doc.text('Traffic Violation Management System', 50, 28)
+  
+  doc.setFontSize(10)
+  doc.text(`Generated: ${currentDate}`, 50, 35)
+  
+  // Page number with modern styling
+  doc.setFillColor(colors.background[0], colors.background[1], colors.background[2])
+  doc.roundedRect(170, 8, 25, 12, 2, 2, 'F')
+  doc.setTextColor(colors.primary[0], colors.primary[1], colors.primary[2])
+  doc.setFontSize(10) // Fixed the typo here
+  doc.setFont('helvetica', 'bold')
+  doc.text(`Page ${pageNumber}`, 182.5, 16, { align: 'center' })
+}
       const addFooter = (pageNumber, totalPages) => {
         // Footer line
         doc.setDrawColor(colors.border[0], colors.border[1], colors.border[2])
