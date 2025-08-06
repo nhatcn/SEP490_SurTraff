@@ -1,7 +1,13 @@
+
+"use client"
+
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
+import { getCookie } from '../../utils/cookieUtils'; // Adjust the import path based on your project structure
 
 const AddVehicle = () => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: '',
     licensePlate: '',
@@ -20,36 +26,56 @@ const AddVehicle = () => {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Fetch userId automatically
+  const API_URL = "http://localhost:8081";
+
+  // Fetch userId using cookie and localStorage
   useEffect(() => {
-    const fetchUserId = async () => {
+    const fetchUserData = async () => {
+      setIsLoading(true);
       try {
-        const response = await fetch('http://localhost:8081/api/auth/current-user', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            // 'Authorization': `Bearer ${yourToken}` // Uncomment if authentication is required
-          },
-        });
-        if (!response.ok) throw new Error('Failed to fetch user ID');
-        const userData = await response.json();
-        setFormData((prev) => ({ ...prev, userId: userData.id.toString() }));
+        const userId = getCookie('userId');
+        if (!userId) {
+          setFormData((prev) => ({ ...prev, userId: "" }));
+          setErrorMessage("No user ID found in cookies");
+          setIsLoading(false);
+          return;
+        }
+
+        const response = await fetch(`${API_URL}/api/users/${userId}`);
+        if (response.ok) {
+          const user = await response.json();
+          setFormData((prev) => ({ ...prev, userId: user.id.toString() }));
+        } else {
+          const localStorageUserId = localStorage.getItem("userId");
+          if (localStorageUserId) {
+            setFormData((prev) => ({ ...prev, userId: localStorageUserId }));
+            setErrorMessage("Failed to fetch user data, using localStorage userId");
+          } else {
+            setErrorMessage("No user ID found");
+          }
+        }
       } catch (error) {
-        setErrorMessage(`Error fetching user ID: ${error.message}`);
+        console.error("Error fetching user data:", error);
+        const localStorageUserId = localStorage.getItem("userId") || "";
+        setFormData((prev) => ({ ...prev, userId: localStorageUserId }));
+        setErrorMessage("Error fetching user data, using localStorage userId");
+      } finally {
+        setIsLoading(false);
       }
     };
-    fetchUserId();
-  }, []);
+
+    fetchUserData();
+  }, [API_URL]);
 
   // Fetch vehicle types from API
   useEffect(() => {
     const fetchVehicleTypes = async () => {
       try {
-        const response = await fetch('http://localhost:8081/api/violations/vehicle-types', {
+        const response = await fetch(`${API_URL}/api/violations/vehicle-types`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
         });
-        if (!response.ok) throw new Error('Failed to fetch vehicle types');
+        if (!response.ok) throw new Error(`Failed to fetch vehicle types: ${response.status}`);
         const data = await response.json();
         setVehicleTypes(data);
       } catch (error) {
@@ -57,34 +83,35 @@ const AddVehicle = () => {
       }
     };
     fetchVehicleTypes();
-  }, []);
+  }, [API_URL]);
 
-  // Fetch existing vehicles to check license plates
+  // Fetch existing vehicles for the specific user to check license plates
   useEffect(() => {
     const fetchVehicles = async () => {
       try {
-        const response = await fetch('http://localhost:8081/api/vehicle', {
+        const response = await fetch(`${API_URL}/api/vehicle/user/${formData.userId}`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
         });
-        if (!response.ok) throw new Error('Failed to fetch vehicles');
+        if (!response.ok) throw new Error(`Failed to fetch vehicles: ${response.status}`);
         const vehicles = await response.json();
         setExistingPlates(vehicles.map((vehicle) => vehicle.licensePlate));
       } catch (error) {
         setErrorMessage(`Error loading vehicles: ${error.message}`);
       }
     };
-    fetchVehicles();
-  }, []);
+    if (formData.userId) {
+      fetchVehicles();
+    }
+  }, [API_URL, formData.userId]);
 
   const validateForm = () => {
     const newErrors = {};
     const plateRegex = /^\d{2}[A-Z]{1,2}-\d{4,5}$/;
-    const textRegex = /^[a-zA-Z\s]+$/; // Allow only letters and spaces
+    const textRegex = /^[a-zA-Z\s]+$/;
     const specialCharRegex = /[!@#$%^&*(),.?":{}|<>]/;
     const numberRegex = /^\d+$/;
 
-    // Validate name
     if (!formData.name || formData.name.trim() === '') {
       newErrors.name = 'Vehicle name is required';
     } else if (specialCharRegex.test(formData.name)) {
@@ -93,7 +120,6 @@ const AddVehicle = () => {
       newErrors.name = 'Vehicle name must contain only letters and spaces';
     }
 
-    // Validate license plate
     if (!formData.licensePlate || formData.licensePlate.trim() === '') {
       newErrors.licensePlate = 'License plate is required';
     } else if (!plateRegex.test(formData.licensePlate)) {
@@ -102,19 +128,16 @@ const AddVehicle = () => {
       newErrors.licensePlate = 'License plate already exists';
     }
 
-    // Validate user ID
     if (!formData.userId || formData.userId.trim() === '') {
       newErrors.userId = 'User ID is required';
     } else if (!numberRegex.test(formData.userId)) {
       newErrors.userId = 'User ID must be a number';
     }
 
-    // Validate vehicle type
     if (!formData.vehicleTypeId || formData.vehicleTypeId.trim() === '') {
       newErrors.vehicleTypeId = 'Vehicle type is required';
     }
 
-    // Validate color
     if (!formData.color || formData.color.trim() === '') {
       newErrors.color = 'Color is required';
     } else if (specialCharRegex.test(formData.color)) {
@@ -123,7 +146,6 @@ const AddVehicle = () => {
       newErrors.color = 'Color must contain only letters and spaces';
     }
 
-    // Validate brand
     if (!formData.brand || formData.brand.trim() === '') {
       newErrors.brand = 'Brand is required';
     } else if (specialCharRegex.test(formData.brand)) {
@@ -159,14 +181,14 @@ const AddVehicle = () => {
     }
 
     try {
-      const response = await fetch('http://localhost:8081/api/vehicle', {
+      const response = await fetch(`${API_URL}/api/vehicle`, {
         method: 'POST',
         body: formDataToSend,
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || `HTTP error! Status: ${response.status}`);
+        throw new Error(errorData.message || `HTTP error: ${response.status}`);
       }
 
       const newVehicle = await response.json();
@@ -182,9 +204,13 @@ const AddVehicle = () => {
       });
       setPreviewUrl(null);
       setExistingPlates((prev) => [...prev, newVehicle.licensePlate]);
-      setTimeout(() => setSuccessMessage(''), 5000);
+      setTimeout(() => {
+        setSuccessMessage('');
+        navigate('/vehicle/list');
+      }, 2000);
     } catch (error) {
       setErrorMessage(`Error: ${error.message}`);
+      setTimeout(() => setErrorMessage(''), 5000);
     } finally {
       setIsLoading(false);
     }
@@ -342,6 +368,50 @@ const AddVehicle = () => {
               <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   <div className="flex items-center space-x-2">
+                    <svg className="w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                      />
+                    </svg>
+                    <span>User ID</span>
+                  </div>
+                </label>
+                <input
+                  type="text"
+                  name="userId"
+                  value={formData.userId}
+                  onChange={handleChange}
+                  placeholder="e.g., 123"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-300 bg-gray-50/50 hover:bg-white"
+                  disabled={isLoading}
+                />
+                <AnimatePresence>
+                  {errors.userId && (
+                    <motion.p
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="text-red-500 text-xs flex items-center space-x-1"
+                    >
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path
+                          fillRule="evenodd"
+                          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      <span>{errors.userId}</span>
+                    </motion.p>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+
+              <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <div className="flex items-center space-x-2">
                     <svg className="w-4 h-4 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path
                         strokeLinecap="round"
@@ -391,7 +461,7 @@ const AddVehicle = () => {
               <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   <div className="flex items-center space-x-2">
-                    <svg className="w-4 h-4 text-pink-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-4 h-4 text-pink-500" fill="none" viewBox="0 0 24 32" stroke="currentColor">
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
