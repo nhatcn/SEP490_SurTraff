@@ -105,29 +105,57 @@ const AddVehicle = ({ onVehicleAdded }: { onVehicleAdded?: (vehicle: Vehicle) =>
   const validateForm = () => {
     const newErrors: FormErrors = {};
     const plateRegex = /^\d{2}[A-Z]{1,2}-\d{4,5}$/;
-    const colorRegex = /^[a-zA-Z\s]+$/;
+    const textRegex = /^[a-zA-Z\s]+$/; // Allow only letters and spaces
+    const specialCharRegex = /[!@#$%^&*(),.?":{}|<>]/;
     const numberRegex = /^\d+$/;
 
-    if (!editForm.name) newErrors.name = 'Vehicle name is required';
-    if (!editForm.licensePlate) {
+    // Validate name
+    if (!editForm.name || editForm.name.trim() === '') {
+      newErrors.name = 'Vehicle name is required';
+    } else if (specialCharRegex.test(editForm.name)) {
+      newErrors.name = 'Vehicle name must not contain special characters';
+    } else if (!textRegex.test(editForm.name)) {
+      newErrors.name = 'Vehicle name must contain only letters and spaces';
+    }
+
+    // Validate license plate
+    if (!editForm.licensePlate || editForm.licensePlate.trim() === '') {
       newErrors.licensePlate = 'License plate is required';
     } else if (!plateRegex.test(editForm.licensePlate)) {
       newErrors.licensePlate = 'Invalid format (e.g., 30A-12345 or 30AB-12345)';
     } else if (vehicles.some(v => v.licensePlate === editForm.licensePlate)) {
       newErrors.licensePlate = 'License plate already exists';
     }
-    if (!editForm.userId) {
+
+    // Validate user ID
+    if (!editForm.userId || editForm.userId.trim() === '') {
       newErrors.userId = 'User ID is required';
     } else if (!numberRegex.test(editForm.userId)) {
       newErrors.userId = 'User ID must be a number';
     }
-    if (!editForm.vehicleTypeId) newErrors.vehicleTypeId = 'Vehicle type is required';
-    if (!editForm.color) {
+
+    // Validate vehicle type
+    if (!editForm.vehicleTypeId || editForm.vehicleTypeId.trim() === '') {
+      newErrors.vehicleTypeId = 'Vehicle type is required';
+    }
+
+    // Validate color
+    if (!editForm.color || editForm.color.trim() === '') {
       newErrors.color = 'Color is required';
-    } else if (!colorRegex.test(editForm.color)) {
+    } else if (specialCharRegex.test(editForm.color)) {
+      newErrors.color = 'Color must not contain special characters';
+    } else if (!textRegex.test(editForm.color)) {
       newErrors.color = 'Color must contain only letters and spaces';
     }
-    if (!editForm.brand) newErrors.brand = 'Brand is required';
+
+    // Validate brand
+    if (!editForm.brand || editForm.brand.trim() === '') {
+      newErrors.brand = 'Brand is required';
+    } else if (specialCharRegex.test(editForm.brand)) {
+      newErrors.brand = 'Brand must not contain special characters';
+    } else if (!textRegex.test(editForm.brand)) {
+      newErrors.brand = 'Brand must contain only letters and spaces';
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;

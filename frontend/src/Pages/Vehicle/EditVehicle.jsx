@@ -90,16 +90,26 @@ const EditVehicle = () => {
       }
     };
     fetchVehicle();
-  }, [id]); // Added id to dependency array
+  }, [id]);
 
   const validateForm = () => {
     const newErrors = {};
     const plateRegex = /^\d{2}[A-Z]{1,2}-\d{4,5}$/;
-    const colorRegex = /^[a-zA-Z\s]+$/;
+    const textRegex = /^[a-zA-Z\s]+$/; // Allow only letters and spaces
+    const specialCharRegex = /[!@#$%^&*(),.?":{}|<>]/;
     const numberRegex = /^\d+$/;
 
-    if (!formData.name) newErrors.name = 'Vehicle name is required';
-    if (!formData.licensePlate) {
+    // Validate name
+    if (!formData.name || formData.name.trim() === '') {
+      newErrors.name = 'Vehicle name is required';
+    } else if (specialCharRegex.test(formData.name)) {
+      newErrors.name = 'Vehicle name must not contain special characters';
+    } else if (!textRegex.test(formData.name)) {
+      newErrors.name = 'Vehicle name must contain only letters and spaces';
+    }
+
+    // Validate license plate
+    if (!formData.licensePlate || formData.licensePlate.trim() === '') {
       newErrors.licensePlate = 'License plate is required';
     } else if (!plateRegex.test(formData.licensePlate)) {
       newErrors.licensePlate = 'Invalid format (e.g., 30A-12345 or 30AB-12345)';
@@ -109,18 +119,36 @@ const EditVehicle = () => {
     ) {
       newErrors.licensePlate = 'License plate already exists';
     }
-    if (!formData.userId) {
+
+    // Validate user ID
+    if (!formData.userId || formData.userId.trim() === '') {
       newErrors.userId = 'User ID is required';
     } else if (!numberRegex.test(formData.userId)) {
       newErrors.userId = 'User ID must be a number';
     }
-    if (!formData.vehicleTypeId) newErrors.vehicleTypeId = 'Vehicle type is required';
-    if (!formData.color) {
-      newErrors.color = 'Vehicle color is required';
-    } else if (!colorRegex.test(formData.color)) {
-      newErrors.color = 'Color can only contain letters and spaces';
+
+    // Validate vehicle type
+    if (!formData.vehicleTypeId || formData.vehicleTypeId.trim() === '') {
+      newErrors.vehicleTypeId = 'Vehicle type is required';
     }
-    if (!formData.brand) newErrors.brand = 'Vehicle brand is required';
+
+    // Validate color
+    if (!formData.color || formData.color.trim() === '') {
+      newErrors.color = 'Vehicle color is required';
+    } else if (specialCharRegex.test(formData.color)) {
+      newErrors.color = 'Color must not contain special characters';
+    } else if (!textRegex.test(formData.color)) {
+      newErrors.color = 'Color must contain only letters and spaces';
+    }
+
+    // Validate brand
+    if (!formData.brand || formData.brand.trim() === '') {
+      newErrors.brand = 'Vehicle brand is required';
+    } else if (specialCharRegex.test(formData.brand)) {
+      newErrors.brand = 'Brand must not contain special characters';
+    } else if (!textRegex.test(formData.brand)) {
+      newErrors.brand = 'Brand must contain only letters and spaces';
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;

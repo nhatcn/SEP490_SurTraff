@@ -50,9 +50,9 @@ const handleVehicleAdded = (newVehicle: VehicleType) => {
       <div className="flex flex-col flex-grow overflow-hidden">
         <Header title="Vehicle Dashboard" />
         <div className="flex-grow overflow-y-auto p-4">
-          <div className="mb-4">
+          {/* <div className="mb-4">
             <AddVehicle onVehicleAdded={handleVehicleAdded} />
-          </div>
+          </div> */}
           <TableVehicle key={refreshKey} />
         </div>
       </div>

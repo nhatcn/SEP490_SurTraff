@@ -23,11 +23,19 @@ interface Vehicle {
 interface FormErrors {
   name?: string
   licensePlate?: string
-  userId?: string
   vehicleTypeId?: string
   color?: string
   brand?: string
   image?: string
+}
+
+interface EditForm {
+  name: string
+  licensePlate: string
+  vehicleTypeId: string
+  color: string
+  brand: string
+  image: File | null
 }
 
 const VehicleDetail = () => {
@@ -45,14 +53,13 @@ const VehicleDetail = () => {
   const [errorMessage, setErrorMessage] = useState('')
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editForm, setEditForm] = useState({
+  const [editForm, setEditForm] = useState<EditForm>({
     name: '',
     licensePlate: '',
-    userId: '',
     vehicleTypeId: '',
     color: '',
     brand: '',
-    image: null as File | null
+    image: null
   })
 
   // Fetch vehicle types
@@ -106,7 +113,6 @@ const VehicleDetail = () => {
         setEditForm({
           name: data.name || '',
           licensePlate: data.licensePlate || '',
-          userId: data.userId ? data.userId.toString() : '',
           vehicleTypeId: data.vehicleTypeId ? data.vehicleTypeId.toString() : '',
           color: data.color || '',
           brand: data.brand || '',
@@ -125,11 +131,20 @@ const VehicleDetail = () => {
   const validateForm = () => {
     const newErrors: FormErrors = {}
     const plateRegex = /^\d{2}[A-Z]{1,2}-\d{4,5}$/
-    const colorRegex = /^[a-zA-Z\s]+$/
-    const numberRegex = /^\d+$/
+    const textRegex = /^[a-zA-Z\s]+$/
+    const specialCharRegex = /[!@#$%^&*(),.?":{}|<>]/
 
-    if (!editForm.name) newErrors.name = 'Vehicle name is required'
-    if (!editForm.licensePlate) {
+    // Validate name
+    if (!editForm.name || editForm.name.trim() === '') {
+      newErrors.name = 'Vehicle name is required'
+    } else if (specialCharRegex.test(editForm.name)) {
+      newErrors.name = 'Vehicle name must not contain special characters'
+    } else if (!textRegex.test(editForm.name)) {
+      newErrors.name = 'Vehicle name must contain only letters and spaces'
+    }
+
+    // Validate license plate
+    if (!editForm.licensePlate || editForm.licensePlate.trim() === '') {
       newErrors.licensePlate = 'License plate is required'
     } else if (!plateRegex.test(editForm.licensePlate)) {
       newErrors.licensePlate = 'Invalid format (e.g., 30A-12345 or 30AB-12345)'
@@ -138,18 +153,31 @@ const VehicleDetail = () => {
     ) {
       newErrors.licensePlate = 'License plate already exists'
     }
-    if (!editForm.userId) {
-      newErrors.userId = 'User ID is required'
-    } else if (!numberRegex.test(editForm.userId)) {
-      newErrors.userId = 'User ID must be a number'
+
+    // Validate vehicle type
+    if (!editForm.vehicleTypeId || editForm.vehicleTypeId.trim() === '') {
+      newErrors.vehicleTypeId = 'Vehicle type is required'
+    } else if (!vehicleTypes.some(type => type.id === parseInt(editForm.vehicleTypeId))) {
+      newErrors.vehicleTypeId = 'Selected vehicle type is invalid'
     }
-    if (!editForm.vehicleTypeId) newErrors.vehicleTypeId = 'Vehicle type is required'
-    if (!editForm.color) {
+
+    // Validate color
+    if (!editForm.color || editForm.color.trim() === '') {
       newErrors.color = 'Color is required'
-    } else if (!colorRegex.test(editForm.color)) {
+    } else if (specialCharRegex.test(editForm.color)) {
+      newErrors.color = 'Color must not contain special characters'
+    } else if (!textRegex.test(editForm.color)) {
       newErrors.color = 'Color must contain only letters and spaces'
     }
-    if (!editForm.brand) newErrors.brand = 'Brand is required'
+
+    // Validate brand
+    if (!editForm.brand || editForm.brand.trim() === '') {
+      newErrors.brand = 'Brand is required'
+    } else if (specialCharRegex.test(editForm.brand)) {
+      newErrors.brand = 'Brand must not contain special characters'
+    } else if (!textRegex.test(editForm.brand)) {
+      newErrors.brand = 'Brand must contain only letters and spaces'
+    }
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -173,12 +201,16 @@ const VehicleDetail = () => {
     setSuccessMessage('')
     setErrorMessage('')
     try {
+      const vehicleTypeIdNum = parseInt(editForm.vehicleTypeId)
+      if (isNaN(vehicleTypeIdNum)) {
+        throw new Error('Invalid vehicle type ID')
+      }
+
       const formData = new FormData()
       const vehicleDTO = {
         name: editForm.name,
         licensePlate: editForm.licensePlate,
-        userId: parseInt(editForm.userId),
-        vehicleTypeId: parseInt(editForm.vehicleTypeId),
+        vehicleTypeId: vehicleTypeIdNum,
         color: editForm.color,
         brand: editForm.brand
       }
@@ -245,7 +277,6 @@ const VehicleDetail = () => {
       setEditForm({
         name: vehicle.name,
         licensePlate: vehicle.licensePlate,
-        userId: vehicle.userId.toString(),
         vehicleTypeId: vehicle.vehicleTypeId.toString(),
         color: vehicle.color,
         brand: vehicle.brand,
@@ -261,11 +292,11 @@ const VehicleDetail = () => {
       <div className="flex h-screen bg-gray-50">
         <Sidebar />
         <div className="flex flex-col flex-grow">
-          <Header title="Chi tiết Phương Tiện" />
+          <Header title="Vehicle Details" />
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">Đang tải dữ liệu...</p>
+              <p className="text-gray-600">Loading data...</p>
             </div>
           </div>
         </div>
@@ -282,15 +313,15 @@ const VehicleDetail = () => {
     <div className="flex h-screen bg-gray-50">
       <Sidebar />
       <div className="flex flex-col flex-grow">
-        <Header title={id === '0' ? 'Chọn Phương Tiện để Chỉnh Sửa' : `Chi tiết Phương Tiện #${id}`} />
+        <Header title={id === '0' ? 'Select Vehicle to Edit' : `Vehicle Details #${id}`} />
         
         <div className="p-6 overflow-y-auto">
           <button
-            onClick={() => navigate('/vehicle')}
+            onClick={() => navigate('/vehicles')}
             className="mb-6 flex items-center space-x-2 text-gray-600 hover:text-blue-600 transition-colors"
           >
             <ArrowLeft size={20} />
-            <span>Quay lại danh sách</span>
+            <span>Back to list</span>
           </button>
 
           <div className="bg-white shadow rounded-lg overflow-hidden max-w-4xl mx-auto">
@@ -298,8 +329,8 @@ const VehicleDetail = () => {
               <div className="flex items-center space-x-3">
                 <Car size={24} />
                 <div>
-                  <h1 className="text-xl font-bold">Quản lý Phương Tiện</h1>
-                  <p className="text-blue-100">Thông tin chi tiết và chỉnh sửa</p>
+                  <h1 className="text-xl font-bold">Vehicle Management</h1>
+                  <p className="text-blue-100">Details and editing</p>
                 </div>
               </div>
             </div>
@@ -307,7 +338,7 @@ const VehicleDetail = () => {
             <div className="p-6">
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Chọn Phương Tiện
+                  Select Vehicle
                 </label>
                 <select
                   value={id || '0'}
@@ -315,7 +346,7 @@ const VehicleDetail = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   disabled={isLoading}
                 >
-                  <option value="0">Chọn một phương tiện để xem chi tiết</option>
+                  <option value="0">Select a vehicle to view details</option>
                   {vehicles.map(v => (
                     <option key={v.id} value={v.id}>
                       {v.licensePlate} - {v.name} ({v.brand})
@@ -328,7 +359,7 @@ const VehicleDetail = () => {
                 <>
                   <div className="flex justify-between items-center mb-6">
                     <h2 className="text-lg font-semibold text-gray-800">
-                      Thông tin Phương Tiện
+                      Vehicle Information
                     </h2>
                     {!isEditing ? (
                       <button
@@ -336,7 +367,7 @@ const VehicleDetail = () => {
                         className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                       >
                         <Pencil size={16} />
-                        <span>Chỉnh sửa</span>
+                        <span>Edit</span>
                       </button>
                     ) : (
                       <div className="flex space-x-2">
@@ -346,14 +377,14 @@ const VehicleDetail = () => {
                           disabled={isLoading}
                         >
                           <Save size={16} />
-                          <span>Lưu</span>
+                          <span>Save</span>
                         </button>
                         <button
                           onClick={handleCancel}
                           className="flex items-center space-x-2 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
                         >
                           <X size={16} />
-                          <span>Hủy</span>
+                          <span>Cancel</span>
                         </button>
                         <button
                           onClick={() => setShowDeleteConfirm(true)}
@@ -361,7 +392,7 @@ const VehicleDetail = () => {
                           disabled={isLoading}
                         >
                           <Trash2 size={16} />
-                          <span>Xóa</span>
+                          <span>Delete</span>
                         </button>
                       </div>
                     )}
@@ -370,7 +401,7 @@ const VehicleDetail = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Tên Phương Tiện
+                        Vehicle Name
                       </label>
                       {isEditing ? (
                         <input
@@ -401,7 +432,7 @@ const VehicleDetail = () => {
 
                     <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Biển Số
+                        License Plate
                       </label>
                       {isEditing ? (
                         <input
@@ -432,39 +463,7 @@ const VehicleDetail = () => {
 
                     <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        User ID
-                      </label>
-                      {isEditing ? (
-                        <input
-                          name="userId"
-                          type="text"
-                          value={editForm.userId}
-                          onChange={handleChange}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          placeholder="e.g., 123"
-                          disabled={isLoading}
-                        />
-                      ) : (
-                        <p className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md">#{vehicle.userId}</p>
-                      )}
-                      <AnimatePresence>
-                        {errors.userId && (
-                          <motion.p
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            className="text-red-500 text-xs flex items-center"
-                          >
-                            <AlertCircle size={12} className="mr-1" />
-                            {errors.userId}
-                          </motion.p>
-                        )}
-                      </AnimatePresence>
-                    </motion.div>
-
-                    <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Loại Xe
+                        Vehicle Type
                       </label>
                       {isEditing ? (
                         <select
@@ -474,7 +473,7 @@ const VehicleDetail = () => {
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                           disabled={isLoading}
                         >
-                          <option value="">Chọn loại xe</option>
+                          <option value="">Select vehicle type</option>
                           {vehicleTypes.map(type => (
                             <option key={type.id} value={type.id}>{type.typeName}</option>
                           ))}
@@ -501,7 +500,7 @@ const VehicleDetail = () => {
 
                     <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Màu Sắc
+                        Color
                       </label>
                       {isEditing ? (
                         <input
@@ -532,7 +531,7 @@ const VehicleDetail = () => {
 
                     <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Hãng
+                        Brand
                       </label>
                       {isEditing ? (
                         <input
@@ -564,7 +563,7 @@ const VehicleDetail = () => {
                     {isEditing && (
                       <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2 md:col-span-2">
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Hình Ảnh Phương Tiện
+                          Vehicle Image
                         </label>
                         <input
                           type="file"
@@ -583,7 +582,7 @@ const VehicleDetail = () => {
                               <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M12 12v9m0-9l3 3m-3-3l-3 3m6-8V5a2 2 0 00-2-2H8a2 2 0 00-2 2v4" />
                               </svg>
-                              <span>Chọn ảnh khác</span>
+                              <span>Choose another image</span>
                             </label>
                             <button
                               type="button"
@@ -593,7 +592,7 @@ const VehicleDetail = () => {
                               <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M4 6h16M4 10h16M4 14h10M4 18h10" />
                               </svg>
-                              <span>Xem trước ảnh</span>
+                              <span>Preview image</span>
                             </button>
                           </div>
                         ) : (
@@ -606,7 +605,7 @@ const VehicleDetail = () => {
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M12 12v9m0-9l3 3m-3-3l-3 3m6-8V5a2 2 0 00-2-2H8a2 2 0 00-2 2v4" />
                             </svg>
-                            <span>Chọn ảnh</span>
+                            <span>Choose image</span>
                           </label>
                         )}
                         <AnimatePresence>
@@ -685,8 +684,8 @@ const VehicleDetail = () => {
               <div className="flex items-center mb-4">
                 <CheckCircle className="text-green-600 mr-3" size={24} />
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-800">Xác nhận lưu thay đổi</h3>
-                  <p className="text-sm text-gray-600">Bạn có chắc chắn muốn lưu các thay đổi này?</p>
+                  <h3 className="text-lg font-semibold text-gray-800">Confirm Save Changes</h3>
+                  <p className="text-sm text-gray-600">Are you sure you want to save these changes?</p>
                 </div>
               </div>
               <div className="flex justify-end space-x-3">
@@ -694,7 +693,7 @@ const VehicleDetail = () => {
                   onClick={() => setShowConfirm(false)}
                   className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition-colors"
                 >
-                  Hủy
+                  Cancel
                 </button>
                 <button
                   onClick={handleSave}
@@ -704,12 +703,12 @@ const VehicleDetail = () => {
                   {isLoading ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      <span>Đang lưu...</span>
+                      <span>Saving...</span>
                     </>
                   ) : (
                     <>
                       <Save size={16} />
-                      <span>Xác nhận</span>
+                      <span>Confirm</span>
                     </>
                   )}
                 </button>
@@ -724,13 +723,13 @@ const VehicleDetail = () => {
               <div className="flex items-center mb-4">
                 <AlertCircle className="text-red-600 mr-3" size={24} />
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-800">Xác nhận xóa phương tiện</h3>
-                  <p className="text-sm text-gray-600">Hành động này không thể hoàn tác. Bạn có chắc chắn?</p>
+                  <h3 className="text-lg font-semibold text-gray-800">Confirm Vehicle Deletion</h3>
+                  <p className="text-sm text-gray-600">This action cannot be undone. Are you sure?</p>
                 </div>
               </div>
               <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4">
                 <p className="text-red-700 text-sm">
-                  ⚠️ Phương tiện sẽ bị xóa vĩnh viễn khỏi hệ thống
+                  ⚠️ The vehicle will be permanently deleted from the system
                 </p>
               </div>
               <div className="flex justify-end space-x-3">
@@ -738,7 +737,7 @@ const VehicleDetail = () => {
                   onClick={() => setShowDeleteConfirm(false)}
                   className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition-colors"
                 >
-                  Hủy
+                  Cancel
                 </button>
                 <button
                   onClick={handleDelete}
@@ -748,12 +747,12 @@ const VehicleDetail = () => {
                   {isLoading ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      <span>Đang xóa...</span>
+                      <span>Deleting...</span>
                     </>
                   ) : (
                     <>
                       <Trash2 size={16} />
-                      <span>Xác nhận xóa</span>
+                      <span>Confirm Delete</span>
                     </>
                   )}
                 </button>

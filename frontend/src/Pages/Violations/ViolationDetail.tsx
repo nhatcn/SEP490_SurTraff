@@ -36,7 +36,6 @@ interface Vehicle {
   id: number;
   name?: string;
   licensePlate: string;
-  userId?: number;
   vehicleTypeId?: number;
   color: string;
   brand: string;
@@ -71,9 +70,8 @@ export default function ViolationDetail() {
   const [violation, setViolation] = useState<Violation | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isEditingViolation, setIsEditingViolation] = useState(false);
   const [isEditingDetail, setIsEditingDetail] = useState(false);
-  const [formData, setFormData] = useState<Partial<Violation>>({});
+  const [formData, setFormData] = useState<Partial<Pick<Violation, 'status'>>>({ status: '' });
   const [detailFormData, setDetailFormData] = useState<Partial<ViolationDetail>>({});
   const [imageExpanded, setImageExpanded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -91,12 +89,7 @@ export default function ViolationDetail() {
         setLoading(true);
         const response = await axios.get(`${API_URL}/api/violations/${id}`);
         setViolation(response.data);
-        setFormData({
-          camera: response.data.camera,
-          vehicleType: response.data.vehicleType,
-          vehicle: response.data.vehicle,
-          status: response.data.status,
-        });
+        setFormData({ status: response.data.status });
         const firstDetail = response.data.violationDetails?.[0] || {};
         setDetailFormData({
           violationType: firstDetail.violationType,
@@ -118,113 +111,8 @@ export default function ViolationDetail() {
     fetchData();
   }, [id]);
 
-  const handleViolationInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
-
-    if (name === "status") {
-      setFormData((prev) => ({ ...prev, status: value }));
-    } else if (["licensePlate", "vehicleColor", "vehicleBrand", "vehicleName", "userId"].includes(name)) {
-      const vehicleFieldMap: Record<string, keyof Vehicle> = {
-        licensePlate: "licensePlate",
-        vehicleColor: "color",
-        vehicleBrand: "brand",
-        vehicleName: "name",
-        userId: "userId",
-      };
-      const field = vehicleFieldMap[name];
-      setFormData((prev) => ({
-        ...prev,
-        vehicle: {
-          id: prev.vehicle?.id ?? 0,
-          licensePlate: prev.vehicle?.licensePlate ?? "",
-          color: prev.vehicle?.color ?? "",
-          brand: prev.vehicle?.brand ?? "",
-          name: prev.vehicle?.name ?? "",
-          userId: prev.vehicle?.userId ?? undefined,
-          vehicleTypeId: prev.vehicle?.vehicleTypeId ?? prev.vehicleType?.id ?? undefined,
-          [field]: value,
-        },
-      }));
-    } else if (name === "cameraId") {
-      setFormData((prev) => ({
-        ...prev,
-        camera: { ...prev.camera, id: Number(value) } as Camera,
-      }));
-    } else if (name === "vehicleTypeId") {
-      const vehicleTypeId = Number(value);
-      setFormData((prev) => ({
-        ...prev,
-        vehicleType: { ...prev.vehicleType, id: vehicleTypeId } as VehicleType,
-        vehicle: {
-          ...prev.vehicle,
-          vehicleTypeId,
-        } as Vehicle,
-      }));
-    }
-  };
-
-  const handleUpdateViolation = async () => {
-    if (!id || !formData) return;
-
-    // Validate required fields
-    if (!formData.vehicle?.licensePlate) {
-      toast.error("License Plate is required.");
-      return;
-    }
-    if (!formData.vehicleType?.id) {
-      toast.error("Vehicle Type is required.");
-      return;
-    }
-    if (!formData.vehicle?.vehicleTypeId || formData.vehicle.vehicleTypeId !== formData.vehicleType.id) {
-      toast.error("Vehicle Type ID must match the selected Vehicle Type.");
-      return;
-    }
-    if (!formData.camera?.id) {
-      toast.error("Camera is required.");
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const updateData = {
-        id: Number(id),
-        camera: formData.camera ? { id: formData.camera.id } : null,
-        vehicleType: formData.vehicleType ? { id: formData.vehicleType.id } : null,
-        vehicle: formData.vehicle
-          ? {
-              id: formData.vehicle.id || 0,
-              name: formData.vehicle.name || null,
-              licensePlate: formData.vehicle.licensePlate,
-              userId: formData.vehicle.userId || null,
-              vehicleTypeId: formData.vehicle.vehicleTypeId || formData.vehicleType?.id,
-              color: formData.vehicle.color || null,
-              brand: formData.vehicle.brand || null,
-            }
-          : null,
-        // Exclude status from this update, as it's handled by handleUpdateStatus
-      };
-      const response = await axios.put(`${API_URL}/api/violations/${id}`, updateData);
-      setViolation(response.data);
-      setFormData((prev) => ({
-        ...prev,
-        camera: response.data.camera,
-        vehicleType: response.data.vehicleType,
-        vehicle: response.data.vehicle,
-      }));
-      setIsEditingViolation(false);
-      toast.success("Violation information updated successfully!");
-    } catch (err: any) {
-      console.error("Error updating violation:", err);
-      const errorMessage =
-        err.response?.data?.message ||
-        err.response?.data?.errors?.join(", ") ||
-        "Unable to update violation. Please check your input and try again.";
-      toast.error(errorMessage);
-    } finally {
-      setLoading(false);
-    }
+  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setFormData({ status: e.target.value });
   };
 
   const handleUpdateStatus = async (newStatus: string) => {
@@ -251,17 +139,16 @@ export default function ViolationDetail() {
         case "PENDING":
           response = await axios.put(`${API_URL}/api/violations/${id}`, {
             id: Number(id),
-            camera: formData.camera ? { id: formData.camera.id } : null,
-            vehicleType: formData.vehicleType ? { id: formData.vehicleType.id } : null,
-            vehicle: formData.vehicle
+            camera: violation?.camera ? { id: violation.camera.id } : null,
+            vehicleType: violation?.vehicleType ? { id: violation.vehicleType.id } : null,
+            vehicle: violation?.vehicle
               ? {
-                  id: formData.vehicle.id,
-                  name: formData.vehicle.name,
-                  licensePlate: formData.vehicle.licensePlate,
-                  userId: formData.vehicle.userId,
-                  vehicleTypeId: formData.vehicle.vehicleTypeId,
-                  color: formData.vehicle.color,
-                  brand: formData.vehicle.brand,
+                  id: violation.vehicle.id,
+                  name: violation.vehicle.name,
+                  licensePlate: violation.vehicle.licensePlate,
+                  vehicleTypeId: violation.vehicle.vehicleTypeId,
+                  color: violation.vehicle.color,
+                  brand: violation.vehicle.brand,
                 }
               : null,
             status: "PENDING",
@@ -272,7 +159,7 @@ export default function ViolationDetail() {
       }
 
       setViolation(response.data);
-      setFormData((prev) => ({ ...prev, status: response.data.status }));
+      setFormData({ status: response.data.status });
       if (statusUpper === "APPROVED") {
         toast.success("Violation approved! An email with the violation report has been sent.");
       } else {
@@ -370,12 +257,7 @@ export default function ViolationDetail() {
     try {
       const response = await axios.get(`${API_URL}/api/violations/${id}`);
       setViolation(response.data);
-      setFormData({
-        camera: response.data.camera,
-        vehicleType: response.data.vehicleType,
-        vehicle: response.data.vehicle,
-        status: response.data.status,
-      });
+      setFormData({ status: response.data.status });
       const firstDetail = response.data.violationDetails?.[0] || {};
       setDetailFormData({
         violationType: firstDetail.violationType,
@@ -601,57 +483,33 @@ export default function ViolationDetail() {
                   <RefreshCw size={16} className={refreshing ? "animate-spin mr-2" : "mr-2"} />
                   Refresh
                 </button>
-                {!isEditingViolation && !isEditingDetail && (
-                  <>
-                    <button
-                      onClick={() => setIsEditingViolation(true)}
-                      className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-blue-500/40 relative overflow-hidden group"
-                      aria-label="Edit violation information"
+                {!isEditingDetail && (
+                  <button
+                    onClick={() => setIsEditingDetail(true)}
+                    className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-blue-500/40 relative overflow-hidden group"
+                    aria-label="Edit violation detail"
+                  >
+                    <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></span>
+                    <svg
+                      className="w-4 h-4 mr-2"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
                     >
-                      <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></span>
-                      <svg
-                        className="w-4 h-4 mr-2"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                        />
-                      </svg>
-                      Edit Information
-                    </button>
-                    <button
-                      onClick={() => setIsEditingDetail(true)}
-                      className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-blue-500/40 relative overflow-hidden group"
-                      aria-label="Edit violation detail"
-                    >
-                      <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></span>
-                      <svg
-                        className="w-4 h-4 mr-2"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                        />
-                      </svg>
-                      Edit Detail
-                    </button>
-                  </>
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
+                    </svg>
+                    Edit Detail
+                  </button>
                 )}
-
-                {(isEditingViolation || isEditingDetail) && (
+                {isEditingDetail && (
                   <div className="flex space-x-3">
                     <button
-                      onClick={isEditingDetail ? handleUpdateDetail : handleUpdateViolation}
+                      onClick={handleUpdateDetail}
                       disabled={loading}
                       className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl hover:from-green-600 hover:to-emerald-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-green-500/40 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none relative overflow-hidden group"
                       aria-label="Save changes"
@@ -677,10 +535,7 @@ export default function ViolationDetail() {
                       Save Changes
                     </button>
                     <button
-                      onClick={() => {
-                        setIsEditingViolation(false);
-                        setIsEditingDetail(false);
-                      }}
+                      onClick={() => setIsEditingDetail(false)}
                       className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-rose-500 to-red-500 text-white rounded-xl hover:from-rose-600 hover:to-red-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-rose-500/40 relative overflow-hidden group"
                       aria-label="Cancel edit"
                     >
@@ -735,7 +590,7 @@ export default function ViolationDetail() {
                     <select
                       name="status"
                       value={formData.status || ""}
-                      onChange={handleViolationInputChange}
+                      onChange={handleStatusChange}
                       className="w-full border border-blue-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/70 backdrop-blur-sm transition-all duration-300"
                       disabled={loading}
                     >
@@ -964,140 +819,39 @@ export default function ViolationDetail() {
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
                       <span className="text-blue-700 font-medium">Vehicle Type:</span>
-                      {isEditingViolation ? (
-                        <select
-                          name="vehicleTypeId"
-                          value={formData.vehicleType?.id || ""}
-                          onChange={handleViolationInputChange}
-                          className="border border-blue-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/70 backdrop-blur-sm transition-all duration-300"
-                        >
-                          <option value="" disabled>
-                            Select Vehicle Type
-                          </option>
-                          {/* Replace with actual vehicle types from API if available */}
-                          <option value="1">Car</option>
-                          <option value="2">Truck</option>
-                          <option value="3">Motorcycle</option>
-                        </select>
-                      ) : (
-                        <span className="font-semibold text-blue-900 bg-blue-100/80 px-3 py-1 rounded-xl">
-                          {violation.vehicleType?.typeName || "N/A"}
-                        </span>
-                      )}
+                      <span className="font-semibold text-blue-900 bg-blue-100/80 px-3 py-1 rounded-xl">
+                        {violation.vehicleType?.typeName || "N/A"}
+                      </span>
                     </div>
-
                     <div className="flex justify-between items-center">
                       <span className="text-blue-700 font-medium">Vehicle Name:</span>
-                      {isEditingViolation ? (
-                        <input
-                          type="text"
-                          name="vehicleName"
-                          value={formData.vehicle?.name || ""}
-                          onChange={handleViolationInputChange}
-                          className="border border-blue-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/70 backdrop-blur-sm transition-all duration-300"
-                          placeholder="Enter vehicle name"
-                        />
-                      ) : (
-                        <span className="font-semibold text-blue-900 bg-blue-100/80 px-3 py-1 rounded-xl">
-                          {violation.vehicle?.name || "N/A"}
-                        </span>
-                      )}
+                      <span className="font-semibold text-blue-900 bg-blue-100/80 px-3 py-1 rounded-xl">
+                        {violation.vehicle?.name || "N/A"}
+                      </span>
                     </div>
-
                     <div className="flex justify-between items-center">
                       <span className="text-blue-700 font-medium">License Plate:</span>
-                      {isEditingViolation ? (
-                        <input
-                          type="text"
-                          name="licensePlate"
-                          value={formData.vehicle?.licensePlate || ""}
-                          onChange={handleViolationInputChange}
-                          className="border border-blue-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/70 backdrop-blur-sm transition-all duration-300"
-                          placeholder="Enter license plate"
-                        />
-                      ) : (
-                        <span className="font-semibold text-blue-900 font-mono bg-blue-100/80 px-3 py-1 rounded-xl">
-                          {violation.vehicle?.licensePlate || "N/A"}
-                        </span>
-                      )}
+                      <span className="font-semibold text-blue-900 font-mono bg-blue-100/80 px-3 py-1 rounded-xl">
+                        {violation.vehicle?.licensePlate || "N/A"}
+                      </span>
                     </div>
-
-                    <div className="flex justify-between items-center">
-                      <span className="text-blue-700 font-medium">User ID:</span>
-                      {isEditingViolation ? (
-                        <input
-                          type="number"
-                          name="userId"
-                          value={formData.vehicle?.userId || ""}
-                          onChange={handleViolationInputChange}
-                          className="border border-blue-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/70 backdrop-blur-sm transition-all duration-300"
-                          placeholder="Enter user ID"
-                        />
-                      ) : (
-                        <span className="font-semibold text-blue-900 bg-blue-100/80 px-3 py-1 rounded-xl">
-                          {violation.vehicle?.userId || "N/A"}
-                        </span>
-                      )}
-                    </div>
-
                     <div className="flex justify-between items-center">
                       <span className="text-blue-700 font-medium">Vehicle Color:</span>
-                      {isEditingViolation ? (
-                        <input
-                          type="text"
-                          name="vehicleColor"
-                          value={formData.vehicle?.color || ""}
-                          onChange={handleViolationInputChange}
-                          className="border border-blue-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/70 backdrop-blur-sm transition-all duration-300"
-                          placeholder="Enter vehicle color"
-                        />
-                      ) : (
-                        <span className="font-semibold text-blue-900 bg-blue-100/80 px-3 py-1 rounded-xl">
-                          {violation.vehicle?.color || "N/A"}
-                        </span>
-                      )}
+                      <span className="font-semibold text-blue-900 bg-blue-100/80 px-3 py-1 rounded-xl">
+                        {violation.vehicle?.color || "N/A"}
+                      </span>
                     </div>
-
                     <div className="flex justify-between items-center">
                       <span className="text-blue-700 font-medium">Vehicle Brand:</span>
-                      {isEditingViolation ? (
-                        <input
-                          type="text"
-                          name="vehicleBrand"
-                          value={formData.vehicle?.brand || ""}
-                          onChange={handleViolationInputChange}
-                          className="border border-blue-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/70 backdrop-blur-sm transition-all duration-300"
-                          placeholder="Enter vehicle brand"
-                        />
-                      ) : (
-                        <span className="font-semibold text-blue-900 bg-blue-100/80 px-3 py-1 rounded-xl">
-                          {violation.vehicle?.brand || "N/A"}
-                        </span>
-                      )}
+                      <span className="font-semibold text-blue-900 bg-blue-100/80 px-3 py-1 rounded-xl">
+                        {violation.vehicle?.brand || "N/A"}
+                      </span>
                     </div>
-
                     <div className="flex justify-between items-center">
                       <span className="text-blue-700 font-medium">Camera:</span>
-                      {isEditingViolation ? (
-                        <select
-                          name="cameraId"
-                          value={formData.camera?.id || ""}
-                          onChange={handleViolationInputChange}
-                          className="border border-blue-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/70 backdrop-blur-sm transition-all duration-300"
-                        >
-                          <option value="" disabled>
-                            Select Camera
-                          </option>
-                          {/* Replace with actual cameras from API if available */}
-                          <option value="1">Camera 1</option>
-                          <option value="2">Camera 2</option>
-                          <option value="3">Camera 3</option>
-                        </select>
-                      ) : (
-                        <span className="font-semibold text-blue-900 bg-blue-100/80 px-3 py-1 rounded-xl">
-                          {violation.camera?.name || "N/A"}
-                        </span>
-                      )}
+                      <span className="font-semibold text-blue-900 bg-blue-100/80 px-3 py-1 rounded-xl">
+                        {violation.camera?.name || "N/A"}
+                      </span>
                     </div>
                   </div>
                 </motion.div>
@@ -1142,7 +896,6 @@ export default function ViolationDetail() {
                           <option value="" disabled>
                             Select Violation Type
                           </option>
-                          {/* Replace with actual violation types from API if available */}
                           <option value="1">Red Light</option>
                           <option value="2">Overspeed</option>
                           <option value="3">Parking Violation</option>
@@ -1157,7 +910,6 @@ export default function ViolationDetail() {
                         </span>
                       )}
                     </div>
-
                     <div>
                       <label className="block text-blue-700 font-medium mb-1">
                         Violation Time:
@@ -1194,7 +946,6 @@ export default function ViolationDetail() {
                         </span>
                       )}
                     </div>
-
                     <div>
                       <label className="block text-blue-700 font-medium mb-1">Speed:</label>
                       {isEditingDetail ? (
@@ -1236,7 +987,6 @@ export default function ViolationDetail() {
                         </span>
                       )}
                     </div>
-
                     <div>
                       <label className="block text-blue-700 font-medium mb-1">Location:</label>
                       {isEditingDetail ? (
