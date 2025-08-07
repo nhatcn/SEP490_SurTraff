@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getCookie } from "../../utils/cookieUltil"
+import { Header, MobileDropdownMenu } from '../../components/Layout/Menu';
+import Footer from '../../components/Layout/Footer';
 
 const EditVehicle = () => {
   const { id } = useParams();
@@ -27,6 +29,7 @@ const EditVehicle = () => {
   const [existingPlates, setExistingPlates] = useState([]);
   const [previewUrl, setPreviewUrl] = useState(null); // For displaying existing or new image
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   const API_URL = "http://localhost:8081";
 
@@ -312,7 +315,11 @@ setFormData((prev) => ({ ...prev, userId: user.userId.toString() }));
   };
 
   return (
+    <div>
+            <Header showMobileMenu={showMobileMenu} setShowMobileMenu={setShowMobileMenu} />
+      <MobileDropdownMenu showMobileMenu={showMobileMenu} setShowMobileMenu={setShowMobileMenu} />
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 py-12 px-4">
+           
       <motion.div
         initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
@@ -502,7 +509,7 @@ setFormData((prev) => ({ ...prev, userId: user.userId.toString() }));
                   </AnimatePresence>
                 </motion.div>
 
-                <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2">
+                <motion.div hidden variants={inputVariants} whileFocus="focused" className="space-y-2">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     <div className="flex items-center space-x-2">
                       <svg className="w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -524,6 +531,7 @@ setFormData((prev) => ({ ...prev, userId: user.userId.toString() }));
                     placeholder="e.g., 123"
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-300 bg-gray-50/50 hover:bg-white"
                     disabled={isLoading}
+                    hidden
                   />
                   <AnimatePresence>
                     {errors.userId && (
@@ -900,6 +908,8 @@ setFormData((prev) => ({ ...prev, userId: user.userId.toString() }));
           </AnimatePresence>
         </motion.div>
       </motion.div>
+    </div>
+    <Footer/>
     </div>
   );
 };

@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { getCookie } from "../../utils/cookieUltil"
+import { Header, MobileDropdownMenu } from '../../components/Layout/Menu';
+import Footer from '../../components/Layout/Footer';
 
 const AddVehicle = () => {
   const navigate = useNavigate();
@@ -24,6 +26,7 @@ const AddVehicle = () => {
   const [existingPlates, setExistingPlates] = useState([]);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   const API_URL = "http://localhost:8081";
 
@@ -239,6 +242,9 @@ const AddVehicle = () => {
   };
 
   return (
+    <div>
+            <Header showMobileMenu={showMobileMenu} setShowMobileMenu={setShowMobileMenu} />
+      <MobileDropdownMenu showMobileMenu={showMobileMenu} setShowMobileMenu={setShowMobileMenu} />
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 py-12 px-4">
       <motion.div
         initial={{ opacity: 0, y: 40 }}
@@ -702,6 +708,8 @@ const AddVehicle = () => {
           </AnimatePresence>
         </motion.div>
       </motion.div>
+    </div>
+    <Footer/>
     </div>
   );
 };

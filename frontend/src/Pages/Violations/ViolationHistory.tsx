@@ -6,6 +6,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Search, Camera, Clock, Calendar, AlertTriangle, Car, ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
 import axios, { AxiosError } from "axios";
+import { Header, MobileDropdownMenu } from "../../components/Layout/Menu";
+import Footer from "../../components/Layout/Footer";
 
 // Define interfaces
 interface ViolationsDTO {
@@ -93,6 +95,7 @@ const RequestButton: React.FC<RequestButtonProps> = ({ violationId, onStatusUpda
   const [success, setSuccess] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [violationStatus, setViolationStatus] = useState<string | null>(null);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   useEffect(() => {
     const fetchViolationStatus = async () => {
@@ -1032,6 +1035,7 @@ export default function ViolationHistory() {
   const [filterType, setFilterType] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   const violationTypes = useMemo(() => {
     const types = new Map<string, ViolationType>();
@@ -1145,6 +1149,9 @@ export default function ViolationHistory() {
   }, []);
 
   return (
+    <div>
+            <Header showMobileMenu={showMobileMenu} setShowMobileMenu={setShowMobileMenu} />
+      <MobileDropdownMenu showMobileMenu={showMobileMenu} setShowMobileMenu={setShowMobileMenu} />
     <div
       style={{
         display: "flex",
@@ -1351,6 +1358,8 @@ export default function ViolationHistory() {
           </motion.div>
         </div>
       </div>
+    </div>
+    <Footer/>
     </div>
   );
 }
