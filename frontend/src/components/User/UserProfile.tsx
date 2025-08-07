@@ -83,7 +83,7 @@ export default function UserProfile() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const userId = getCookie('userId')
 
-  // MD5 hash function
+  // MD5 hash function (kept for new password hashing)
   const hashMD5 = (text: string) => {
     return CryptoJS.MD5(text).toString()
   }
@@ -283,17 +283,14 @@ export default function UserProfile() {
     setErrors({})
 
     try {
-      // Hash current password with MD5 before sending
-      const hashedCurrentPassword = hashMD5(passwordForm.currentPassword)
-      
-      // First verify current password
+      // Send plain current password to backend for verification
       const verifyResponse = await fetch(`http://localhost:8081/api/users/verify-password/${user?.userId}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          password: hashedCurrentPassword,
+          password: passwordForm.currentPassword, // Send plain password
         }),
       })
 
@@ -310,7 +307,7 @@ export default function UserProfile() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          newPassword: hashMD5(passwordForm.newPassword),
+          password: passwordForm.newPassword,
         }),
       })
 
@@ -523,11 +520,11 @@ export default function UserProfile() {
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Full Name</label>
-                  <div className="text-sm font-medium text-gray-900 bg-gray-50 rounded-lg p-3">{user.fullName}</div>
+                  <div className="text-sm font-medium text-gray-900 bg-gray-50 rounded-lg p-3">{user.fullName|| "Not provided"}</div>
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Username</label>
-                  <div className="text-sm font-medium text-gray-900 bg-gray-50 rounded-lg p-3">{user.userName}</div>
+                  <div className="text-sm font-medium text-gray-900 bg-gray-50 rounded-lg p-3">{user.userName || "Not provided"}</div>
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Email Address</label>

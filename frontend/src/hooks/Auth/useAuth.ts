@@ -53,7 +53,6 @@ export const useLogin = () => {
       setState({ isLoading: false, error: '' });
 
       if (response.data.role === 'customer') {
-
         navigate('/home');
       } else {
         navigate('/dashboard');
@@ -119,7 +118,6 @@ export const useRegister = () => {
   };
 };
 
-
 export const useForgotPassword = () => {
   const [state, setState] = useState<AuthState & { isSubmitted: boolean }>({
     isLoading: false,
@@ -170,6 +168,7 @@ export const useGoogleAuth = () => {
   const navigate = useNavigate();
 
   const handleGoogleLoginSuccess = async (credentialResponse: CredentialResponse) => {
+    console.log('Google login success, credential response:', credentialResponse);
     setIsLoading(true);
     setError('');
 
@@ -178,6 +177,7 @@ export const useGoogleAuth = () => {
         throw new Error('No credential received from Google');
       }
 
+      console.log('Sending Google token to backend...');
       const response = await axios.post(`${API_BASE_URL}/signin`, {
         token: credentialResponse.credential
       }, {
@@ -186,24 +186,30 @@ export const useGoogleAuth = () => {
         }
       });
 
-      // Store auth data
+      console.log('Google login response:', response.data);
+
+      // Store auth data - consistent with regular login
       localStorage.setItem('token', response.data.token);
-      localStorage.setItem('userId', response.data.userId);
+      setCookie('userId', response.data.userId);
       localStorage.setItem('role', response.data.role);
 
       setIsLoading(false);
-      navigate('/home');
+      
+      // Navigate based on role like regular login
+  
+        navigate('/home');
+     
     } catch (err: any) {
+      console.error('Google login error:', err);
       const errorMessage = err.response?.data?.error || 'Google authentication failed';
       setError(errorMessage);
       setIsLoading(false);
-      console.error('Google login error:', err);
     }
   };
 
   const handleGoogleLoginError = () => {
-    setError('Google login failed. Please try again.');
     console.error('Google login failed');
+    setError('Google login failed. Please try again.');
   };
 
   return {
