@@ -9,16 +9,17 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from models.model import Camera
 import logging
-from utils.yt_stream import get_stream_url
 import time
+import torch
+from utils.yt_stream import get_stream_url
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Constants
-YOLO_SCORE_TH = 0.55
-REID_SCORE_TH = 0.4  # Giảm ngưỡng để dễ đăng ký đặc trưng
+YOLO_SCORE_TH = 0.5
+REID_SCORE_TH = 0.4  # Đặt lại về 0.4 để kiểm tra, có thể điều chỉnh sau khi gỡ lỗi
 TARGET_IDS = [2, 5, 7]  # car, bus, truck
 HARDCODED_IMAGE_PATH = r"D:\multi_camera_tracking\videos\screenshot_1754414441.png"
 
@@ -107,19 +108,17 @@ def draw_debug(image, tracks, highlight_ids=None, similarities=None, camera_name
     similarities = similarities or {}
     debug_image = image.copy()
     for tid, box, score, cls in tracks:
+        if tid not in highlight_ids:  # Chỉ vẽ các box trong highlight_ids
+            continue
         x1, y1, x2, y2 = map(int, box)
-        color = (0, 0, 255) if tid in highlight_ids else get_id_color(tid)
-        thickness = 4 if tid in highlight_ids else 2
+        color = (0, 0, 255)  # Màu đỏ cho các mục tiêu
+        thickness = 4
         debug_image = cv2.rectangle(debug_image, (x1, y1), (x2, y2), color, thickness)
         text = f"ID:{tid}({score:.2f})"
         debug_image = cv2.putText(debug_image, text, (x1, y1 - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
         debug_image = cv2.putText(debug_image, f"cls:{cls}", (x1 + 2, y1 + 14), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-        if tid in highlight_ids:
-            debug_image = cv2.putText(debug_image, f"TARGET (sim:{similarities.get(tid, 0):.2f})", 
-                                      (x1, y2 + 16), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
-        else:
-            debug_image = cv2.putText(debug_image, f"NON-TARGET (sim:{similarities.get(tid, 0):.2f})", 
-                                      (x1, y2 + 16), cv2.FONT_HERSHEY_SIMPLEX, 0.6, get_id_color(tid), 2)
+        debug_image = cv2.putText(debug_image, f"TARGET (sim:{similarities.get(tid, 0):.2f})", 
+                                  (x1, y2 + 16), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
     cv2.putText(debug_image, f"Camera: {camera_name}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
     if search_error:
         cv2.putText(debug_image, f"Search Image Error: {search_error}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
@@ -146,77 +145,90 @@ def fetch_camera_config(camera_id: int, db: Session):
         "stream_url": camera.stream_url,
     }
 
-def stream_vehicle_tracking_service(camera_id: int, vehicle_info: VehicleInfo, search_image: Optional[bytes], db: Session):
+def stream_vehicle_tracking_service(camera_id: int,  search_image: Optional[bytes], db: Session):
     try:
         camera_config = fetch_camera_config(camera_id, db)
         logger.info(f"Starting tracking stream for camera {camera_id}: {camera_config['name']}")
         stream_url = get_stream_url(camera_config["stream_url"])
         cap = cv2.VideoCapture(stream_url)
-        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1000)  # Tăng buffer
-        time.sleep(1)  # Chờ stream ổn định
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1000)
+        time.sleep(1)
 
         if not cap.isOpened():
             logger.error(f"Cannot open stream for camera {camera_id}")
             return
 
+        # Khởi tạo instance riêng cho mỗi camera
         reid = VehicleReID0001(reid_model_path, score_th=REID_SCORE_TH)
-        reid.gallery = {}  # Reset gallery
         tracker = ByteTrackWrapper(track_thresh=0.3, match_thresh=0.9)
-        local_to_global_id = {}  # Reset local_to_global_id
+        local_to_global_id = {}  # Dictionary riêng cho mỗi camera
 
         search_features = None
         search_error = None
-        # Try search_image first
+        # Xử lý ảnh tìm kiếm
+        if search_image is None:
+            logger.info(f"No search image provided for camera {camera_id}, using hardcoded image")
         if search_image:
             query_img = cv2.imdecode(np.frombuffer(search_image, np.uint8), cv2.IMREAD_COLOR)
             if query_img is None:
-                search_error = "Cannot read search image"
+                search_error = f"Cannot read search image for camera {camera_id}"
                 logger.warning(search_error)
             else:
-                results_query = model_vehicle.predict(query_img, conf=YOLO_SCORE_TH, iou=0.45, device='cuda')[0]
+                logger.info(f"Processing search image for camera {camera_id}")
+                results_query = model_vehicle.predict(query_img, conf=YOLO_SCORE_TH, iou=0.45, device='cuda' if torch.cuda.is_available() else 'cpu')[0]
                 boxes_query, scores_query, class_ids_query = extract_boxes(results_query, TARGET_IDS)
+                logger.info(f"Search image: {len(boxes_query)} vehicles detected for camera {camera_id}")
                 if boxes_query:
                     max_score_idx = np.argmax(scores_query)
                     selected_box = boxes_query[max_score_idx]
+                    logger.info(f"Selected box for feature extraction: {selected_box}")
                     feats_query = reid.extract_features(query_img, [selected_box])
                     if len(feats_query) > 0:
                         search_features = feats_query[0]
                         search_features /= np.linalg.norm(search_features, axis=0, keepdims=True) + 1e-8
-                        logger.info("Search image features extracted successfully")
+                        logger.info(f"Search image features extracted successfully for camera {camera_id}")
                     else:
-                        search_error = "No features extracted from search image"
+                        search_error = f"No features extracted from search image for camera {camera_id}"
                         logger.warning(search_error)
                 else:
-                    search_error = "No vehicles detected in search image"
+                    search_error = f"No vehicles detected in search image for camera {camera_id}"
                     logger.warning(search_error)
 
-        # If search_image fails or not provided, try hardcoded image
+        # Nếu không có search_image, thử ảnh cứng
         if search_features is None:
             try:
-                query_img = cv2.imread(HARDCODED_IMAGE_PATH)
-                if query_img is None:
-                    search_error = f"Cannot read hardcoded image: {HARDCODED_IMAGE_PATH}"
-                    logger.warning(search_error)
+                logger.info(f"Attempting to read hardcoded image for camera {camera_id}: {HARDCODED_IMAGE_PATH}")
+                if not os.path.exists(HARDCODED_IMAGE_PATH):
+                    search_error = f"Hardcoded image path does not exist: {HARDCODED_IMAGE_PATH}"
+                    logger.error(search_error)
                 else:
-                    results_query = model_vehicle.predict(query_img, conf=YOLO_SCORE_TH, iou=0.45, device='cuda')[0]
-                    boxes_query, scores_query, class_ids_query = extract_boxes(results_query, TARGET_IDS)
-                    if boxes_query:
-                        max_score_idx = np.argmax(scores_query)
-                        selected_box = boxes_query[max_score_idx]
-                        feats_query = reid.extract_features(query_img, [selected_box])
-                        if len(feats_query) > 0:
-                            search_features = feats_query[0]
-                            search_features /= np.linalg.norm(search_features, axis=0, keepdims=True) + 1e-8
-                            logger.info(f"Hardcoded image features extracted successfully from {HARDCODED_IMAGE_PATH}")
-                        else:
-                            search_error = f"No features extracted from hardcoded image: {HARDCODED_IMAGE_PATH}"
-                            logger.warning(search_error)
+                    query_img = cv2.imread(HARDCODED_IMAGE_PATH)
+                    if query_img is None:
+                        search_error = f"Cannot read hardcoded image for camera {camera_id}: {HARDCODED_IMAGE_PATH}"
+                        logger.error(search_error)
                     else:
-                        search_error = f"No vehicles detected in hardcoded image: {HARDCODED_IMAGE_PATH}"
-                        logger.warning(search_error)
+                        logger.info(f"Processing hardcoded image for camera {camera_id}")
+                        results_query = model_vehicle.predict(query_img, conf=YOLO_SCORE_TH, iou=0.45, device='cuda' if torch.cuda.is_available() else 'cpu')[0]
+                        boxes_query, scores_query, class_ids_query = extract_boxes(results_query, TARGET_IDS)
+                        logger.info(f"Hardcoded image: {len(boxes_query)} vehicles detected for camera {camera_id}")
+                        if boxes_query:
+                            max_score_idx = np.argmax(scores_query)
+                            selected_box = boxes_query[max_score_idx]
+                            logger.info(f"Selected box for feature extraction: {selected_box}")
+                            feats_query = reid.extract_features(query_img, [selected_box])
+                            if len(feats_query) > 0:
+                                search_features = feats_query[0]
+                                search_features /= np.linalg.norm(search_features, axis=0, keepdims=True) + 1e-8
+                                logger.info(f"Hardcoded image features extracted successfully for camera {camera_id}")
+                            else:
+                                search_error = f"No features extracted from hardcoded image for camera {camera_id}"
+                                logger.error(search_error)
+                        else:
+                            search_error = f"No vehicles detected in hardcoded image for camera {camera_id}"
+                            logger.error(search_error)
             except Exception as e:
-                search_error = f"Error reading hardcoded image: {str(e)}"
-                logger.warning(search_error)
+                search_error = f"Error processing hardcoded image for camera {camera_id}: {str(e)}"
+                logger.error(search_error)
 
         h, w = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)), int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         frame_idx = 0
@@ -224,7 +236,7 @@ def stream_vehicle_tracking_service(camera_id: int, vehicle_info: VehicleInfo, s
         while True:
             ret, frame = cap.read()
             if not ret or frame is None or frame.size == 0:
-                logger.warning(f"Invalid frame from camera {camera_id}, reconnecting...")
+                logger.error(f"Failed to read frame from camera {camera_id}. Ret: {ret}, Frame: {frame}")
                 cap.release()
                 cap = cv2.VideoCapture(stream_url)
                 cap.set(cv2.CAP_PROP_BUFFERSIZE, 1000)
@@ -232,9 +244,10 @@ def stream_vehicle_tracking_service(camera_id: int, vehicle_info: VehicleInfo, s
                 continue
 
             logger.info(f"[INFO] Processing frame {frame_idx} for camera {camera_id}")
-            logger.info(f"Frame {frame_idx}: {len(extract_boxes(model_vehicle.predict(frame, conf=YOLO_SCORE_TH, iou=0.45, device='cuda')[0], TARGET_IDS)[0])} objects detected")
-            results = model_vehicle.predict(frame, conf=YOLO_SCORE_TH, iou=0.45, device='cuda')[0]
+            results = model_vehicle.predict(frame, conf=YOLO_SCORE_TH, iou=0.45, device='cuda' if torch.cuda.is_available() else 'cpu')[0]
             boxes, scores, class_ids = extract_boxes(results, TARGET_IDS)
+            logger.info(f"Frame {frame_idx}: {len(boxes)} objects detected")
+
             tracks = tracker.update(np.array(boxes), scores, class_ids, (h, w)) if boxes else []
             logger.info(f"Frame {frame_idx}: {len(tracks)} tracks generated")
 
@@ -245,7 +258,7 @@ def stream_vehicle_tracking_service(camera_id: int, vehicle_info: VehicleInfo, s
                 feats = reid.extract_features(frame, bboxes)
                 logger.info(f"Frame {frame_idx}: {len(feats)} features extracted, gallery size: {len(reid.gallery)}")
                 for i, (tid, box, score, cls) in enumerate(tracks):
-                    key = f"{id(tracks)}_{tid}"
+                    key = f"{camera_id}_{tid}"  # Sử dụng camera_id để đảm bảo key duy nhất
                     if key not in local_to_global_id:
                         gid = reid.match_or_register([feats[i]])[0]
                         local_to_global_id[key] = gid
@@ -274,5 +287,6 @@ def stream_vehicle_tracking_service(camera_id: int, vehicle_info: VehicleInfo, s
         import traceback
         traceback.print_exc()
     finally:
-        cap.release()
+        if 'cap' in locals():
+            cap.release()
         logger.info(f"Stream cleanup completed for camera {camera_id}")

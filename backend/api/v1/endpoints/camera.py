@@ -150,7 +150,7 @@ def stream_video(camera_id: int, db: Session = Depends(get_db)):
         )
     elif camera.violation_type_id == 7:
         return StreamingResponse(
-            pothole_detection_service(camera.stream_url, camera.id),
+            detect_potholes_in_video(camera.stream_url, camera.id),
             media_type="multipart/x-mixed-replace; boundary=frame"
         )
 # Updated Tracking Models
@@ -191,7 +191,7 @@ async def stream_tracking_video(
     )
     
     return StreamingResponse(
-        stream_vehicle_tracking_service(camera_id, vehicle_info, None, db),
+        stream_vehicle_tracking_service(camera_id, None, db),
         media_type="multipart/x-mixed-replace; boundary=frame"
     )
 
@@ -218,14 +218,32 @@ async def stream_tracking_video_with_image(
         brand=brand,
         color=color
     )
-    
+    print("=== API TRACKING SESSION START ===")
+    print("===================================")
+    print("===================================")
+    print("===================================")
+    print("===================================")
+    print("===================================")
+    print("===================================")
+    print("===================================")
+    print("===================================")
+    print("===================================")
+    print("===================================")
+    print("===================================")
+    print("===================================")
+    print("===================================")
+    print("===================================")
+    print("===================================")
+    print("===================================")
+
+    print(f"search_image: {search_image.filename if search_image else None}")
     # Read search image if provided
     search_image_bytes = None
     if search_image:
         search_image_bytes = await search_image.read()
     
     return StreamingResponse(
-        stream_vehicle_tracking_service(camera_id, vehicle_info, search_image_bytes, db),
+        stream_vehicle_tracking_service(camera_id, search_image_bytes, db),
         media_type="multipart/x-mixed-replace; boundary=frame"
     )
 
