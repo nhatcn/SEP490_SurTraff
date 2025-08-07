@@ -3,12 +3,27 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Camera, Car, Clock, Calendar, AlertTriangle, Film } from "lucide-react";
+import { 
+  ArrowLeft, 
+  Camera, 
+  Car, 
+  Clock, 
+  MapPin, 
+  AlertTriangle, 
+  Film, 
+  Download,
+  Gauge,
+  FileText,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  Clock3
+} from "lucide-react";
 import { format } from "date-fns";
 import axios, { AxiosError } from "axios";
 import jsPDF from "jspdf";
 
-// Define interfaces
+// Define interfaces (keeping the same as original)
 interface ViolationType {
   id: number;
   typeName: string;
@@ -129,37 +144,6 @@ const ViolationDetailForUser: React.FC = () => {
     doc.text(`Status: ${violation.status || "N/A"}`, 20, y);
     y += 10;
     doc.text(`Additional Notes: ${detail.additionalNotes || "N/A"}`, 20, y, { maxWidth: 170 });
-    y += doc.getTextDimensions(`Additional Notes: ${detail.additionalNotes || "N/A"}`, { maxWidth: 170 }).h + 10;
-
-    // Image (if available and CORS-enabled)
-    if (detail.imageUrl) {
-      try {
-        const img = new Image();
-        img.crossOrigin = "Anonymous";
-        img.src = detail.imageUrl;
-        await new Promise((resolve, reject) => {
-          img.onload = resolve;
-          img.onerror = () => {
-            console.warn("Image loading failed due to CORS or other issues.");
-            resolve(null); // Continue without image
-          };
-        });
-        doc.addImage(img, "JPEG", 20, y, 160, 90);
-        y += 100;
-        doc.text("Violation Image", 105, y, { align: "center" });
-        y += 10;
-      } catch (err) {
-        console.warn("Failed to add image to PDF:", err);
-        doc.text("Image not available (CORS or loading issue)", 20, y);
-        y += 10;
-      }
-    }
-
-    // Video URL (add as text, since jsPDF doesn't support embedding videos)
-    if (detail.videoUrl) {
-      doc.text(`Video URL: ${detail.videoUrl}`, 20, y, { maxWidth: 170 });
-      y += doc.getTextDimensions(`Video URL: ${detail.videoUrl}`, { maxWidth: 170 }).h + 10;
-    }
 
     doc.save(`violation_${id}.pdf`);
   };
@@ -173,22 +157,46 @@ const ViolationDetailForUser: React.FC = () => {
     }
   };
 
+  const getStatusBadge = (status?: string) => {
+    const configs = {
+      "APPROVED": { color: "bg-green-500", icon: CheckCircle, text: "Approved" },
+      "REJECTED": { color: "bg-red-500", icon: XCircle, text: "Rejected" },
+      "PENDING": { color: "bg-yellow-500", icon: Clock3, text: "Pending" },
+      "PROCESSED": { color: "bg-blue-500", icon: AlertCircle, text: "Processed" },
+      default: { color: "bg-gray-500", icon: AlertCircle, text: "Unknown" }
+    };
+    
+    const config = configs[status as keyof typeof configs] || configs.default;
+    const IconComponent = config.icon;
+    
+    return (
+      <div className={`${config.color} text-white px-4 py-2 rounded-full flex items-center gap-2 text-sm font-medium`}>
+        <IconComponent size={16} />
+        {config.text}
+      </div>
+    );
+  };
+
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-600"></div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex justify-center items-center h-screen">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-red-600 text-lg font-semibold">{error}</p>
+          <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <p className="text-red-600 text-lg mb-4">{error}</p>
           <button
             onClick={() => navigate("/violations")}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
           >
             Back to Violations
           </button>
@@ -200,166 +208,195 @@ const ViolationDetailForUser: React.FC = () => {
   const detail = violation?.violationDetails?.[0] || {} as ViolationDetail;
 
   return (
-    <div
-      style={{
-        display: "flex",
-        height: "100vh",
-        background: "linear-gradient(to bottom right, #F1F5F9, #DBEAFE, #E0E7FF)",
-        fontFamily: "'Inter', sans-serif",
-        overflow: "hidden",
-      }}
-    >
-      <div style={{ flexGrow: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <motion.div
-          style={{
-            padding: "1rem 1.5rem",
-            background: "linear-gradient(to right, #3B82F6, #8B5CF6)",
-            color: "white",
-            boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-            display: "flex",
-            alignItems: "center",
-            gap: "1rem",
-          }}
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <button
-            onClick={() => navigate("/violations")}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.5rem",
-              padding: "0.5rem 1rem",
-              backgroundColor: "rgba(255,255,255,0.2)",
-              borderRadius: "0.75rem",
-              color: "white",
-              fontWeight: 500,
-              transition: "background-color 0.3s ease",
-              cursor: "pointer",
-              border: "none",
-            }}
-            className="hover:bg-white/30"
-          >
-            <ArrowLeft size={18} />
-            <span>Back</span>
-          </button>
-          <h1 style={{ fontSize: "1.25rem", fontWeight: 600 }}>
-            Violation Details - ID: {id}
-          </h1>
-        </motion.div>
-        <div style={{ flexGrow: 1, padding: "1.5rem", overflowY: "auto" }}>
+    <div className="min-h-screen bg-gray-50">
+      {/* Simple Header */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-6xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => navigate("/violations")}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
+              >
+                <ArrowLeft size={18} />
+                Back
+              </button>
+              <div>
+                <h1 className="text-xl font-semibold text-gray-900">Violation Details</h1>
+                <p className="text-gray-600">ID: #{id}</p>
+              </div>
+            </div>
+            
+            <button
+              onClick={handleExportPDF}
+              className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition"
+            >
+              <Download size={18} />
+              Export PDF
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content - Single Column Layout */}
+      <div className="max-w-6xl mx-auto px-6 py-8">
+        <div className="space-y-8">
+          
+          {/* Status Section */}
           <motion.div
-            style={{
-              maxWidth: "100%",
-              background: "rgba(255, 255, 255, 0.8)",
-              backdropFilter: "blur(8px)",
-              borderRadius: "1.5rem",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-              border: "1px solid rgba(255,255,255,0.2)",
-              padding: "2rem",
-            }}
+            className="bg-white rounded-lg shadow-sm p-6 border"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-800">Violation Details</h2>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleExportPDF}
-                className="px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition"
-              >
-                Export PDF
-              </motion.button>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">Status</h2>
+              {getStatusBadge(violation?.status)}
             </div>
+          </motion.div>
+
+          {/* Basic Information */}
+          <motion.div
+            className="bg-white rounded-lg shadow-sm p-6 border"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+          >
+            <h2 className="text-lg font-semibold text-gray-900 mb-6">Violation Information</h2>
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-6">
-                {/* Image Section */}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Violation Type</label>
+                  <div className="flex items-center gap-2 p-3 bg-red-50 rounded-lg border border-red-100">
+                    <AlertTriangle className="w-5 h-5 text-red-600" />
+                    <span className="text-red-800 font-medium">{detail.violationType?.typeName || "N/A"}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">License Plate</label>
+                  <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg border">
+                    <Car className="w-5 h-5 text-gray-600" />
+                    <span className="font-mono text-lg font-semibold">{violation?.vehicle?.licensePlate || "N/A"}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Vehicle Info</label>
+                  <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg border">
+                    <Car className="w-5 h-5 text-gray-600" />
+                    <span>{violation?.vehicle?.brand || "N/A"} - {violation?.vehicle?.color || "N/A"}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Date & Time</label>
+                  <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg border">
+                    <Clock className="w-5 h-5 text-gray-600" />
+                    <span>{formatDate(detail.violationTime)}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                  <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg border">
+                    <MapPin className="w-5 h-5 text-gray-600" />
+                    <span>{detail.location || "N/A"}</span>
+                  </div>
+                </div>
+
+                {detail.speed && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Speed</label>
+                    <div className="flex items-center gap-2 p-3 bg-orange-50 rounded-lg border border-orange-200">
+                      <Gauge className="w-5 h-5 text-orange-600" />
+                      <span className="text-orange-800 font-semibold text-lg">{detail.speed} km/h</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Media Section */}
+          <motion.div
+            className="bg-white rounded-lg shadow-sm p-6 border"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+          >
+            <h2 className="text-lg font-semibold text-gray-900 mb-6">Evidence</h2>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Image */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <Camera className="w-5 h-5 text-gray-600" />
+                  <span className="font-medium text-gray-900">Photo Evidence</span>
+                </div>
                 {detail.imageUrl ? (
                   <img
                     src={detail.imageUrl}
-                    alt="Violation"
-                    className="w-full max-w-md rounded-lg shadow-md"
+                    alt="Violation Evidence"
+                    className="w-full rounded-lg border shadow-sm"
                     crossOrigin="anonymous"
                   />
                 ) : (
-                  <div className="w-full max-w-md h-64 flex items-center justify-center bg-gray-100 rounded-lg">
-                    <Camera className="w-12 h-12 text-gray-400" />
-                    <span className="ml-2 text-gray-600">No Image Available</span>
+                  <div className="w-full h-64 bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
+                    <div className="text-center">
+                      <Camera className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                      <p className="text-gray-500">No image available</p>
+                    </div>
                   </div>
                 )}
-                {/* Video Section */}
+              </div>
+
+              {/* Video */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <Film className="w-5 h-5 text-gray-600" />
+                  <span className="font-medium text-gray-900">Video Evidence</span>
+                </div>
                 {detail.videoUrl ? (
                   <video
                     src={detail.videoUrl}
                     controls
-                    className="w-full max-w-md rounded-lg shadow-md"
+                    className="w-full rounded-lg border shadow-sm"
+                    style={{ maxHeight: '300px' }}
                   />
                 ) : (
-                  <div className="w-full max-w-md h-64 flex items-center justify-center bg-gray-100 rounded-lg">
-                    <Film className="w-12 h-12 text-gray-400" />
-                    <span className="ml-2 text-gray-600">No Video Available</span>
+                  <div className="w-full h-64 bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
+                    <div className="text-center">
+                      <Film className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                      <p className="text-gray-500">No video available</p>
+                    </div>
                   </div>
                 )}
               </div>
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="w-5 h-5 text-yellow-600" />
-                  <p>
-                    <span className="font-semibold">Violation Type:</span>{" "}
-                    {detail.violationType?.typeName || "N/A"}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Car className="w-5 h-5 text-green-600" />
-                  <p>
-                    <span className="font-semibold">License Plate:</span>{" "}
-                    {violation?.vehicle?.licensePlate || "N/A"}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Car className="w-5 h-5 text-green-600" />
-                  <p>
-                    <span className="font-semibold">Vehicle:</span>{" "}
-                    {violation?.vehicle?.brand || "N/A"} ({violation?.vehicle?.color || "N/A"})
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Clock className="w-5 h-5 text-purple-600" />
-                  <p>
-                    <span className="font-semibold">Time:</span>{" "}
-                    {formatDate(detail.violationTime)}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-blue-600" />
-                  <p>
-                    <span className="font-semibold">Location:</span>{" "}
-                    {detail.location || "N/A"}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-red-600">🚀</span>
-                  <p>
-                    <span className="font-semibold">Speed:</span>{" "}
-                    {detail.speed ? `${detail.speed} km/h` : "N/A"}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <p>
-                    <span className="font-semibold">Status:</span>{" "}
-                    {violation?.status || "N/A"}
-                  </p>
-                </div>
-                <div>
-                  <p className="font-semibold">Additional Notes:</p>
-                  <p className="text-gray-600">{detail.additionalNotes || "N/A"}</p>
-                </div>
-              </div>
             </div>
           </motion.div>
+
+          {/* Additional Notes */}
+          {detail.additionalNotes && (
+            <motion.div
+              className="bg-white rounded-lg shadow-sm p-6 border"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <FileText className="w-5 h-5 text-gray-600" />
+                <h2 className="text-lg font-semibold text-gray-900">Additional Notes</h2>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-4 border">
+                <p className="text-gray-700 leading-relaxed">{detail.additionalNotes}</p>
+              </div>
+            </motion.div>
+          )}
+          
         </div>
       </div>
     </div>

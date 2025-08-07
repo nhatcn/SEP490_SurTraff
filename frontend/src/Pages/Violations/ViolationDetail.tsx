@@ -124,9 +124,6 @@ export default function ViolationDetail() {
       const statusUpper = newStatus.toUpperCase();
 
       switch (statusUpper) {
-        case "REQUESTED":
-          response = await axios.post(`${API_URL}/api/violations/${id}/request`);
-          break;
         case "PROCESSED":
           response = await axios.post(`${API_URL}/api/violations/${id}/process`);
           break;
@@ -244,7 +241,7 @@ export default function ViolationDetail() {
   const getStatusColor = (status: string) => {
     const statusMap: { [key: string]: { bg: string; text: string; icon: React.ReactNode } } = {
       pending: { bg: "bg-gray-100", text: "text-gray-500", icon: <div className="w-2 h-2 bg-gray-400 rounded-full" /> },
-      requested: { bg: "bg-yellow-100", text: "text-yellow-700", icon: <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" /> },
+      // requested: { bg: "bg-yellow-100", text: "text-yellow-700", icon: <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" /> },
       approved: { bg: "bg-green-100", text: "text-green-700", icon: <CheckCircle2 className="text-green-500" size={14} /> },
       rejected: { bg: "bg-red-100", text: "text-red-700", icon: <XCircle className="text-red-500" size={14} /> },
       processed: { bg: "bg-teal-100", text: "text-teal-700", icon: <CheckCircle2 className="text-teal-500" size={14} /> }
@@ -596,7 +593,6 @@ export default function ViolationDetail() {
                       disabled={loading}
                     >
                       <option value="PENDING">Pending</option>
-                      <option value="REQUESTED">Requested</option>
                       <option value="PROCESSED">Processed</option>
                       <option value="APPROVED">Approved</option>
                       <option value="REJECTED">Rejected</option>
