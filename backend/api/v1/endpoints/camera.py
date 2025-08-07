@@ -153,6 +153,11 @@ def stream_video(camera_id: int, db: Session = Depends(get_db)):
             detect_potholes_in_video(camera.stream_url, camera.id),
             media_type="multipart/x-mixed-replace; boundary=frame"
         )
+    elif camera_id == 2:
+        return StreamingResponse(
+            stream_accident_video_service(camera.stream_url, camera.id),
+            media_type="multipart/x-mixed-replace; boundary=frame"
+        )
 # Updated Tracking Models
 class VehicleInfo(BaseModel):
     brand: Optional[str] = None

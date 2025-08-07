@@ -5,7 +5,7 @@ import UserProfile from "../../../components/User/UserProfile"
 export default function UserProfileDashboard() {
   return (
     <div className="flex h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      <Sidebar />
+      <Sidebar defaultActiveItem="profile"/>
       <div className="flex flex-col flex-grow overflow-hidden">
         <Header title="User Dashboard" />
 

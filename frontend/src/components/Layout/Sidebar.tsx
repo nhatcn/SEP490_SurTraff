@@ -116,12 +116,12 @@ export default function Sidebar({ defaultActiveItem = "dashboard" }: SidebarProp
       description: "User Management",
     },
     {
-      id: "alerts",
+      id: "tracks",
       name: "Tracking",
       icon: <Car size={20} />,
       path: "/tracks",
       description: "Tracking Multiple Camera",
-      badge: "3",
+      badge: "0",
     },
 
   ]

@@ -414,7 +414,7 @@ export default function VehicleTrackingDashboard() {
 
   return (
     <div className="flex h-screen bg-gray-50">
-      <Sidebar defaultActiveItem="vehicles" />
+      <Sidebar defaultActiveItem="tracks" />
 
       <div className="flex flex-col flex-grow overflow-hidden">
         <Header title="Vehicle Tracking System" />

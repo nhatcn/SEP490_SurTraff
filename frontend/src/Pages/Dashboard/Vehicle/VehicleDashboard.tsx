@@ -46,7 +46,7 @@ const handleVehicleAdded = (newVehicle: VehicleType) => {
 
   return (
     <div className="flex h-screen">
-      <Sidebar defaultActiveItem="vehicle" />
+      <Sidebar defaultActiveItem="vehicles" />
       <div className="flex flex-col flex-grow overflow-hidden">
         <Header title="Vehicle Dashboard" />
         <div className="flex-grow overflow-y-auto p-4">

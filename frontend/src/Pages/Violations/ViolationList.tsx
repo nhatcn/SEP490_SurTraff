@@ -310,7 +310,7 @@ export default function ViolationList() {
   if (loading) {
     return (
       <div className="flex h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-        <Sidebar />
+        <Sidebar defaultActiveItem="violations"/>
         <div className="flex flex-col flex-grow">
           <Header title="Traffic Violation List" />
           <div className="flex-grow flex items-center justify-center">
