@@ -22,6 +22,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ element, path }) => {
     '/myprofile',
     '/usermap',
     '/vehiclelistuser',
+    '/violations/history/:plate',
+    '/violationsuser/:id',
+    '/editv/:id',
+    '/addv'
   ];
 
   // Check if the current path is allowed for customers

@@ -31,6 +31,7 @@ import EditVehicle from '../Pages/Vehicle/EditVehicle';
 import ViolationCustomerList from '../Pages/Violations/ViolationCustomerList';
 import VehicleCustomerList from '../Pages/Violations/VehicleCustomerList';
 import ProtectedRoute from './ProtectedRoute';
+import ViolationDetailForUser from '../Pages/Violations/ViolationDetailForUser';
 
 const RoutesConfig = () => {
   return (
@@ -61,9 +62,11 @@ const RoutesConfig = () => {
       <Route path="/myprofile" element={<ProtectedRoute path="/myprofile" element={<CustomerProfile />} />} />
       <Route path="/usermap" element={<ProtectedRoute path="/usermap" element={<UserTrafficMap />} />} />
       <Route path="/addv" element={<ProtectedRoute path="/addv" element={<AddVehicle />} />} />
-      <Route path="/editv" element={<ProtectedRoute path="/editv" element={<EditVehicle />} />} />
+      <Route path="/editv/:id" element={<ProtectedRoute path="/editv/:id" element={<EditVehicle />} />} />
       <Route path="/v" element={<ProtectedRoute path="/v" element={<ViolationCustomerList />} />} />
       <Route path="/vehiclelistuser" element={<ProtectedRoute path="/vehiclelistuser" element={<VehicleCustomerList />} />} />
+      <Route path="/violationsuser/:id" element={<ProtectedRoute path="/violationsuser/:id" element={<ViolationDetailForUser />} />} />
+
     </Routes>
   );
 };
