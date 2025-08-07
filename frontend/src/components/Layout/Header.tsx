@@ -12,7 +12,7 @@ interface HeaderProps {
 
 interface UserData {
   id: string
-  name: string
+  fullName: string
   email: string
   avatar?: string
   role: string
@@ -59,7 +59,7 @@ export default function Header({ title }: HeaderProps) {
         } else {
           setUserData({
             id: userId,
-            name: "User",
+            fullName: "User",
             email: "",
             role: role,
           })
@@ -70,7 +70,7 @@ export default function Header({ title }: HeaderProps) {
         const role = localStorage.getItem("role") || "Admin"
         setUserData({
           id: userId,
-          name: "User",
+          fullName: "User",
           email: "",
           role: role,
         })
@@ -83,12 +83,12 @@ export default function Header({ title }: HeaderProps) {
   }, [])
 
   const getAvatarInitials = (user: UserData) => {
-    if (user.name) {
-      const words = user.name.split(" ").filter((word) => word.length > 0)
+    if (user.fullName) {
+      const words = user.fullName.split(" ").filter((word) => word.length > 0)
       if (words.length >= 2) {
         return (words[0][0] + words[1][0]).toUpperCase()
       }
-      return user.name.substring(0, 2).toUpperCase()
+      return user.fullName.substring(0, 2).toUpperCase()
     }
     return "AD"
   }
@@ -228,7 +228,7 @@ export default function Header({ title }: HeaderProps) {
                   {/* User Info */}
                   <div className="hidden sm:block text-left">
                     <span className="text-sm font-medium text-gray-700 block max-w-24 truncate">
-                      {loading ? "Loading..." : userData?.name || userData?.role || "Admin"}
+                      {loading ? "Loading..." : userData?.fullName || userData?.role || "Admin"}
                     </span>
                   </div>
 
@@ -257,7 +257,7 @@ export default function Header({ title }: HeaderProps) {
               {showUserMenu && userData && (
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
                   <div className="px-4 py-3 border-b border-gray-100">
-                    <p className="font-medium text-gray-800">{userData?.name || "Admin"}</p>
+                    <p className="font-medium text-gray-800">{userData?.fullName || "Admin"}</p>
                     <p className="text-sm text-gray-600">{userData?.email || ""}</p>
                   </div>
 

@@ -7,7 +7,7 @@ import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import Logo from "../../components/Logo/Logo"
 import NotificationDropdown from "./NotificationDropdown"
-import { eraseCookie } from "../../utils/cookieUltil"
+import { eraseCookie, getCookie } from "../../utils/cookieUltil"
 
 interface HeaderProps {
   showMobileMenu: boolean
@@ -16,7 +16,7 @@ interface HeaderProps {
 
 interface UserData {
   id: string
-  name: string
+  fullName: string
   email: string
   avatar?: string
   role: string
@@ -57,7 +57,7 @@ const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const userId = localStorage.getItem("userId")
+        const userId = getCookie("userId")
         const role = localStorage.getItem("role") || "Admin"
 
         if (!userId) {
@@ -78,7 +78,7 @@ const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
         } else {
           setUserData({
             id: userId,
-            name: "User",
+            fullName: "User",
             email: "",
             role: role,
           })
@@ -89,7 +89,7 @@ const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
         const role = localStorage.getItem("role") || "Admin"
         setUserData({
           id: userId,
-          name: "User",
+          fullName: "User",
           email: "",
           role: role,
         })
@@ -103,12 +103,12 @@ const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
 
   // Get avatar initials
   const getAvatarInitials = (user: UserData) => {
-    if (user.name) {
-      const words = user.name.split(" ").filter((word) => word.length > 0)
+    if (user.fullName) {
+      const words = user.fullName.split(" ").filter((word) => word.length > 0)
       if (words.length >= 2) {
         return (words[0][0] + words[1][0]).toUpperCase()
       }
-      return user.name.substring(0, 2).toUpperCase()
+      return user.fullName.substring(0, 2).toUpperCase()
     }
     return "AD"
   }
@@ -145,14 +145,15 @@ const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
             Home
           </a>
           <a href="/search" className="text-gray-500 hover:text-gray-800 transition-colors duration-200">
-            Search Violations
+            Vehicle
+          </a>
+          <a href="/usermap" className="text-gray-500 hover:text-gray-800 transition-colors duration-200">
+            Map
           </a>
           <a href="/help" className="text-gray-600 hover:text-gray-800 transition-colors duration-200">
             Help
           </a>
-          <a href="/contact" className="text-gray-600 hover:text-gray-800 transition-colors duration-200">
-            Contact
-          </a>
+
         </nav>
 
         {/* Notification Component */}
@@ -191,9 +192,9 @@ const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
               )}
             </div>
 
-            {/* User name or Login */}
+            {/* User fullName or Login */}
             <span className="text-sm text-gray-700 font-medium hidden sm:block max-w-24 truncate">
-              {loading ? "Loading..." : userData?.name || userData?.role || "Login"}
+              {loading ? "Loading..." : userData?.fullName || userData?.role || "Login"}
             </span>
             <ChevronDown
               size={16}
@@ -205,7 +206,7 @@ const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
           {showUserMenu && userData && (
             <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
               <div className="px-4 py-3 border-b border-gray-100">
-                <p className="font-medium text-gray-800">{loading ? "Loading..." : userData?.name || userData?.role || "Admin"}</p>
+                <p className="font-medium text-gray-800">{loading ? "Loading..." : userData?.fullName || userData?.role || "Admin"}</p>
                 <p className="text-sm text-gray-600">{loading ? "" : userData?.email || ""}</p>
               </div>
 
@@ -214,10 +215,7 @@ const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
                   <User size={16} className="mr-2" />
                   Your Profile
                 </a>
-                <a href="/settings" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                  <Shield size={16} className="mr-2" />
-                  Settings
-                </a>
+
                 <div className="border-t border-gray-100 my-1"></div>
                 <button
                   onClick={handleSignOut}
@@ -259,11 +257,11 @@ const MobileDropdownMenu = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) 
   }
 
   const menuItems = [
-    { id: "home", name: "Home", icon: <Eye size={20} />, path: "/home", active: true },
-    { id: "search", name: "Search Violations", icon: <Search size={20} />, path: "/search" },
-    { id: "help", name: "Help", icon: <Shield size={20} />, path: "/help" },
-    { id: "contact", name: "Contact", icon: <User size={20} />, path: "/contact" },
-    { id: "logout", name: "Log Out", icon: <LogOut size={20} />, path: "/logout" },
+    { id: "home", fullName: "Home", icon: <Eye size={20} />, path: "/home", active: true },
+    { id: "search", fullName: "Search Violations", icon: <Search size={20} />, path: "/search" },
+    { id: "help", fullName: "Help", icon: <Shield size={20} />, path: "/help" },
+    { id: "contact", fullName: "Contact", icon: <User size={20} />, path: "/contact" },
+    { id: "logout", fullName: "Log Out", icon: <LogOut size={20} />, path: "/logout" },
   ]
 
   if (!showMobileMenu) {
@@ -311,7 +309,7 @@ const MobileDropdownMenu = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) 
                   >
                     {item.icon}
                   </span>
-                  <span className="ml-3 text-sm font-medium">{item.name}</span>
+                  <span className="ml-3 text-sm font-medium">{item.fullName}</span>
                   {item.active && (
                     <div className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-blue-300 h-2 w-2 rounded-full animate-pulse"></div>
                   )}
