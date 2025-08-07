@@ -1,6 +1,8 @@
+// RecentViolationsSection.tsx
 "use client"
-import { Car, Clock, MapPin, AlertTriangle, CheckCircle, XCircle, Activity } from "lucide-react"
-import { useState, useEffect } from "react"
+
+import { Car, Clock, MapPin, AlertTriangle, CheckCircle, XCircle, Activity, ArrowLeft } from "lucide-react"
+import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import { getCookie } from "../utils/cookieUltil"
 
@@ -20,6 +22,7 @@ interface RecentViolationsSectionProps {
   searchResults: Violation[]
   isSearching: boolean
   currentSearchQuery: string
+  resetSearch: () => void // Add resetSearch prop
 }
 
 export default function RecentViolationsSection({
@@ -27,25 +30,33 @@ export default function RecentViolationsSection({
   searchResults,
   isSearching,
   currentSearchQuery,
+  resetSearch, // Destructure resetSearch
 }: RecentViolationsSectionProps) {
   const [recentViolations, setRecentViolations] = useState<Violation[]>([])
   const [isLoadingRecentViolations, setIsLoadingRecentViolations] = useState(true)
   const [errorRecentViolations, setErrorRecentViolations] = useState<string | null>(null)
   const [requestingId, setRequestingId] = useState<number | null>(null)
   const [requestMessage, setRequestMessage] = useState<string | null>(null)
+  const sectionRef = useRef<HTMLDivElement>(null)
 
   const navigate = useNavigate()
+
+  useEffect(() => {
+    if (hasSearched && sectionRef.current) {
+      sectionRef.current.scrollIntoView({ behavior: "smooth", block: "start" })
+    }
+  }, [hasSearched])
 
   useEffect(() => {
     const fetchRecentViolations = async () => {
       setIsLoadingRecentViolations(true)
       setErrorRecentViolations(null)
       try {
-        const userId = getCookie("userId") // Get userId from cookie
+        const userId = getCookie("userId")
         if (!userId) {
           throw new Error("User ID not found in cookie")
         }
-        const response = await fetch(`http://localhost:8081/api/accident/user/${userId}`)
+        const response = await fetch(`http://localhost:8081/api/violations/user/${userId}`)
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`)
         }
@@ -53,26 +64,28 @@ export default function RecentViolationsSection({
         const transformedData: Violation[] = data
           .map((item: any) => {
             let displayStatusText = item.status
-            if (item.status === "Approved") {
+            if (item.status === "APPROVED") {
               displayStatusText = "New"
             }
             return {
               id: item.id,
-              plateNumber: item.licensePlate,
-              violationType: item.description,
-              location: item.location,
-              time: new Date(item.accidentTime).toLocaleString(),
+              plateNumber: item.vehicle?.licensePlate || "N/A",
+              violationType: item.violationDetails?.[0]?.violationType?.typeName || "Unknown",
+              location: item.violationDetails?.[0]?.location || "N/A",
+              time: item.violationDetails?.[0]?.violationTime
+                ? new Date(item.violationDetails[0].violationTime).toLocaleString()
+                : "N/A",
               status: item.status,
               displayStatus: displayStatusText,
-              image: item.imageUrl || "/placeholder.svg",
+              image: item.violationDetails?.[0]?.imageUrl || "/placeholder.svg",
             }
           })
           .filter(
             (violation: Violation) =>
-              violation.status === "Approved" ||
-              violation.status === "Requested" ||
-              violation.status === "Processed" ||
-              violation.status === "Rejected",
+              violation.status === "APPROVED" ||
+              violation.status === "REQUEST" ||
+              violation.status === "PROCESSED" ||
+              violation.status === "REJECT",
           )
         setRecentViolations(transformedData)
       } catch (error) {
@@ -90,7 +103,7 @@ export default function RecentViolationsSection({
     setRequestingId(id)
     setRequestMessage(null)
     try {
-      const response = await fetch(`http://localhost:8081/api/accident/${id}/request`, {
+      const response = await fetch(`http://localhost:8081/api/violations/${id}/request`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -117,13 +130,13 @@ export default function RecentViolationsSection({
 
   const getStatusClasses = (status: string) => {
     switch (status) {
-      case "Approved":
+      case "APPROVED":
         return "bg-green-100 text-green-800 border border-green-200"
-      case "Requested":
+      case "REQUEST":
         return "bg-yellow-100 text-yellow-800 border border-yellow-200"
-      case "Processed":
+      case "PROCESSED":
         return "bg-blue-100 text-blue-800 border border-blue-200"
-      case "Rejected":
+      case "REJECT":
         return "bg-red-100 text-red-800 border border-red-200"
       default:
         return "bg-gray-100 text-gray-800 border border-gray-200"
@@ -132,13 +145,13 @@ export default function RecentViolationsSection({
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case "Approved":
+      case "APPROVED":
         return <CheckCircle className="w-4 h-4 mr-1" />
-      case "Requested":
+      case "REQUEST":
         return <AlertTriangle className="w-4 h-4 mr-1" />
-      case "Processed":
+      case "PROCESSED":
         return <Activity className="w-4 h-4 mr-1" />
-      case "Rejected":
+      case "REJECT":
         return <XCircle className="w-4 h-4 mr-1" />
       default:
         return null
@@ -146,7 +159,7 @@ export default function RecentViolationsSection({
   }
 
   return (
-    <div className="py-20 relative z-[10]">
+    <div ref={sectionRef} className="py-20 relative z-[10]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {hasSearched && (
           <div className="mb-12">
@@ -171,6 +184,14 @@ export default function RecentViolationsSection({
                 <p className="text-gray-600 text-lg">
                   This license plate has a clean record with no traffic violations
                 </p>
+                <button
+                  onClick={resetSearch}
+                  className="mt-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3 px-6 rounded-2xl transition-all duration-300 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center justify-center mx-auto"
+                  aria-label="Back to recent violations"
+                >
+                  <ArrowLeft className="w-5 h-5 mr-2" />
+                  Back to Recent Violations
+                </button>
               </div>
             ) : (
               <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
@@ -210,26 +231,30 @@ export default function RecentViolationsSection({
                           <span>{violation.time}</span>
                         </div>
                       </div>
-                      {violation.status === "Processed" ? (
-                        <button
-                          onClick={() => navigate(`/accidentsdetails/${violation.id}`)}
-                          className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3 px-6 rounded-2xl transition-all duration-300 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105"
-                        >
-                          View Full Details
-                        </button>
-                      ) : violation.status === "Approved" ? (
-                        <button
-                          onClick={() => handleRequestToView(violation.id)}
-                          disabled={requestingId === violation.id}
-                          className="w-full bg-gradient-to-r from-gray-400 to-gray-500 hover:from-gray-500 hover:to-gray-600 text-white py-3 px-6 rounded-2xl transition-all duration-300 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {requestingId === violation.id ? "Sending Request..." : "Request to View"}
-                        </button>
-                      ) : (
-                        <div className="h-12 flex items-center justify-center text-gray-500 text-sm">
-                          No action available
-                        </div>
-                      )}
+                      <div className="w-44 mx-auto">
+                        {violation.status === "PROCESSED" ? (
+                          <button
+                            onClick={() => navigate(`/violationsdetails/${violation.id}`)}
+                            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3 px-6 rounded-2xl transition-all duration-300 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105"
+                            aria-label={`View details for violation ${violation.id}`}
+                          >
+                            View Full Details
+                          </button>
+                        ) : violation.status === "APPROVED" ? (
+                          <button
+                            onClick={() => handleRequestToView(violation.id)}
+                            disabled={requestingId === violation.id}
+                            className="w-full bg-gradient-to-r from-gray-400 to-gray-500 hover:from-gray-500 hover:to-gray-600 text-white py-3 px-6 rounded-2xl transition-all duration-300 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                            aria-label={`Request to view violation ${violation.id}`}
+                          >
+                            {requestingId === violation.id ? "Sending Request..." : "Request to View"}
+                          </button>
+                        ) : (
+                          <div className="h-12 flex items-center justify-center text-gray-500 text-sm w-full">
+                            No action available
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -318,24 +343,30 @@ export default function RecentViolationsSection({
                           </span>
                         </td>
                         <td className="px-8 py-6 whitespace-nowrap">
-                          {violation.status === "Processed" ? (
-                            <button
-                              onClick={() => navigate(`/accidentsdetails/${violation.id}`)}
-                              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-2 px-4 rounded-xl transition-all duration-300 font-semibold shadow-md hover:shadow-lg"
-                            >
-                              View Full Details
-                            </button>
-                          ) : violation.status === "Approved" ? (
-                            <button
-                              onClick={() => handleRequestToView(violation.id)}
-                              disabled={requestingId === violation.id}
-                              className="bg-gradient-to-r from-gray-400 to-gray-500 hover:from-gray-500 hover:to-gray-600 text-white py-2 px-4 rounded-xl transition-all duration-300 font-semibold shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              {requestingId === violation.id ? "Sending Request..." : "Request to View"}
-                            </button>
-                          ) : (
-                            <div className="h-10 flex items-center justify-center text-gray-500 text-sm">—</div>
-                          )}
+                          <div className="w-44">
+                            {violation.status === "PROCESSED" ? (
+                              <button
+                                onClick={() => navigate(`/violationsdetails/${violation.id}`)}
+                                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-2 px-4 rounded-xl transition-all duration-300 font-semibold shadow-md hover:shadow-lg"
+                                aria-label={`View details for violation ${violation.id}`}
+                              >
+                                View Full Details
+                              </button>
+                            ) : violation.status === "APPROVED" ? (
+                              <button
+                                onClick={() => handleRequestToView(violation.id)}
+                                disabled={requestingId === violation.id}
+                                className="w-full bg-gradient-to-r from-gray-400 to-gray-500 hover:from-gray-500 hover:to-gray-600 text-white py-2 px-4 rounded-xl transition-all duration-300 font-semibold shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                                aria-label={`Request to view violation ${violation.id}`}
+                              >
+                                {requestingId === violation.id ? "Sending Request..." : "Request to View"}
+                              </button>
+                            ) : (
+                              <div className="h-10 flex items-center justify-center text-gray-500 text-sm w-full">
+                                No action available
+                              </div>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}

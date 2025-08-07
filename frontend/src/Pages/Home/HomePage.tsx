@@ -8,6 +8,7 @@ import Footer from "../../components/Layout/Footer"
 import { SearchBar } from "../../components/HomeSearch/search-bar"
 import RecentViolationsSection from "../../components/RecentViolationsSection"
 import { getCookie } from "../../utils/cookieUltil"
+import Chatbot from "../../components/Chatbot/chatbot"
 
 interface StatCard {
   title: string
@@ -105,7 +106,12 @@ export default function CustomerHome() {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000)
     return () => clearInterval(timer)
   }, [])
-
+// New function to reset search
+  const resetSearch = () => {
+    setSearchResults([])
+    setHasSearched(false)
+    setCurrentSearchQuery("")
+  }
   const handleSearch = async (query: string) => {
     if (!query.trim()) {
       setSearchResults([])
@@ -252,13 +258,15 @@ export default function CustomerHome() {
             </div>
           </div>
         </div>
-        <RecentViolationsSection
+       <RecentViolationsSection
           hasSearched={hasSearched}
           searchResults={searchResults}
           isSearching={isSearching}
           currentSearchQuery={currentSearchQuery}
+          resetSearch={resetSearch} // Pass the resetSearch function
         />
       </main>
+      <Chatbot/>
       <Footer />
     </div>
   )
