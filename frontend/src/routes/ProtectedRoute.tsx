@@ -22,6 +22,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ element, path }) => {
     '/myprofile',
     '/usermap',
     '/vehiclelistuser',
+    '/accidentsdetails/:id',
     '/violations/history/:plate',
     '/violationsuser/:id',
     '/editv/:id',
