@@ -887,21 +887,7 @@ export default function ViolationDetail() {
                       <label className="block text-blue-700 font-medium mb-1">
                         Violation Type:
                       </label>
-                      {isEditingDetail ? (
-                        <select
-                          name="violationTypeId"
-                          value={detailFormData.violationType?.id || ""}
-                          onChange={handleDetailInputChange}
-                          className="w-full border border-blue-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/70 backdrop-blur-sm transition-all duration-300"
-                        >
-                          <option value="" disabled>
-                            Select Violation Type
-                          </option>
-                          <option value="1">Red Light</option>
-                          <option value="2">Overspeed</option>
-                          <option value="3">Parking Violation</option>
-                        </select>
-                      ) : (
+                      
                         <span
                           className={`px-4 py-2 rounded-xl text-sm font-semibold transform hover:scale-105 transition-all duration-300 ${getSeverityBadge(
                             violation.violationDetails[0].violationType?.typeName || ""
@@ -909,7 +895,7 @@ export default function ViolationDetail() {
                         >
                           {violation.violationDetails[0].violationType?.typeName || "N/A"}
                         </span>
-                      )}
+                      
                     </div>
                     <div>
                       <label className="block text-blue-700 font-medium mb-1">
