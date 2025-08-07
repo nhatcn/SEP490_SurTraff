@@ -49,7 +49,7 @@ export const useLogin = () => {
 
       localStorage.setItem('token', response.data.token);
       setCookie('userId', response.data.userId);
-
+      localStorage.setItem('role', response.data.role);
       setState({ isLoading: false, error: '' });
 
       if (response.data.role === 'customer') {

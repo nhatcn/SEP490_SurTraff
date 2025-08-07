@@ -118,62 +118,41 @@ def stream_video(camera_id: int, db: Session = Depends(get_db)):
     if not camera:
         raise HTTPException(status_code=404, detail="Camera not found")
 
-    if camera_id == 2:
+    if camera.violation_type_id == 1:
         return StreamingResponse(
-            stream_violation_video_service(camera.stream_url, camera.id),
+            stream_violation_video_service1(camera.stream_url, camera.id),
             media_type="multipart/x-mixed-replace; boundary=frame"
         )
-    elif camera_id == 3:
+    elif camera.violation_type_id == 2:
         return StreamingResponse(
-            stream_count_video_service(camera.stream_url),
+            stream_overspeed_service(camera.stream_url, camera.id),
             media_type="multipart/x-mixed-replace; boundary=frame"
         )
-    elif camera_id == 4:
-        return StreamingResponse(
-            stream_accident_video_service(camera.stream_url),
-            media_type="multipart/x-mixed-replace; boundary=frame"
-        )
-    elif camera_id == 5:
-        return StreamingResponse(
-            stream_plate_with_ocr_video_service(camera.stream_url),
-            media_type="multipart/x-mixed-replace; boundary=frame"
-        )
-    elif camera_id == 6:
+    elif camera.violation_type_id == 3:
         return StreamingResponse(
             analyze_traffic_video(camera.stream_url, camera.id),
             media_type="multipart/x-mixed-replace; boundary=frame"
         )
-    elif camera_id == 7:
-        return StreamingResponse(
-            detect_potholes_in_video(camera.stream_url, camera.id, db),
-            media_type="multipart/x-mixed-replace; boundary=frame"
-        )
-    elif camera_id == 8:
-        return StreamingResponse(
-            stream_violation_wrongway_video_service(camera.stream_url, camera.id, db),
-            media_type="multipart/x-mixed-replace; boundary=frame"
-        )
-    elif camera_id == 9:
-        return StreamingResponse(
-            stream_overspeed_service(camera.stream_url, camera.id, db),
-            media_type="multipart/x-mixed-replace; boundary=frame"
-        )
-    elif camera_id == 11:
-        return StreamingResponse(
-            stream_no_helmet_service(camera.stream_url, camera.id),
-            media_type="multipart/x-mixed-replace; boundary=frame"
-        ) 
-    elif camera_id >= 50:
+    elif camera.violation_type_id == 4:
         return StreamingResponse(
             stream_violation_wrongway_video_service1(camera.stream_url, camera.id),
             media_type="multipart/x-mixed-replace; boundary=frame"
-        )   
-    else:
+        )
+    elif camera.violation_type_id == 5:
         return StreamingResponse(
-            analyze_traffic_video(camera.stream_url, camera.id),
+            stream_no_helmet_service(camera.stream_url, camera.id),
             media_type="multipart/x-mixed-replace; boundary=frame"
         )
-
+    elif camera.violation_type_id == 6:
+        return StreamingResponse(
+            stream_count_video_service(camera.stream_url, camera.id),
+            media_type="multipart/x-mixed-replace; boundary=frame"
+        )
+    elif camera.violation_type_id == 7:
+        return StreamingResponse(
+            pothole_detection_service(camera.stream_url, camera.id),
+            media_type="multipart/x-mixed-replace; boundary=frame"
+        )
 # Updated Tracking Models
 class VehicleInfo(BaseModel):
     brand: Optional[str] = None
