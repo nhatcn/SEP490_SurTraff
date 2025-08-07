@@ -52,7 +52,7 @@ interface ViolationsDTO {
     createdAt?: string;
     licensePlate?: string;
   }>;
-  status?: "Pending" | "Request" | "Approve" | "Reject" | "Processed";
+  status?: "Pending" | "Request" | "Approved" | "Reject" | "Processed";
 }
 
 interface VehicleDTO {
@@ -126,56 +126,60 @@ const RequestButton: React.FC<RequestButtonProps> = ({ violationId, onStatusUpda
   }, [success, error]);
 
   const handleRequest = async () => {
-    setIsLoading(true);
-    setSuccess(null);
-    setError(null);
+  setIsLoading(true);
+  setSuccess(null);
+  setError(null);
 
-    try {
-      const response = await axios.patch<ViolationsDTO>(
-        `${API_URL}/api/violations/${violationId}/status`,
-        null,
-        {
-          params: {
-            status: "REQUEST",
-          },
-          headers: {
-            Accept: "application/json",
-          },
-        }
-      );
-      onStatusUpdate(response.data);
-      setViolationStatus(response.data.status?.toUpperCase() || "REQUEST");
-      setSuccess(true);
-    } catch (err) {
-      const error = err as AxiosError;
-      console.error("Error details:", {
-        status: error.response?.status,
-        data: error.response?.data,
-        headers: error.response?.headers,
-        request: {
-          url: error.config?.url,
-          params: error.config?.params,
-          headers: error.config?.headers,
+  try {
+    const response = await axios.post<ViolationsDTO>(
+      `${API_URL}/api/violations/${violationId}/request`,
+      null,
+      {
+        headers: {
+          Accept: "application/json",
         },
-      });
-      if (error.response?.status === 404) {
-        setError((error.response?.data as any)?.message || "Violation not found.");
-      } else if (error.response?.status === 400) {
-        setError((error.response?.data as any)?.message || "Invalid request. Violation must be in APPROVE status.");
-      } else {
-        setError((error.response?.data as any)?.message || "An error occurred. Please try again.");
       }
-      setSuccess(false);
-    } finally {
-      setIsLoading(false);
+    );
+
+    // Nếu violation trả về không có id, xem như là lỗi do backend trả về DTO rỗng
+    if (!response.data || !response.data.id) {
+      throw new Error("Empty or invalid response.");
     }
-  };
+
+    onStatusUpdate(response.data);
+    setViolationStatus(response.data.status?.toUpperCase() || "REQUEST");
+    setSuccess(true);
+  } catch (err) {
+    const error = err as AxiosError;
+
+    const status = error.response?.status;
+
+    if (status === 404) {
+      setError("Violation not found.");
+    } else if (status === 400) {
+      setError("Invalid request. Violation must be in APPROVED status.");
+    } else {
+      setError("An unexpected error occurred. Please try again.");
+    }
+
+    console.error("Request failed:", {
+      status,
+      data: error.response?.data,
+      headers: error.response?.headers,
+      url: error.config?.url,
+    });
+
+    setSuccess(false);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleViewDetails = () => {
     navigate(`/violationsuser/${violationId}`);
   };
 
-  const isRequestAllowed = violationStatus === "APPROVE";
+  const isRequestAllowed = violationStatus === "APPROVED";
   const isProcessed = violationStatus === "PROCESSED";
   const buttonText = isLoading
     ? "Processing..."
@@ -183,7 +187,7 @@ const RequestButton: React.FC<RequestButtonProps> = ({ violationId, onStatusUpda
     ? "Success"
     : success === false
     ? "Failed"
-    : violationStatus === "APPROVE"
+    : violationStatus === "APPROVED"
     ? "Send Request"
     : violationStatus === "PROCESSED"
     ? "View Details"
@@ -663,7 +667,7 @@ const SearchAndFilter: React.FC<{
 // ViolationRow Component
 const ViolationRow: React.FC<{
   violation: ViolationsDTO;
-  onStatusUpdate: (violationId: number, newStatus: "Pending" | "Request" | "Approve" | "Reject" | "Processed") => void;
+  onStatusUpdate: (violationId: number, newStatus: "Pending" | "Request" | "Approved" | "Reject" | "Processed") => void;
 }> = React.memo(({ violation, onStatusUpdate }) => {
   const detail = violation.violationDetails?.[0] || null;
 
@@ -694,7 +698,7 @@ const ViolationRow: React.FC<{
         text: "text-blue-700",
         icon: <div style={{ width: "0.5rem", height: "0.5rem", backgroundColor: "#3B82F6", borderRadius: "50%" }} />,
       },
-      Approve: {
+      Approved: {
         bg: "bg-green-100",
         text: "text-green-700",
         icon: <div style={{ width: "0.5rem", height: "0.5rem", backgroundColor: "#10B981", borderRadius: "50%" }} />,
@@ -773,7 +777,7 @@ const ViolationRow: React.FC<{
   }, []);
 
   const handleStatusUpdateFromButton = (updatedViolation: ViolationsDTO) => {
-    onStatusUpdate(violation.id, updatedViolation.status as "Pending" | "Request" | "Approve" | "Reject" | "Processed");
+    onStatusUpdate(violation.id, updatedViolation.status as "Pending" | "Request" | "Approved" | "Reject" | "Processed");
   };
 
   return (
@@ -1132,7 +1136,7 @@ export default function ViolationHistory() {
     setCurrentPage(1);
   }, [searchTerm, filterType, selectedLicensePlate]);
 
-  const handleStatusUpdate = useCallback((violationId: number, newStatus: "Pending" | "Request" | "Approve" | "Reject" | "Processed") => {
+  const handleStatusUpdate = useCallback((violationId: number, newStatus: "Pending" | "Request" | "Approved" | "Reject" | "Processed") => {
     setViolations((prev) => prev.map((v) => (v.id === violationId ? { ...v, status: newStatus } : v)));
   }, []);
 

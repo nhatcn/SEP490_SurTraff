@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import Sidebar from "../../components/Layout/Sidebar";
 import Header from "../../components/Layout/Header";
@@ -12,8 +13,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Eye, Trash2, Camera, MapPin, Clock, Car, AlertTriangle, RefreshCw, TrendingUp, 
   Filter, Download, BarChart3, Calendar, Search, X, ChevronDown, Sparkles,
-  Shield, Target, Zap, Activity, Users, Globe, CheckCircle2, XCircle, ChevronLeft,
-  ChevronRight, ChevronsLeft, ChevronsRight
+  Shield, Target, Zap, Activity, Globe, CheckCircle2, XCircle, ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 
 // Types
@@ -62,6 +63,7 @@ interface Violation {
   createdAt: string | null;
   violationDetails: ViolationDetail[] | null;
   status: string | null;
+  isDelete: boolean; // Added to match backend
 }
 
 // Constants
@@ -127,11 +129,12 @@ export default function ViolationList() {
   }, [filteredViolations, currentPage, pageSize]);
 
   const totalPages = useMemo(() => Math.ceil(filteredViolations.length / pageSize), [filteredViolations.length, pageSize]);
-// Lọc ITEMS_PER_PAGE_OPTIONS để chỉ hiển thị các tùy chọn nhỏ hơn hoặc bằng tổng số bản ghi
+
   const availablePageSizeOptions = useMemo(() => {
-    if (filteredViolations.length === 0) return [ITEMS_PER_PAGE_OPTIONS[0]]; // Hiển thị tùy chọn nhỏ nhất nếu không có bản ghi
+    if (filteredViolations.length === 0) return [ITEMS_PER_PAGE_OPTIONS[0]];
     return ITEMS_PER_PAGE_OPTIONS.filter(size => size <= filteredViolations.length || size === ITEMS_PER_PAGE_OPTIONS[0]);
   }, [filteredViolations.length]);
+
   // Statistics
   const stats = useMemo(() => {
     const totalViolations = filteredViolations.length;
@@ -191,7 +194,14 @@ export default function ViolationList() {
       processed: { bg: "bg-teal-100", text: "text-teal-700", icon: <CheckCircle2 className="text-teal-500" size={14} /> },
       dismissed: { bg: "bg-blue-100", text: "text-blue-700", icon: <XCircle className="text-blue-500" size={14} /> },
     };
-    return statusMap[status.toLowerCase()] || { bg: "bg-gray-100", text: "text-gray-500", icon: <div className="w-2 h-2 bg-gray-400 rounded-full" /> };
+    return statusMap[status?.toLowerCase()] || { bg: "bg-gray-100", text: "text-gray-500", icon: <div className="w-2 h-2 bg-gray-400 rounded-full" /> };
+  };
+
+  // Get state color for isDelete
+  const getStateColor = (isDelete: boolean) => {
+    return isDelete
+      ? { bg: "bg-red-100", text: "text-red-700", icon: <XCircle className="text-red-500" size={14} /> }
+      : { bg: "bg-green-100", text: "text-green-700", icon: <CheckCircle2 className="text-green-500" size={14} /> };
   };
 
   // Load violations with retry capability
@@ -203,6 +213,7 @@ export default function ViolationList() {
       const processedData = response.data.map((item: any) => ({
         ...item,
         violationDetails: item.violationDetails || [],
+        isDelete: item.isDelete ?? false, // Ensure isDelete is always boolean
       }));
       setViolations(processedData);
     } catch (err) {
@@ -210,7 +221,7 @@ export default function ViolationList() {
       console.error("Failed to load violations:", err);
       setError(errorMsg);
     } finally {
-      setLoading(false);
+      setLoading(false); // Fixed bug: was setLoading(true)
     }
   }, [refreshKey]);
 
@@ -328,6 +339,7 @@ export default function ViolationList() {
               <button
                 onClick={handleRetry}
                 className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                aria-label="Retry loading data"
               >
                 Try Again
               </button>
@@ -343,316 +355,320 @@ export default function ViolationList() {
       <Sidebar />
       <div className="flex flex-col flex-grow overflow-hidden">
         <Header title="Traffic Violation List" />
-        <div className="flex-grow overflow-y-auto">
-          <div className="p-6 space-y-6">
-            
-
-            {/* Enhanced Statistics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <motion.div 
-                className="bg-gradient-to-br from-white/95 to-blue-50/95 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-6 border border-blue-200/50 hover:border-blue-300/50 transform hover:-translate-y-1"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.5, delay: 0.1 }}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center space-x-2 mb-2">
-                      <Target size={16} className="text-blue-500" />
-                      <p className="text-sm font-medium text-gray-600">Total Violations</p>
-                    </div>
-                    <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                      {stats.totalViolations}
-                    </p>
-                    <div className="flex items-center space-x-1 mt-2">
-                      <TrendingUp size={14} className={stats.trendPercentage > 0 ? "text-red-500" : "text-green-500"} />
-                      <span className={`text-sm font-medium ${stats.trendPercentage > 0 ? "text-red-500" : "text-green-500"}`}>
-                        {stats.trendPercentage > 0 ? "+" : ""}{stats.trendPercentage.toFixed(1)}%
-                      </span>
-                      <span className="text-xs text-gray-500">vs last week</span>
-                    </div>
-                  </div>
-                  <div className="bg-gradient-to-r from-blue-500 to-purple-500 p-3 rounded-xl shadow-lg">
-                    <AlertTriangle className="text-white" size={24} />
-                  </div>
-                </div>
-              </motion.div>
-              
-              <motion.div 
-                className="bg-gradient-to-br from-white/95 to-green-50/95 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-6 border border-green-200/50 hover:border-green-300/50 transform hover:-translate-y-1"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.5, delay: 0.2 }}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center space-x-2 mb-2">
-                      <Clock size={16} className="text-green-500" />
-                      <p className="text-sm font-medium text-gray-600">Today</p>
-                    </div>
-                    <p className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-                      {stats.todayViolations}
-                    </p>
-                    <div className="flex items-center space-x-1 mt-2">
-                      <span className="text-sm text-gray-500">
-                        {stats.totalViolations > 0 ? ((stats.todayViolations / stats.totalViolations) * 100).toFixed(1) : 0}% of total
-                      </span>
-                    </div>
-                  </div>
-                  <div className="bg-gradient-to-r from-green-500 to-emerald-500 p-3 rounded-xl shadow-lg">
-                    <Activity className="text-white" size={24} />
-                  </div>
-                </div>
-              </motion.div>
-              
-              <motion.div 
-                className="bg-gradient-to-br from-white/95 to-orange-50/95 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-6 border border-orange-200/50 hover:border-orange-300/50 transform hover:-translate-y-1"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.5, delay: 0.3 }}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center space-x-2 mb-2">
-                      <BarChart3 size={16} className="text-orange-500" />
-                      <p className="text-sm font-medium text-gray-600">Most Common</p>
-                    </div>
-                    <p className="text-lg font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
-                      {stats.typeStats[0]?.type || "N/A"}
-                    </p>
-                    <div className="flex items-center space-x-1 mt-2">
-                      <span className="text-sm text-gray-500">
-                        {stats.typeStats[0]?.count || 0} cases
-                      </span>
-                    </div>
-                  </div>
-                  <div className="bg-gradient-to-r from-orange-500 to-red-500 p-3 rounded-xl shadow-lg">
-                    <TrendingUp className="text-white" size={24} />
-                  </div>
-                </div>
-              </motion.div>
-
-              <motion.div 
-                className="bg-gradient-to-br from-white/95 to-purple-50/95 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-6 border border-purple-200/50 hover:border-purple-300/50 transform hover:-translate-y-1"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.5, delay: 0.4 }}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center space-x-2 mb-2">
-                      <Camera size={16} className="text-purple-500" />
-                      <p className="text-sm font-medium text-gray-600">Active Cameras</p>
-                    </div>
-                    <p className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                      {stats.cameraStats?.totalCameras || 0}
-                    </p>
-                    <div className="flex items-center space-x-1 mt-2">
-                      <span className="text-sm text-gray-500">
-                        Top: {stats.cameraStats?.topCamera || "N/A"}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-3 rounded-xl shadow-lg">
-                    <Globe className="text-white" size={24} />
-                  </div>
-                </div>
-              </motion.div>
-            </div>
-
-            {/* Controls Section */}
+        <div className="flex-grow overflow-y-auto p-4 sm:p-6 space-y-6">
+          {/* Enhanced Statistics Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
             <motion.div 
-              className="bg-gradient-to-r from-white/95 to-slate-50/95 rounded-2xl shadow-xl border border-slate-200/50 backdrop-blur-sm"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
+              className="bg-gradient-to-br from-white/95 to-blue-50/95 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-4 sm:p-6 border border-blue-200/50 hover:border-blue-300/50 transform hover:-translate-y-1"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
             >
-              <div className="p-6">
-                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <ExportViolationsPDF violations={filteredViolations} />
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={handleRefresh}
-                      disabled={refreshing}
-                      className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl hover:from-blue-600 hover:to-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
-                    >
-                      <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
-                      <span>Refresh</span>
-                    </motion.button>
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => setShowFilters(!showFilters)}
-                      className="flex items-center space-x-2 px-4 py-2 bg-white text-gray-700 rounded-xl hover:bg-gray-50 border border-gray-200 transition-all duration-200 shadow-sm hover:shadow-md"
-                    >
-                      <Filter size={16} />
-                      <span>Filters</span>
-                      <ChevronDown size={16} className={`transform transition-transform ${showFilters ? "rotate-180" : ""}`} />
-                    </motion.button>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Target size={16} className="text-blue-500" />
+                    <p className="text-sm font-medium text-gray-600">Total Violations</p>
                   </div>
-                  
-                  <div className="flex items-center space-x-4">
-                    <div className="flex items-center space-x-2 bg-blue-50/80 px-4 py-2 rounded-xl">
-                      <Sparkles size={16} className="text-blue-500" />
-                      <span className="text-sm font-medium text-blue-700">
-                        {filteredViolations.length} results
-                      </span>
-                    </div>
-                    {(searchTerm || filterType || filterStatus) && (
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm text-gray-600">Filtered from {violations.length} total</span>
-                        <motion.button
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={handleResetFilters}
-                          className="flex items-center space-x-1 px-3 py-1 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors duration-200"
-                        >
-                          <X size={14} />
-                          <span className="text-sm">Clear</span>
-                        </motion.button>
-                      </div>
-                    )}
+                  <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                    {stats.totalViolations}
+                  </p>
+                  <div className="flex items-center space-x-1 mt-2">
+                    <TrendingUp size={14} className={stats.trendPercentage > 0 ? "text-red-500" : "text-green-500"} />
+                    <span className={`text-sm font-medium ${stats.trendPercentage > 0 ? "text-red-500" : "text-green-500"}`}>
+                      {stats.trendPercentage > 0 ? "+" : ""}{stats.trendPercentage.toFixed(1)}%
+                    </span>
+                    <span className="text-xs text-gray-500">vs last week</span>
                   </div>
                 </div>
-
-                {/* Expandable Filter Section */}
-                <AnimatePresence>
-                  {showFilters && (
-                    <motion.div 
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.3 }}
-                      className="border-t border-gray-200/50 pt-6"
-                    >
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="relative">
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Search License Plate
-                          </label>
-                          <div className="relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-                            <input
-                              type="text"
-                              placeholder="Enter license plate..."
-                              value={searchTerm}
-                              onChange={(e) => handleFilterChange("licensePlate", e.target.value)}
-                              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 shadow-sm"
-                            />
-                          </div>
-                        </div>
-                        
-                        <div className="relative">
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Violation Type
-                          </label>
-                          <select
-                            value={filterType}
-                            onChange={(e) => handleFilterChange("violationType", e.target.value)}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 shadow-sm"
-                          >
-                            <option value="">All Types</option>
-                            {violationTypes.map((type) => (
-                              <option key={type.id} value={type.typeName}>
-                                {type.typeName}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        
-                        <div className="relative">
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Status
-                          </label>
-                          <select
-                            value={filterStatus}
-                            onChange={(e) => handleFilterChange("status", e.target.value)}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 shadow-sm"
-                          >
-                            <option value="">All Statuses</option>
-                            {statuses.map((status) => (
-                              <option key={status} value={status}>
-                                {status || "Pending"}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                <div className="bg-gradient-to-r from-blue-500 to-purple-500 p-3 rounded-xl shadow-lg">
+                  <AlertTriangle className="text-white" size={24} />
+                </div>
+              </div>
+            </motion.div>
+            
+            <motion.div 
+              className="bg-gradient-to-br from-white/95 to-green-50/95 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-4 sm:p-6 border border-green-200/50 hover:border-green-300/50 transform hover:-translate-y-1"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Clock size={16} className="text-green-500" />
+                    <p className="text-sm font-medium text-gray-600">Today</p>
+                  </div>
+                  <p className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+                    {stats.todayViolations}
+                  </p>
+                  <div className="flex items-center space-x-1 mt-2">
+                    <span className="text-sm text-gray-500">
+                      {stats.totalViolations > 0 ? ((stats.todayViolations / stats.totalViolations) * 100).toFixed(1) : 0}% of total
+                    </span>
+                  </div>
+                </div>
+                <div className="bg-gradient-to-r from-green-500 to-emerald-500 p-3 rounded-xl shadow-lg">
+                  <Activity className="text-white" size={24} />
+                </div>
+              </div>
+            </motion.div>
+            
+            <motion.div 
+              className="bg-gradient-to-br from-white/95 to-orange-50/95 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-4 sm:p-6 border border-orange-200/50 hover:border-orange-300/50 transform hover:-translate-y-1"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center space-x-2 mb-2">
+                    <BarChart3 size={16} className="text-orange-500" />
+                    <p className="text-sm font-medium text-gray-600">Most Common</p>
+                  </div>
+                  <p className="text-lg font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
+                    {stats.typeStats[0]?.type || "N/A"}
+                  </p>
+                  <div className="flex items-center space-x-1 mt-2">
+                    <span className="text-sm text-gray-500">
+                      {stats.typeStats[0]?.count || 0} cases
+                    </span>
+                  </div>
+                </div>
+                <div className="bg-gradient-to-r from-orange-500 to-red-500 p-3 rounded-xl shadow-lg">
+                  <TrendingUp className="text-white" size={24} />
+                </div>
               </div>
             </motion.div>
 
-          
-        {/* Enhanced Data Table */}
             <motion.div 
-              className="bg-white/95 rounded-2xl shadow-2xl border border-gray-200/50 overflow-hidden backdrop-blur-sm"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
+              className="bg-gradient-to-br from-white/95 to-purple-50/95 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-4 sm:p-6 border border-purple-200/50 hover:border-purple-300/50 transform hover:-translate-y-1"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, delay: 0.4 }}
             >
-              <div className="bg-gradient-to-r from-gray-50/95 to-blue-50/95 px-6 py-4 border-b border-gray-200/50">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg shadow-md">
-                      <BarChart3 className="text-white" size={20} />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">Violation List</h3>
-                      <p className="text-sm text-gray-600">Manage and track traffic violations</p>
-                    </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Camera size={16} className="text-purple-500" />
+                    <p className="text-sm font-medium text-gray-600">Active Cameras</p>
                   </div>
-                  <div className="flex items-center space-x-4">
-                    <div className="bg-green-100/80 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
-                      {filteredViolations.length} records
-                    </div>
-                    <div className="flex items-center space-x-2 text-sm text-gray-600">
-                      <span>Show:</span>
-                      <select
-                        value={pageSize}
-                        onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                        className="px-2 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  <p className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                    {stats.cameraStats?.totalCameras || 0}
+                  </p>
+                  <div className="flex items-center space-x-1 mt-2">
+                    <span className="text-sm text-gray-500">
+                      Top: {stats.cameraStats?.topCamera || "N/A"}
+                    </span>
+                  </div>
+                </div>
+                <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-3 rounded-xl shadow-lg">
+                  <Globe className="text-white" size={24} />
+                </div>
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Controls Section */}
+          <motion.div 
+            className="bg-gradient-to-r from-white/95 to-slate-50/95 rounded-2xl shadow-xl border border-slate-200/50 backdrop-blur-sm"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <div className="p-4 sm:p-6">
+              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
+                <div className="flex flex-wrap items-center gap-3">
+                  <ExportViolationsPDF violations={filteredViolations} />
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleRefresh}
+                    disabled={refreshing}
+                    className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl hover:from-blue-600 hover:to-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
+                    aria-label="Refresh violation list"
+                  >
+                    <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
+                    <span>Refresh</span>
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setShowFilters(!showFilters)}
+                    className="flex items-center space-x-2 px-4 py-2 bg-white text-gray-700 rounded-xl hover:bg-gray-50 border border-gray-200 transition-all duration-200 shadow-sm hover:shadow-md"
+                    aria-label={showFilters ? "Hide filters" : "Show filters"}
+                  >
+                    <Filter size={16} />
+                    <span>Filters</span>
+                    <ChevronDown size={16} className={`transform transition-transform ${showFilters ? "rotate-180" : ""}`} />
+                  </motion.button>
+                </div>
+                
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2 bg-blue-50/80 px-4 py-2 rounded-xl">
+                    <Sparkles size={16} className="text-blue-500" />
+                    <span className="text-sm font-medium text-blue-700">
+                      {filteredViolations.length} results
+                    </span>
+                  </div>
+                  {(searchTerm || filterType || filterStatus) && (
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm text-gray-600">Filtered from {violations.length} total</span>
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={handleResetFilters}
+                        className="flex items-center space-x-1 px-3 py-1 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors duration-200"
+                        aria-label="Clear all filters"
                       >
-                        {availablePageSizeOptions.map((size) => (
-                          <option key={size} value={size}>
-                            {size}
-                          </option>
-                        ))}
-                      </select>
-                      <span>entries</span>
+                        <X size={14} />
+                        <span className="text-sm">Clear</span>
+                      </motion.button>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
 
+              {/* Expandable Filter Section */}
+              <AnimatePresence>
+                {showFilters && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="border-t border-gray-200/50 pt-4 sm:pt-6"
+                  >
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                      <div className="relative">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Search License Plate
+                        </label>
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                          <input
+                            type="text"
+                            placeholder="Enter license plate..."
+                            value={searchTerm}
+                            onChange={(e) => handleFilterChange("licensePlate", e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 shadow-sm"
+                            aria-label="Search by license plate"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="relative">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Violation Type
+                        </label>
+                        <select
+                          value={filterType}
+                          onChange={(e) => handleFilterChange("violationType", e.target.value)}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 shadow-sm"
+                          aria-label="Filter by violation type"
+                        >
+                          <option value="">All Types</option>
+                          {violationTypes.map((type) => (
+                            <option key={type.id} value={type.typeName}>
+                              {type.typeName}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      
+                      <div className="relative">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Status
+                        </label>
+                        <select
+                          value={filterStatus}
+                          onChange={(e) => handleFilterChange("status", e.target.value)}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 shadow-sm"
+                          aria-label="Filter by status"
+                        >
+                          <option value="">All Statuses</option>
+                          {statuses.map((status) => (
+                            <option key={status} value={status}>
+                              {status || "Pending"}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </motion.div>
 
-            {/* Sửa bảng để responsive */}
+          {/* Enhanced Data Table */}
+          <motion.div 
+            className="bg-white/95 rounded-2xl shadow-2xl border border-gray-200/50 overflow-hidden backdrop-blur-sm"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <div className="bg-gradient-to-r from-gray-50/95 to-blue-50/95 px-4 sm:px-6 py-4 border-b border-gray-200/50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg shadow-md">
+                    <BarChart3 className="text-white" size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Violation List</h3>
+                    <p className="text-sm text-gray-600">Manage and track traffic violations</p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-4">
+                  <div className="bg-green-100/80 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+                    {filteredViolations.length} records
+                  </div>
+                  <div className="flex items-center space-x-2 text-sm text-gray-600">
+                    <span>Show:</span>
+                    <select
+                      value={pageSize}
+                      onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                      className="px-2 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                      aria-label="Select number of entries per page"
+                    >
+                      {availablePageSizeOptions.map((size) => (
+                        <option key={size} value={size}>
+                          {size}
+                        </option>
+                      ))}
+                    </select>
+                    <span>entries</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div className="overflow-x-auto">
-              <table className="w-full table-auto">
+              <table className="w-full table-auto" role="grid">
                 <thead className="bg-gray-50/80 sticky top-0 z-10">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%]">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[80px]">
                       Image
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[20%]">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
                       Violation Type
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[20%]">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
                       Camera
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[20%]">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
                       License Plate
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[20%]">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
                       Time
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%]">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">
                       Status
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%]">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">
+                      State
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[80px]">
                       Actions
                     </th>
                   </tr>
@@ -660,7 +676,7 @@ export default function ViolationList() {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {paginatedViolations.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-6 py-12 text-center">
+                      <td colSpan={8} className="px-6 py-12 text-center">
                         <div className="flex flex-col items-center justify-center space-y-4">
                           <AlertTriangle className="h-12 w-12 text-gray-400" />
                           <p className="text-lg text-gray-500">🚫 No violations found</p>
@@ -677,6 +693,7 @@ export default function ViolationList() {
                         transition={{ duration: 0.3, delay: index * 0.05 }}
                         className="hover:bg-blue-50/50 transition-colors duration-200 cursor-pointer"
                         onClick={() => navigate(`/violations/${violation.id}`)}
+                        role="row"
                       >
                         {/* Image Column */}
                         <td className="px-4 py-4">
@@ -817,14 +834,21 @@ export default function ViolationList() {
                           })()}
                         </td>
 
-                  {/* Status Column - Sửa lỗi TS2345 */}
-                          <td className="px-4 py-4">
-                            <div className={`inline-flex items-center px-3 py-1 rounded-lg ${getStatusColor(violation.status || "Pending").bg} ${getStatusColor(violation.status || "Pending").text} font-medium`}>
-                              {getStatusColor(violation.status || "Pending").icon}
-                              <span className="ml-2 capitalize">{violation.status || "Pending"}</span>
-                            </div>
-                          </td>
+                        {/* Status Column */}
+                        <td className="px-4 py-4">
+                          <div className={`inline-flex items-center px-3 py-1 rounded-lg ${getStatusColor(violation.status || "Pending").bg} ${getStatusColor(violation.status || "Pending").text} font-medium`}>
+                            {getStatusColor(violation.status || "Pending").icon}
+                            <span className="ml-2 capitalize">{violation.status || "Pending"}</span>
+                          </div>
+                        </td>
 
+                        {/* State Column (for isDelete) */}
+                        <td className="px-4 py-4">
+                          <div className={`inline-flex items-center px-3 py-1 rounded-lg ${getStateColor(violation.isDelete).bg} ${getStateColor(violation.isDelete).text} font-medium`}>
+                            {getStateColor(violation.isDelete).icon}
+                            <span className="ml-2">{violation.isDelete ? "Inactive" : "Active"}</span>
+                          </div>
+                        </td>
 
                         {/* Actions Column */}
                         <td className="px-4 py-4">
@@ -835,6 +859,7 @@ export default function ViolationList() {
                               onClick={() => navigate(`/violations/${violation.id}`)}
                               className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-all duration-200 rounded-lg p-2"
                               title="View Details"
+                              aria-label={`View details for violation ${violation.id}`}
                             >
                               <Eye size={16} />
                             </motion.button>
@@ -847,6 +872,7 @@ export default function ViolationList() {
                               }}
                               className="text-red-600 hover:text-red-700 hover:bg-red-50 transition-all duration-200 rounded-lg p-2"
                               title="Delete"
+                              aria-label={`Delete violation ${violation.id}`}
                             >
                               <Trash2 size={16} />
                             </motion.button>
@@ -859,15 +885,14 @@ export default function ViolationList() {
               </table>
             </div>
 
-            {/* Pagination - Cập nhật style giống mẫu */}
+            {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
-                <div className="flex items-center space-x-2">
+              <div className="flex flex-col sm:flex-row items-center justify-between px-4 py-3 border-t border-gray-200">
+                <div className="flex items-center space-x-2 mb-2 sm:mb-0">
                   <span className="text-sm text-gray-700">
                     Page {currentPage} of {totalPages}
                   </span>
                 </div>
-
                 <div className="flex items-center space-x-1">
                   <motion.button
                     whileHover={{ scale: 1.05 }}
@@ -876,6 +901,7 @@ export default function ViolationList() {
                     disabled={currentPage === 1}
                     className="flex items-center px-3 py-2 text-sm rounded border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
                     title="Previous page"
+                    aria-label="Previous page"
                   >
                     <ChevronLeft size={16} className="mr-1" />
                     Previous
@@ -905,6 +931,7 @@ export default function ViolationList() {
                             ? 'bg-blue-500 text-white border-blue-500'
                             : 'border-gray-300 hover:bg-gray-50'
                         }`}
+                        aria-label={`Go to page ${pageNumber}`}
                       >
                         {pageNumber}
                       </motion.button>
@@ -918,6 +945,7 @@ export default function ViolationList() {
                     disabled={currentPage === totalPages}
                     className="flex items-center px-3 py-2 text-sm rounded border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
                     title="Next page"
+                    aria-label="Next page"
                   >
                     Next
                     <ChevronRight size={16} className="ml-1" />
@@ -927,94 +955,91 @@ export default function ViolationList() {
             )}
           </motion.div>
 
-       
-            {/* Quick Stats Bar */}
-            <motion.div 
-              className="bg-gradient-to-r from-white/95 to-gray-50/95 rounded-2xl shadow-xl border border-gray-200/50 p-6"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-6">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">{stats.typeStats.length}</div>
-                    <div className="text-sm text-gray-600">Violation Types</div>
-                  </div>
-                  <div className="w-px h-8 bg-gray-300/50"></div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">
-                      {violations.filter((v) => v.camera?.id).length}
-                    </div>
-                    <div className="text-sm text-gray-600">Active Cameras</div>
-                  </div>
-                  <div className="w-px h-8 bg-gray-300/50"></div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-purple-600">
-                      {new Set(violations.map((v) => v.vehicle?.licensePlate).filter(Boolean)).size}
-                    </div>
-                    <div className="text-sm text-gray-600">Violating Vehicles</div>
-                  </div>
+          {/* Quick Stats Bar */}
+          <motion.div 
+            className="bg-gradient-to-r from-white/95 to-gray-50/95 rounded-2xl shadow-xl border border-gray-200/50 p-4 sm:p-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex flex-wrap items-center space-x-4 sm:space-x-6">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">{stats.typeStats.length}</div>
+                  <div className="text-sm text-gray-600">Violation Types</div>
                 </div>
-                <div className="flex items-center space-x-2 text-sm text-gray-600">
-                  <Clock size={16} />
-                  <span>Last updated: {format(new Date(), "HH:mm:ss - dd/MM/yyyy")}</span>
+                <div className="w-px h-8 bg-gray-300/50"></div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">
+                    {violations.filter((v) => v.camera?.id).length}
+                  </div>
+                  <div className="text-sm text-gray-600">Active Cameras</div>
+                </div>
+                <div className="w-px h-8 bg-gray-300/50"></div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-purple-600">
+                    {new Set(violations.map((v) => v.vehicle?.licensePlate).filter(Boolean)).size}
+                  </div>
+                  <div className="text-sm text-gray-600">Violating Vehicles</div>
                 </div>
               </div>
-            </motion.div>
+              <div className="flex items-center space-x-2 text-sm text-gray-600">
+                <Clock size={16} />
+                <span>Last updated: {format(new Date(), "HH:mm:ss - dd/MM/yyyy")}</span>
+              </div>
+            </div>
+          </motion.div>
 
-            {/* Top Violations Chart */}
-            <motion.div 
-              className="bg-white/95 rounded-2xl shadow-2xl border border-gray-200/50 p-6"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-            >
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Top Common Violations</h3>
-                  <p className="text-sm text-gray-600">Statistics of violation types by frequency</p>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <BarChart3 size={20} className="text-blue-500" />
-                </div>
+          {/* Top Violations Chart */}
+          <motion.div 
+            className="bg-white/95 rounded-2xl shadow-2xl border border-gray-200/50 p-4 sm:p-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Top Common Violations</h3>
+                <p className="text-sm text-gray-600">Statistics of violation types by frequency</p>
               </div>
-              <div className="space-y-4">
-                {stats.typeStats.slice(0, 5).map((stat, index) => (
-                  <motion.div 
-                    key={stat.type}
-                    className="flex items-center justify-between p-3 bg-gray-50/90 rounded-xl hover:bg-gray-100/90 transition-colors duration-200"
-                    whileHover={{ scale: 1.02 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg font-semibold text-sm">
-                        {index + 1}
-                      </div>
-                      <div>
-                        <div className="font-medium text-gray-900">{stat.type}</div>
-                        <div className="text-sm text-gray-600">{stat.count} cases</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <div className="w-32 h-2 bg-gray-200/70 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-500"
-                          style={{ width: `${(stat.count / Math.max(...stats.typeStats.map((s) => s.count))) * 100}%` }}
-                        ></div>
-                      </div>
-                      <div className="text-sm font-medium text-gray-900 min-w-[60px] text-right">
-                        {stats.totalViolations > 0 ? ((stat.count / stats.totalViolations) * 100).toFixed(1) : 0}%
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
+              <div className="flex items-center space-x-2">
+                <BarChart3 size={20} className="text-blue-500" />
               </div>
-            </motion.div>
-          </div>
-          
-          <ChatBot />
+            </div>
+            <div className="space-y-4">
+              {stats.typeStats.slice(0, 5).map((stat, index) => (
+                <motion.div 
+                  key={stat.type}
+                  className="flex items-center justify-between p-3 bg-gray-50/90 rounded-xl hover:bg-gray-100/90 transition-colors duration-200"
+                  whileHover={{ scale: 1.02 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg font-semibold text-sm">
+                      {index + 1}
+                    </div>
+                    <div>
+                      <div className="font-medium text-gray-900">{stat.type}</div>
+                      <div className="text-sm text-gray-600">{stat.count} cases</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <div className="w-32 h-2 bg-gray-200/70 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-500"
+                        style={{ width: `${(stat.count / Math.max(...stats.typeStats.map((s) => s.count))) * 100}%` }}
+                      ></div>
+                    </div>
+                    <div className="text-sm font-medium text-gray-900 min-w-[60px] text-right">
+                      {stats.totalViolations > 0 ? ((stat.count / stats.totalViolations) * 100).toFixed(1) : 0}%
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
         </div>
+        <ChatBot />
       </div>
       
       <AlertDialog

@@ -14,7 +14,6 @@ from fastapi.responses import StreamingResponse
 from filterpy.kalman import KalmanFilter
 from utils.yt_stream import get_stream_url
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import ExitStack
 import atexit
 
 # Constants
@@ -110,12 +109,10 @@ def calculate_speed(prev_pos, curr_pos, frame_time, pixel_to_meter):
     return km_per_hour
 
 def send_violation_async(violation_data, snapshot_filepath, video_filepath, track_id):
-    """Gửi dữ liệu vi phạm đến API bất đồng bộ."""
+    """Gửi dữ liệu vi phạm đến API bất đồng bộ và xóa file ngay sau khi gửi."""
     def send_violation():
-        with ExitStack() as stack:
-            try:
-                img_file = stack.enter_context(open(snapshot_filepath, 'rb'))
-                vid_file = stack.enter_context(open(video_filepath, 'rb'))
+        try:
+            with open(snapshot_filepath, 'rb') as img_file, open(video_filepath, 'rb') as vid_file:
                 files = {
                     'imageFile': (os.path.basename(snapshot_filepath), img_file, 'image/jpeg'),
                     'videoFile': (os.path.basename(video_filepath), vid_file, 'video/mp4'),
@@ -124,12 +121,17 @@ def send_violation_async(violation_data, snapshot_filepath, video_filepath, trac
                 response = requests.post(VIOLATION_API_URL, files=files, timeout=10)
                 response.raise_for_status()
                 print(f"[+] Violation sent successfully for track {track_id}: {response.status_code}")
-            except Exception as e:
-                print(f"[-] Failed to send violation to API for track {track_id}: {e}")
-            finally:
-                stack.callback(lambda: os.remove(snapshot_filepath) if os.path.exists(snapshot_filepath) else None)
-                stack.callback(lambda: os.remove(video_filepath) if os.path.exists(video_filepath) else None)
-                print(f"[+] Cleaned up temp files for track {track_id}")
+        except Exception as e:
+            print(f"[-] Failed to send violation to API for track {track_id}: {e}")
+        finally:
+            # Xóa file ngay sau khi gửi, bất kể thành công hay thất bại
+            for filepath in [snapshot_filepath, video_filepath]:
+                try:
+                    if os.path.exists(filepath):
+                        os.remove(filepath)
+                        print(f"[+] Deleted file: {filepath}")
+                except Exception as e:
+                    print(f"[-] Failed to delete file {filepath}: {e}")
 
     violation_executor.submit(send_violation)
 
