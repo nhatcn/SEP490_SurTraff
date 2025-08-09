@@ -133,9 +133,22 @@ def stream_video(camera_id: int, db: Session = Depends(get_db)):
     elif camera.violation_type_id == 6:
         return StreamingResponse(stream_count_video_service(camera.stream_url, camera.id), media_type="multipart/x-mixed-replace; boundary=frame")
     elif camera.violation_type_id == 7:
-        return StreamingResponse(detect_potholes_in_video(camera.stream_url, camera.id), media_type="multipart/x-mixed-replace; boundary=frame")
-    elif camera_id == 2:
-        return StreamingResponse(stream_accident_video_service(camera.stream_url, camera.id), media_type="multipart/x-mixed-replace; boundary=frame")
+
+        return StreamingResponse(
+            detect_potholes_in_video(camera.stream_url, camera.id),
+            media_type="multipart/x-mixed-replace; boundary=frame"
+        )
+    elif camera.violation_type_id == 8:
+        return StreamingResponse(
+            stream_accident_video_service(camera.stream_url, camera.id),
+            media_type="multipart/x-mixed-replace; boundary=frame"
+        )
+# Updated Tracking Models
+class VehicleInfo(BaseModel):
+    brand: Optional[str] = None
+    licensePlate: Optional[str] = None
+    color: Optional[str] = None
+
 
 @router.get("/tracking/stream/{camera_id}")
 async def stream_tracking_video(

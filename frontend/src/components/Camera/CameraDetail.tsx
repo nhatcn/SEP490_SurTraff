@@ -10,6 +10,7 @@ interface CameraProps {
   status: string;
   thumbnail?: string;
   description?: string;
+  violation_type_id?: number;
 }
 
 interface CameraDetailProps {
@@ -18,11 +19,34 @@ interface CameraDetailProps {
 
 export default function CameraDetail({ camera }: CameraDetailProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [videoLoaded, setVideoLoaded] = useState(false);
+  const [videoError, setVideoError] = useState(false);
   const navigate = useNavigate();
 
   const handleConfigClick = () => {
     if (camera?.id) {
       navigate(`/cameras/edit/${camera.id}`);
+    }
+  };
+
+  const getViolationDescription = (violationTypeId?: number): string => {
+    switch (violationTypeId) {
+      case 1:
+        return "This camera is installed for red light violation detection.";
+      case 2:
+        return "This camera is installed for overspeed detection.";
+      case 3:
+        return "This camera is installed for illegal parking detection.";
+      case 4:
+        return "This camera is installed for wrong way detection.";
+      case 5:
+        return "This camera is installed for no helmet violation detection.";
+      case 6:
+        return "This camera is installed for traffic density monitoring.";
+      case 7:
+        return "This camera is installed for obstacle detection.";
+      default:
+        return "This camera is installed for general traffic monitoring.";
     }
   };
 
@@ -48,21 +72,49 @@ export default function CameraDetail({ camera }: CameraDetailProps) {
     <>
       <div className="bg-white rounded-xl shadow-md overflow-hidden h-full flex flex-col border border-gray-200 hover:shadow-lg transition-shadow duration-300">
         <div className="relative bg-black h-96 flex items-center justify-center overflow-hidden group">
-          {processedVideoUrl ? (
+          {/* Show thumbnail first, then video when loaded */}
+          {!videoLoaded && !videoError && camera.thumbnail && (
+            <img
+              src={camera.thumbnail}
+              alt={`Thumbnail for ${camera.name}`}
+              className="w-full h-full object-cover"
+            />
+          )}
+          
+          {processedVideoUrl && !videoError ? (
             <img
               src={processedVideoUrl}
               alt={`Livestream from ${camera.name}`}
-              className="w-full h-full object-contain"
+              className={`w-full h-full object-contain transition-opacity duration-500 ${
+                videoLoaded ? 'opacity-100' : 'opacity-0 absolute'
+              }`}
+              onLoad={() => setVideoLoaded(true)}
+              onError={() => setVideoError(true)}
             />
-          ) : (
+          ) : null}
+          
+          {/* Fallback when no video and no thumbnail */}
+          {(videoError || !processedVideoUrl) && !camera.thumbnail && (
             <div className="text-gray-500 text-center p-8 bg-opacity-5 bg-gray-600 rounded-lg w-4/5">
-              No video to display
+              No video or thumbnail available
+            </div>
+          )}
+
+          {/* Loading indicator when video is loading but thumbnail exists */}
+          {!videoLoaded && !videoError && camera.thumbnail && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30">
+              <div className="bg-white bg-opacity-90 rounded-lg p-3 flex items-center gap-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent"></div>
+                <span className="text-sm text-gray-700">Loading live stream...</span>
+              </div>
             </div>
           )}
           
           <div className="absolute bottom-4 right-4 bg-black bg-opacity-70 text-white px-3 py-1 rounded-full text-xs flex items-center gap-1.5 shadow-md">
-            <span className="inline-block w-2 h-2 bg-red-600 rounded-full animate-pulse"></span>
-            LIVE
+            <span className={`inline-block w-2 h-2 rounded-full animate-pulse ${
+              videoLoaded ? 'bg-red-600' : 'bg-gray-400'
+            }`}></span>
+            {videoLoaded ? 'LIVE' : 'LOADING'}
           </div>
 
           {/* Fullscreen Button Overlay */}
@@ -96,7 +148,7 @@ export default function CameraDetail({ camera }: CameraDetailProps) {
           </div>
 
           <div className="text-gray-700 mb-6 bg-gray-50 p-4 rounded-lg border-l-4 border-blue-500 leading-relaxed">
-            <span className="font-medium">Description:</span> {camera.description || "This camera is installed for person detection."}
+            <span className="font-medium">Description:</span> {camera.description || getViolationDescription(camera.violation_type_id)}
           </div>
           
           <div className="flex gap-3">
