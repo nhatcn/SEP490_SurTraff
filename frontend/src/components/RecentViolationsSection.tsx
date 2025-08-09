@@ -1,4 +1,3 @@
-// RecentViolationsSection.tsx
 "use client"
 
 import { Car, Clock, MapPin, AlertTriangle, CheckCircle, XCircle, Activity, ArrowLeft } from "lucide-react"
@@ -22,7 +21,7 @@ interface RecentViolationsSectionProps {
   searchResults: Violation[]
   isSearching: boolean
   currentSearchQuery: string
-  resetSearch: () => void // Add resetSearch prop
+  resetSearch: () => void
 }
 
 export default function RecentViolationsSection({
@@ -30,7 +29,7 @@ export default function RecentViolationsSection({
   searchResults,
   isSearching,
   currentSearchQuery,
-  resetSearch, // Destructure resetSearch
+  resetSearch,
 }: RecentViolationsSectionProps) {
   const [recentViolations, setRecentViolations] = useState<Violation[]>([])
   const [isLoadingRecentViolations, setIsLoadingRecentViolations] = useState(true)
@@ -194,70 +193,105 @@ export default function RecentViolationsSection({
                 </button>
               </div>
             ) : (
-              <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-                {searchResults.map((violation) => (
-                  <div
-                    key={violation.id}
-                    className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-xl border border-white/20 overflow-hidden hover:shadow-2xl transition-all duration-500 hover:scale-105 group"
-                  >
-                    <div className="relative">
-                      <img
-                        src={violation.image || "/placeholder.svg"}
-                        alt="Violation evidence"
-                        className="w-full h-48 object-cover bg-gray-200 group-hover:scale-110 transition-transform duration-500"
-                      />
-                      <div className="absolute top-4 right-4">
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-bold backdrop-blur-xl border ${getStatusClasses(violation.status)}`}
-                        >
-                          {violation.displayStatus}
-                        </span>
-                      </div>
+              <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-xl border border-white/20 overflow-hidden">
+                <div className="px-8 py-6 border-b border-gray-200/50 bg-gradient-to-r from-blue-50 to-purple-50">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-2xl font-bold text-gray-900">Search Results</h2>
+                      <p className="text-gray-600 mt-1">Violations matching your search query</p>
                     </div>
-                    <div className="p-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                          {violation.plateNumber}
-                        </span>
-                      </div>
-                      <h3 className="font-bold text-gray-900 mb-4 text-lg">{violation.violationType}</h3>
-                      <div className="space-y-3 text-sm text-gray-600 mb-6">
-                        <div className="flex items-center">
-                          <MapPin className="h-4 w-4 mr-3 text-blue-500" />
-                          <span>{violation.location}</span>
-                        </div>
-                        <div className="flex items-center">
-                          <Clock className="h-4 w-4 mr-3 text-green-500" />
-                          <span>{violation.time}</span>
-                        </div>
-                      </div>
-                      <div className="w-44 mx-auto">
-                        {violation.status === "PROCESSED" ? (
-                          <button
-                            onClick={() => navigate(`/violationsdetails/${violation.id}`)}
-                            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3 px-6 rounded-2xl transition-all duration-300 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105"
-                            aria-label={`View details for violation ${violation.id}`}
-                          >
-                            View Full Details
-                          </button>
-                        ) : violation.status === "APPROVED" ? (
-                          <button
-                            onClick={() => handleRequestToView(violation.id)}
-                            disabled={requestingId === violation.id}
-                            className="w-full bg-gradient-to-r from-gray-400 to-gray-500 hover:from-gray-500 hover:to-gray-600 text-white py-3 px-6 rounded-2xl transition-all duration-300 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-                            aria-label={`Request to view violation ${violation.id}`}
-                          >
-                            {requestingId === violation.id ? "Sending Request..." : "Request to View"}
-                          </button>
-                        ) : (
-                          <div className="h-12 flex items-center justify-center text-gray-500 text-sm w-full">
-                            No action available
-                          </div>
-                        )}
-                      </div>
+                    <div className="flex items-center gap-2 bg-white/50 rounded-full px-4 py-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                      <span className="text-sm font-medium text-gray-700">Live Data</span>
                     </div>
                   </div>
-                ))}
+                </div>
+                {requestMessage && (
+                  <div
+                    className={`p-4 text-center font-medium ${
+                      requestMessage.includes("Successfully") ? "text-green-700 bg-green-50" : "text-red-700 bg-red-50"
+                    }`}
+                  >
+                    {requestMessage}
+                  </div>
+                )}
+                <div className="overflow-x-auto">
+                  <table className="min-w-full">
+                    <thead className="bg-gray-50/50">
+                      <tr>
+                        <th className="px-8 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
+                          License Plate
+                        </th>
+                        <th className="px-8 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
+                          Violation Type
+                        </th>
+                        <th className="px-8 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
+                          Time & Date
+                        </th>
+                        <th className="px-8 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="px-8 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200/50">
+                      {searchResults.map((violation) => (
+                        <tr key={violation.id} className="hover:bg-blue-50/50 transition-colors duration-200 group">
+                          <td className="px-8 py-6 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center mr-4">
+                                <Car className="w-5 h-5 text-white" />
+                              </div>
+                              <div className="text-lg font-bold text-gray-900">{violation.plateNumber}</div>
+                            </div>
+                          </td>
+                          <td className="px-8 py-6 whitespace-nowrap">
+                            <div className="text-sm font-semibold text-gray-900">{violation.violationType}</div>
+                          </td>
+                          <td className="px-8 py-6 whitespace-nowrap">
+                            <div className="text-sm text-gray-600">{violation.time}</div>
+                          </td>
+                          <td className="px-8 py-6 whitespace-nowrap">
+                            <span
+                              className={`inline-flex items-center px-3 py-1 text-sm font-bold rounded-full ${getStatusClasses(violation.status)}`}
+                            >
+                              {getStatusIcon(violation.status)}
+                              {violation.displayStatus}
+                            </span>
+                          </td>
+                          <td className="px-8 py-6 whitespace-nowrap">
+                            <div className="w-44">
+                              {violation.status === "PROCESSED" ? (
+                                <button
+                                  onClick={() => navigate(`/violationsdetails/${violation.id}`)}
+                                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-2 px-4 rounded-xl transition-all duration-300 font-semibold shadow-md hover:shadow-lg"
+                                  aria-label={`View details for violation ${violation.id}`}
+                                >
+                                  View Full Details
+                                </button>
+                              ) : violation.status === "APPROVED" ? (
+                                <button
+                                  onClick={() => handleRequestToView(violation.id)}
+                                  disabled={requestingId === violation.id}
+                                  className="w-full bg-gradient-to-r from-gray-400 to-gray-500 hover:from-gray-500 hover:to-gray-600 text-white py-2 px-4 rounded-xl transition-all duration-300 font-semibold shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                                  aria-label={`Request to view violation ${violation.id}`}
+                                >
+                                  {requestingId === violation.id ? "Sending Request..." : "Request to View"}
+                                </button>
+                              ) : (
+                                <div className="h-10 flex items-center justify-center text-gray-500 text-sm w-full">
+                                  No action available
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>

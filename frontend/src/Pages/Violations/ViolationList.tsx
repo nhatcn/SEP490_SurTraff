@@ -8,7 +8,6 @@ import { AlertDialog } from "./AlertDialog";
 import { format } from "date-fns";
 import { toast } from "react-toastify";
 import ExportViolationsPDF from "./ExportViolationsPDF";
-import ChatBot from "../../components/Chatbot/chatbot";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Eye, Trash2, Camera, MapPin, Clock, Car, AlertTriangle, RefreshCw, TrendingUp, 
@@ -310,7 +309,7 @@ export default function ViolationList() {
   if (loading) {
     return (
       <div className="flex h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-        <Sidebar defaultActiveItem="violations"/>
+        <Sidebar />
         <div className="flex flex-col flex-grow">
           <Header title="Traffic Violation List" />
           <div className="flex-grow flex items-center justify-center">
@@ -1039,7 +1038,7 @@ export default function ViolationList() {
             </div>
           </motion.div>
         </div>
-        <ChatBot />
+        
       </div>
       
       <AlertDialog

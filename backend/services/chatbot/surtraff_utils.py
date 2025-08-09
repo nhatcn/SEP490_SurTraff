@@ -20,6 +20,7 @@ from retry import retry as retry_decorator
 import spacy
 from typing import List, Dict, Optional
 import unicodedata
+from langchain_core.embeddings import Embeddings
 
 # Thiết lập logging
 logger = logging.getLogger(__name__)
@@ -35,9 +36,7 @@ CHAT_LOG_FILE = "services/chatbot/chat_log.jsonl"
 LIMIT_FEEDBACK = 1000
 
 # Thiết lập API key
-# API_KEY = os.getenv("GOOGLE_API_KEY", "AIzaSyAn_DCoTki5FGn1AJ5E9XyvmbDj9AhoMtw")
-API_KEY = os.getenv("GOOGLE_API_KEY", "")
-
+API_KEY = os.getenv("GOOGLE_API_KEY", "AIzaSyAOC31ljmfZVK91xbqT0Rv9V0-FbJT5hNs")
 genai.configure(api_key=API_KEY)
 
 # Tải mô hình spaCy cho tiếng Việt
@@ -161,6 +160,75 @@ TRAFFIC_NEWS_URLS = [
     "https://zingnews.vn/giao-thong.html",
     "https://baocantho.com.vn/"
 ]
+
+from langchain_community.vectorstores import FAISS
+from langchain_core.documents import Document
+
+def init_faiss_index():
+    global vector_official
+    try:
+        logger.info("Khởi tạo FAISS index...")
+        embedding_model = GeminiEmbeddings()
+
+        chunks, metadata = load_feedback_chunks()
+
+        # Nếu không có feedback, dùng dữ liệu cứng
+        if not chunks:
+            logger.warning("Không có feedback, dùng dữ liệu cứng để tạo FAISS index.")
+
+            # 1. Từ surtraff_details
+            for key, val in surtraff_details.items():
+                if val.strip():
+                    chunks.append(val)
+                    metadata.append({"topic": key})
+
+            # 2. Từ surtraff_knowledge.txt
+            if os.path.exists(KNOWLEDGE_TXT_PATH):
+                knowledge_text = extract_text_from_txt(KNOWLEDGE_TXT_PATH)
+                if knowledge_text.strip():
+                    chunks.append(knowledge_text)
+                    metadata.append({"topic": "General"})
+
+            # 3. Từ traffic_dialogs.txt
+            if os.path.exists(TRAFFIC_DIALOGS_PATH) and validate_jsonl_file(TRAFFIC_DIALOGS_PATH):
+                with open(TRAFFIC_DIALOGS_PATH, "r", encoding="utf-8-sig") as f:
+                    for line in f:
+                        if not line.strip():
+                            continue
+                        try:
+                            entry = json.loads(line)
+                            q = entry.get("question", "")
+                            a = " ".join(entry.get("answers", []))
+                            if q and a:
+                                chunks.append(f"{q} {a}")
+                                metadata.append({"topic": detect_topic(q)})
+                        except json.JSONDecodeError:
+                            continue
+
+            if not chunks:
+                logger.error("Không có dữ liệu cứng nào để tạo FAISS index.")
+                return
+
+        # Build FAISS index
+        docs = [Document(page_content=chunk, metadata=meta) for chunk, meta in zip(chunks, metadata)]
+        texts = text_splitter.split_documents(docs)
+        vector_official = FAISS.from_documents(texts, embedding_model)
+        vector_official.save_local(FAISS_INDEX_PATH)
+        logger.info("Đã tạo và lưu FAISS index thành công.")
+    except Exception as e:
+        logger.error(f"Lỗi khởi tạo FAISS index: {e}")
+
+def load_faiss_index():
+    global vector_official
+    try:
+        logger.info("Đang load FAISS index từ ổ đĩa...")
+        embedding_model = GeminiEmbeddings()
+        vector_official = FAISS.load_local(FAISS_INDEX_PATH, embeddings=embedding_model, index_name="index")
+        logger.info("Đã load FAISS index thành công.")
+    except Exception as e:
+        logger.warning(f"Không thể load FAISS index: {e}")
+        vector_official = None
+
 
 # Kiểm tra tài nguyên hệ thống
 def check_system_resources():
@@ -409,11 +477,11 @@ def get_gemini_embeddings(texts: List[str], model: str = "text-embedding-004", t
             logger.error("Gemini API trả về embeddings rỗng")
             return []
         embeddings = [e / np.linalg.norm(e) if np.linalg.norm(e) != 0 else e for e in embeddings]
+        logger.info(f"Đã tạo {len(embeddings)} embeddings, kích thước: {len(embeddings[0]) if embeddings else 0}")
         return embeddings
     except Exception as e:
-        logger.error(f"Lỗi khi tạo nhúng với Gemini API: {e}")
+        logger.error(f"Lỗi khi tạo nhúng với Gemini API: {str(e)}", exc_info=True)
         raise
-
 # Hàm trích xuất văn bản từ file
 def extract_text_from_txt(file_path: str, prioritize_dialogs: bool = False) -> str:
     try:
@@ -826,44 +894,61 @@ async def check_answer_quality(question: str, answer: str, lang: str) -> float:
 async def semantic_search(query: str, topic: str, k: int = 30) -> List[str]:
     try:
         logger.info(f"Thực hiện semantic search cho: {query}, type: {topic}")
-        if topic in surtraff_details:
-            logger.info(f"Trả về dữ liệu từ surtraff_details cho topic: {topic}")
-            return [surtraff_details[topic]]
-        
+
+        # Nếu FAISS chưa có → fallback fuzzy search
         if not vector_official:
-            logger.error("FAISS index (vector_official) chưa được khởi tạo")
-            return []
-        
+            logger.warning("FAISS index chưa được khởi tạo, dùng fuzzy search.")
+            return fuzzy_search_surtraff_details(query)
+
+        # Nếu topic có trong surtraff_details
+        if topic in surtraff_details:
+            return [surtraff_details[topic]]
+
+        # Search trong FAISS
         query_embedding = get_gemini_embeddings([normalize_unicode(query)], task_type="RETRIEVAL_QUERY")[0]
-        if not query_embedding.size:
-            logger.error("Không thể tạo embedding cho query")
-            return []
-        
         faiss_results = vector_official.similarity_search_by_vector(query_embedding, k=k, filter={"topic": topic})
+
+        # Nếu không có → thử General
         if not faiss_results and topic != "General":
-            logger.info(f"Không tìm thấy kết quả cho topic {topic}, thử General")
             faiss_results = vector_official.similarity_search_by_vector(query_embedding, k=k, filter={"topic": "General"})
-        
+
+        # Nếu vẫn không ra → fuzzy search
+        if not faiss_results:
+            return fuzzy_search_surtraff_details(query)
+
         forbidden_terms = ["culture", "tourism", "festival"]
-        filtered_docs = [normalize_unicode(r.page_content) for r in faiss_results if r.page_content.strip() and not any(term in r.page_content.lower() for term in forbidden_terms)]
-        unique_docs = list(dict.fromkeys(filtered_docs))
-        logger.info(f"Tìm thấy {len(unique_docs)} tài liệu liên quan")
-        return unique_docs[:10]
+        filtered_docs = [
+            normalize_unicode(r.page_content) for r in faiss_results
+            if r.page_content.strip() and not any(term in r.page_content.lower() for term in forbidden_terms)
+        ]
+        return list(dict.fromkeys(filtered_docs))[:10]
     except Exception as e:
         logger.error(f"Lỗi semantic search: {str(e)}")
         return []
+
+def fuzzy_search_surtraff_details(query: str) -> List[str]:
+    best_match = None
+    best_score = 0
+    for key, val in surtraff_details.items():
+        score = fuzz.partial_ratio(normalize_unicode(query.lower()), normalize_unicode(key.lower()))
+        if score > best_score:
+            best_score = score
+            best_match = val
+    if best_match and best_score >= 70:
+        return [best_match]
+    return []
 
 # Hàm định dạng câu trả lời
 async def format_response(context: str, question: str, history_summary: str, emotion: str, lang: str, parsed_info: Dict[str, str]) -> str:
     try:
         model = genai.GenerativeModel("gemini-1.5-flash")
-        prompt = f"""
+        prompt = f"""Bạn là một chatbot của Surtraff, SurTraff là một hệ thống giao thông thông minh với các tính năng nhận diện vượt đèn đỏ, vượt tốc độ, đo mật độ xe, nhận diện tai nạn, nhận diện không đội mũ bảo hiểm, nhận diện hố ga động vật trên đường, chạy xe sai làn, ngược chiều, đậu xe sai qui định, bạn hãy:
         Dựa trên ngữ cảnh: {normalize_unicode(context[:800])}
         và lịch sử: {normalize_unicode(history_summary)}
         Thông tin phân tích: Động từ chính: {parsed_info['main_verb']}, Thực thể: {', '.join(parsed_info['entities'])}, Phương tiện: {parsed_info['vehicle_type'] or 'không xác định'}, Thời gian: {parsed_info['time'] or 'không xác định'}, Ý định: {parsed_info['intent']}
         Trả lời câu hỏi: {normalize_unicode(question)}
         Bằng {'tiếng Việt' if lang == 'vi' else 'English'}, ngắn gọn (tối đa 100 từ), đúng trọng tâm, thân thiện, phù hợp cảm xúc ({emotion}), có emoji.
-        Nếu không có thông tin, trả lời 'Không có thông tin chi tiết, hỏi thêm nhé! 😊'
+        Nếu không có thông tin, bạn tự đề xuất câu trả lời nếu câu hỏi trong chủ đề về giao thông hoặc hệ thống surtraff 'Không có thông tin chi tiết, hỏi thêm nhé! 😊'
         """
         response = model.generate_content(
             prompt,
@@ -1040,6 +1125,7 @@ def load_feedback_chunks() -> tuple:
     metadata = []
     try:
         if not os.path.exists(FEEDBACK_FILE):
+            logger.info(f"File {FEEDBACK_FILE} không tồn tại")
             return [], []
         with open(FEEDBACK_FILE, "r", encoding="utf-8-sig") as f:
             for line in f:
@@ -1057,27 +1143,52 @@ def load_feedback_chunks() -> tuple:
                 except json.JSONDecodeError:
                     logger.warning(f"JSON không hợp lệ trong feedback: {line.strip()}")
                     continue
+        logger.info(f"Đã tải {len(chunks)} feedback chunks")
         return chunks, metadata
     except Exception as e:
-        logger.error(f"Lỗi tải feedback chunks: {e}")
+        logger.error(f"Lỗi tải feedback chunks: {str(e)}", exc_info=True)
         return [], []
-
+    
 import asyncio
 import pickle
 import faiss
 from typing import List, Dict, Optional
 from services.chatbot.surtraff_utils import *
-
-# Khởi tạo surtraff_details
-surtraff_details = build_surtraff_details()
-
-# Text splitter
-text_splitter = RecursiveCharacterTextSplitter(chunk_size=150, chunk_overlap=50)
-
-# Biến toàn cục
 vector_official = None
 vector_user = None
+surtraff_details = None
+text_splitter = RecursiveCharacterTextSplitter(chunk_size=150, chunk_overlap=50)
+class GeminiEmbeddings(Embeddings):
+    def __init__(self, model: str = "text-embedding-004", task_type: str = "SEMANTIC_SIMILARITY", output_dimensionality: int = 512):
+        self.model = model
+        self.task_type = task_type
+        self.output_dimensionality = output_dimensionality
 
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        try:
+            embeddings = get_gemini_embeddings(
+                texts=texts,
+                model=self.model,
+                task_type="RETRIEVAL_DOCUMENT",
+                output_dimensionality=self.output_dimensionality
+            )
+            return [e.tolist() for e in embeddings]
+        except Exception as e:
+            logger.error(f"Lỗi tạo embedding cho documents: {str(e)}", exc_info=True)
+            return [[] for _ in texts]
+
+    def embed_query(self, text: str) -> List[float]:
+        try:
+            embedding = get_gemini_embeddings(
+                texts=[text],
+                model=self.model,
+                task_type="RETRIEVAL_QUERY",
+                output_dimensionality=self.output_dimensionality
+            )[0]
+            return embedding.tolist()
+        except Exception as e:
+            logger.error(f"Lỗi tạo embedding cho query: {str(e)}", exc_info=True)
+            return []
 # Hàm cập nhật FAISS index người dùng
 async def update_user_index():
     global vector_user
@@ -1085,7 +1196,7 @@ async def update_user_index():
     
     if not check_system_resources() or not check_disk_space(os.path.dirname(FAISS_INDEX_PATH), 1000):
         logger.error("Tài nguyên hệ thống không đủ để cập nhật FAISS index")
-        return
+        
     
     chunks, metadata = load_feedback_chunks()
     if not chunks:
@@ -1102,27 +1213,28 @@ async def update_user_index():
         index = faiss.IndexHNSWFlat(dimension, 32)
         index.hnsw.efConstruction = 200
         index.hnsw.efSearch = 40
+        
+        # Sử dụng GeminiEmbeddings
         vector_user = FAISS.from_texts(
             texts=chunks,
-            embedding=lambda texts: get_gemini_embeddings(texts, task_type="RETRIEVAL_DOCUMENT"),
+            embedding=GeminiEmbeddings(task_type="RETRIEVAL_DOCUMENT"),
             metadatas=metadata,
-            faiss_index=index
+            # faiss_index=index
         )
         
         with open(user_index_path, "wb") as f:
             pickle.dump(vector_user, f)
-        logger.info("Đã cập nhật FAISS user index (sử dụng CPU)")
+        logger.info(f"Đã cập nhật FAISS user index với {len(chunks)} chunks (sử dụng CPU)")
     except Exception as e:
-        logger.error(f"Lỗi cập nhật FAISS user index: {str(e)}")
-
+        logger.error(f"Lỗi cập nhật FAISS user index: {str(e)}", exc_info=True)
+# Hàm tạo vector FAISS chính thức
 # Hàm tạo vector FAISS chính thức
 def build_vector_official():
-    global surtraff_details
+    global vector_official, surtraff_details
     official_index_path = FAISS_INDEX_PATH + "_official.pkl"
     
     if not check_system_resources() or not check_disk_space(os.path.dirname(FAISS_INDEX_PATH), 1000):
         logger.error("Tài nguyên hệ thống không đủ để tạo FAISS index")
-        return None
     
     try:
         if os.path.exists(official_index_path) and os.path.getsize(official_index_path) > 0:
@@ -1153,6 +1265,10 @@ def build_vector_official():
     try:
         forbidden_terms = ["culture", "tourism", "festival"]
         filtered_chunks = [c for c in surtraff_chunks if c.strip() and not any(term in normalize_unicode(c.lower()) for term in forbidden_terms)]
+        if not filtered_chunks:
+            logger.error("Không có chunk hợp lệ sau khi lọc")
+            return None
+        
         embeddings = get_gemini_embeddings(texts=filtered_chunks, task_type="RETRIEVAL_DOCUMENT", output_dimensionality=512)
         if not embeddings:
             logger.error("Không thể tạo embeddings từ Gemini API")
@@ -1162,21 +1278,22 @@ def build_vector_official():
         index = faiss.IndexHNSWFlat(dimension, 32)
         index.hnsw.efConstruction = 200
         index.hnsw.efSearch = 40
+        
         store = FAISS.from_texts(
             texts=filtered_chunks,
-            embedding=lambda texts: get_gemini_embeddings(texts, task_type="RETRIEVAL_DOCUMENT"),
+            embedding=GeminiEmbeddings(task_type="RETRIEVAL_DOCUMENT"),
             metadatas=[m for c, m in zip(surtraff_chunks, surtraff_metadata) if c.strip() and not any(term in normalize_unicode(c.lower()) for term in forbidden_terms)],
-            faiss_index=index
+            # faiss_index=index
         )
         
         with open(official_index_path, "wb") as f:
             pickle.dump(store, f)
-        logger.info("Đã tạo và lưu FAISS official index (sử dụng CPU)")
+        logger.info(f"Đã tạo và lưu FAISS official index với {len(filtered_chunks)} chunks (sử dụng CPU)")
         return store
     except Exception as e:
-        logger.error(f"Lỗi tạo FAISS index: {e}")
+        logger.error(f"Lỗi tạo FAISS official index: {str(e)}", exc_info=True)
         return None
-
+    
 # Hàm tạo vector FAISS cho người dùng
 def build_vector_user():
     global vector_user
@@ -1184,7 +1301,7 @@ def build_vector_user():
     
     if not check_system_resources() or not check_disk_space(os.path.dirname(FAISS_INDEX_PATH), 1000):
         logger.error("Tài nguyên hệ thống không đủ để tạo FAISS user index")
-        return None
+        
     
     try:
         if os.path.exists(user_index_path) and os.path.getsize(user_index_path) > 0:
@@ -1212,19 +1329,33 @@ def build_vector_user():
         index = faiss.IndexHNSWFlat(dimension, 32)
         index.hnsw.efConstruction = 200
         index.hnsw.efSearch = 40
+        
         vector_user = FAISS.from_texts(
             texts=chunks,
-            embedding=lambda texts: get_gemini_embeddings(texts, task_type="RETRIEVAL_DOCUMENT"),
+            embedding=GeminiEmbeddings(task_type="RETRIEVAL_DOCUMENT"),
             metadatas=metadata,
-            faiss_index=index
+            # faiss_index=index
         )
         
         with open(user_index_path, "wb") as f:
             pickle.dump(vector_user, f)
-        logger.info("Đã tạo và lưu FAISS user index (sử dụng CPU)")
+        logger.info(f"Đã tạo và lưu FAISS user index với {len(chunks)} chunks (sử dụng CPU)")
         return vector_user
     except Exception as e:
-        logger.error(f"Lỗi tạo FAISS user index: {e}")
+        logger.error(f"Lỗi tạo FAISS user index: {str(e)}", exc_info=True)
         return None
 
-# Hàm xử lý câu hỏi
+# Khởi tạo surtraff_details
+surtraff_details = build_surtraff_details()
+if not surtraff_details:
+    logger.error("Không thể khởi tạo surtraff_details, sử dụng dictionary rỗng")
+    surtraff_details = {}
+
+# Khởi tạo FAISS index
+vector_official = build_vector_official()
+if not vector_official:
+    logger.error("Không thể khởi tạo FAISS official index")
+
+vector_user = build_vector_user()
+if not vector_user:
+    logger.info("Không thể khởi tạo FAISS user index, sẽ tạo khi có phản hồi")

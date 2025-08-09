@@ -282,7 +282,7 @@ export default function ViolationDetail() {
   if (loading) {
     return (
       <div className="flex h-screen bg-gradient-to-br from-blue-100 via-gray-50 to-blue-100">
-        <Sidebar defaultActiveItem="violations"/>
+        <Sidebar />
         <div className="flex flex-col flex-grow overflow-hidden">
           <Header title="Violation Detail" />
           <div className="flex items-center justify-center flex-grow">
@@ -304,7 +304,7 @@ export default function ViolationDetail() {
   if (error) {
     return (
       <div className="flex h-screen bg-gradient-to-br from-blue-100 via-gray-50 to-blue-100">
-        <Sidebar defaultActiveItem="violations"/>
+        <Sidebar />
         <div className="flex flex-col flex-grow overflow-hidden">
           <Header title="Violation Detail" />
           <div className="flex items-center justify-center flex-grow">
@@ -342,7 +342,7 @@ export default function ViolationDetail() {
   if (!violation || !violation.violationDetails || violation.violationDetails.length === 0) {
     return (
       <div className="flex h-screen bg-gradient-to-br from-blue-100 via-gray-50 to-blue-100">
-        <Sidebar defaultActiveItem="violations"/>
+        <Sidebar />
         <div className="flex flex-col flex-grow overflow-hidden">
           <Header title="Violation Detail" />
           <div className="flex items-center justify-center flex-grow">
@@ -379,7 +379,7 @@ export default function ViolationDetail() {
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-blue-100 via-gray-50 to-blue-100 overflow-hidden">
-      <Sidebar defaultActiveItem="violations"/>
+      <Sidebar />
       <div className="flex flex-col flex-grow overflow-hidden">
         <Header title="Violation Detail" />
         <div className="p-6 overflow-y-auto">
@@ -702,88 +702,88 @@ export default function ViolationDetail() {
 
                 {/* Video */}
                 {violation.violationDetails[0].videoUrl ? (
-                  <motion.div 
-                    className="bg-gradient-to-br from-white/95 to-blue-100/95 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-blue-200/50 transform hover:scale-[1.02] transition-all duration-300"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.5, delay: 0.1 }}
-                  >
-                    <h3 className="text-xl font-bold bg-gradient-to-r from-blue-800 to-cyan-600 bg-clip-text text-transparent mb-4 flex items-center">
-                      <div className="w-6 h-6 mr-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center animate-pulse-slow">
-                        <svg
-                          className="w-4 h-4 text-white"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                          />
-                        </svg>
-                      </div>
-                      Violation Video
-                    </h3>
-                    <div className="relative group">
-                      <video
-                        src={violation.violationDetails[0].videoUrl}
-                        controls
-                        className="w-full rounded-xl border-2 border-blue-200/50 transition-all duration-300 group-hover:border-blue-400 group-hover:shadow-2xl group-hover:shadow-blue-400/40"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent rounded-xl opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
-                        <div className="bg-white/90 backdrop-blur-sm rounded-full p-3 transform scale-90 group-hover:scale-100 transition-all duration-300">
-                          <svg
-                            className="w-8 h-8 text-blue-600"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
-                            />
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                            />
-                          </svg>
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
-                ) : (
-                  <motion.div 
-                    className="bg-gradient-to-br from-white/95 to-gray-100/95 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-gray-200/50"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.5, delay: 0.1 }}
-                  >
-                    <div className="text-center py-16 text-gray-500">
-                      <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-gray-400 to-blue-400 rounded-full flex items-center justify-center animate-pulse">
-                        <svg
-                          className="w-10 h-10 text-white"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                          />
-                        </svg>
-                      </div>
-                      <p className="font-medium text-gray-600">No video available</p>
-                    </div>
-                  </motion.div>
-                )}
+  <motion.div 
+    className="bg-gradient-to-br from-white/95 to-blue-100/95 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-blue-200/50 transform hover:scale-[1.02] transition-all duration-300"
+    initial={{ opacity: 0, x: -20 }}
+    animate={{ opacity: 1, x: 0 }}
+    transition={{ duration: 0.5, delay: 0.1 }}
+  >
+    <h3 className="text-xl font-bold bg-gradient-to-r from-blue-800 to-cyan-600 bg-clip-text text-transparent mb-4 flex items-center">
+      <div className="w-6 h-6 mr-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center animate-pulse-slow">
+        <svg
+          className="w-4 h-4 text-white"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+          />
+        </svg>
+      </div>
+      Violation Video
+    </h3>
+    <div className="relative group">
+      <video
+        src={violation.violationDetails[0].videoUrl}
+        controls
+        className="w-full rounded-xl border-2 border-blue-200/50 transition-all duration-300 group-hover:border-blue-400 group-hover:shadow-2xl group-hover:shadow-blue-400/40"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent rounded-xl opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center pointer-events-none">
+        <div className="bg-white/90 backdrop-blur-sm rounded-full p-3 transform scale-90 group-hover:scale-100 transition-all duration-300">
+          <svg
+            className="w-8 h-8 text-blue-600"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+            />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+        </div>
+      </div>
+    </div>
+  </motion.div>
+) : (
+  <motion.div 
+    className="bg-gradient-to-br from-white/95 to-gray-100/95 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-gray-200/50"
+    initial={{ opacity: 0, x: -20 }}
+    animate={{ opacity: 1, x: 0 }}
+    transition={{ duration: 0.5, delay: 0.1 }}
+  >
+    <div className="text-center py-16 text-gray-500">
+      <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-gray-400 to-blue-400 rounded-full flex items-center justify-center animate-pulse">
+        <svg
+          className="w-10 h-10 text-white"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+          />
+        </svg>
+      </div>
+      <p className="font-medium text-gray-600">No video available</p>
+    </div>
+  </motion.div>
+)}
               </div>
 
               {/* Details Section */}

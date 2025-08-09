@@ -113,59 +113,78 @@ export default function CustomerHome() {
     setCurrentSearchQuery("")
   }
   const handleSearch = async (query: string) => {
-    if (!query.trim()) {
-      setSearchResults([])
-      setHasSearched(false)
-      setCurrentSearchQuery("")
-      return
+    const trimmedQuery = query.trim().replace(/\s+/g, "");
+    console.log("Query nhập vào:", trimmedQuery);
+    if (!trimmedQuery) {
+      setSearchResults([]);
+      setHasSearched(false);
+      setCurrentSearchQuery("");
+      console.log("Query rỗng, reset searchResults");
+      return;
     }
-    setCurrentSearchQuery(query)
-    setIsSearching(true)
-    setHasSearched(true)
+    setCurrentSearchQuery(trimmedQuery);
+    setIsSearching(true);
+    setHasSearched(true);
+    console.log("Bắt đầu tìm kiếm, hasSearched:", true);
 
     try {
-      const userId = getCookie("userId") // Get userId from cookie
+      const userId = getCookie("userId");
+      console.log("User ID:", userId);
       if (!userId) {
-        throw new Error("User ID not found in cookie")
+        throw new Error("Không tìm thấy User ID trong cookie");
       }
-      const response = await fetch(`http://localhost:8081/api/accident/user/${userId}`)
+      const response = await fetch(`http://localhost:8081/api/violations/user/${userId}`);
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        throw new Error(`Lỗi HTTP! status: ${response.status}`);
       }
-      const data = await response.json()
+      const data = await response.json();
+      console.log("Dữ liệu API (violations):", data);
+
       const transformedData = data
         .map((item: any) => {
-          let displayStatusText = item.status
-          if (item.status === "Approved") {
-            displayStatusText = "New"
+          let displayStatusText = item.status;
+          if (item.status.toUpperCase() === "APPROVED") {
+            displayStatusText = "New";
           }
           return {
             id: item.id,
-            plateNumber: item.licensePlate,
-            violationType: item.description,
-            location: item.location,
-            time: new Date(item.accidentTime).toLocaleString(),
+            plateNumber:
+              item.violationDetails?.[0]?.licensePlate ||
+              item.vehicle?.licensePlate ||
+              "N/A",
+            violationType:
+              item.violationDetails?.[0]?.violationType?.typeName ||
+              item.description ||
+              "Không rõ",
+            location: item.violationDetails?.[0]?.location || item.location || "N/A",
+            time: item.violationDetails?.[0]?.violationTime
+              ? new Date(item.violationDetails[0].violationTime).toLocaleString()
+              : item.accidentTime
+              ? new Date(item.accidentTime).toLocaleString()
+              : "N/A",
             status: item.status,
             displayStatus: displayStatusText,
-            image: item.imageUrl || "/placeholder.svg",
-          }
+            image: item.violationDetails?.[0]?.imageUrl || item.imageUrl || "/placeholder.svg",
+          };
         })
         .filter(
           (violation: any) =>
-            (violation.status === "Approved" ||
-              violation.status === "Requested" ||
-              violation.status === "Processed" ||
-              violation.status === "Rejected") &&
-            violation.plateNumber.toLowerCase().includes(query.toLowerCase()),
-        )
-      setSearchResults(transformedData)
+            (violation.status.toUpperCase() === "APPROVED" ||
+              violation.status.toUpperCase() === "REQUESTED" ||
+              violation.status.toUpperCase() === "PROCESSED" ||
+              violation.status.toUpperCase() === "REJECTED") &&
+            violation.plateNumber?.toLowerCase().includes(trimmedQuery.toLowerCase()),
+        );
+      console.log("Dữ liệu sau lọc (searchResults):", transformedData);
+      setSearchResults(transformedData);
     } catch (error) {
-      console.error("Failed to fetch search results:", error)
-      setSearchResults([])
+      console.error("Lỗi khi tìm kiếm:", error);
+      setSearchResults([]);
     } finally {
-      setIsSearching(false)
+      setIsSearching(false);
+      console.log("Kết thúc tìm kiếm, isSearching:", false);
     }
-  }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">

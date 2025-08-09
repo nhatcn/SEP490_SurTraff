@@ -22,14 +22,14 @@ os.makedirs(VIOLATIONS_DIR, exist_ok=True)
 FRAME_RATE = 30  # FPS
 STANDARD_WIDTH = 640
 STANDARD_HEIGHT = 480
-SPEED_LIMIT = 60  # km/h, adjust as needed
+SPEED_LIMIT = 60  # km/h
 MIN_VEHICLE_SIZE = 50  # Minimum vehicle bounding box size (pixels)
-DISTANCE_REF = 10  # Reference real-world distance (meters) for calibration
-PIXEL_REF = 100  # Corresponding pixel distance for DISTANCE_REF
+DISTANCE_REF = 10  # Reference real-world distance (meters)
+PIXEL_REF = 100  # Corresponding pixel distance
 VIOLATION_API_URL = "http://localhost:8081/api/violations"
 
 # Load YOLOv8m model
-model = YOLO("yolov8m.pt")  # Pre-trained YOLOv8m model
+model = YOLO("yolov8m.pt")
 
 # Define class names mapping
 class_names = {
@@ -37,7 +37,6 @@ class_names = {
     3: "motorbike",
     5: "bus",
     7: "truck",
-    # Add number_plate if your model is fine-tuned to detect it
 }
 
 # Initialize EasyOCR
@@ -70,8 +69,7 @@ def fetch_camera_config(cid: int, retries=3, delay=1):
         try:
             res = requests.get(url)
             res.raise_for_status()
-            config = res.json()
-            return config
+            return res.json()
         except Exception as e:
             print(f"Retry {attempt+1}/{retries}: Error fetching camera config: {e}")
             time.sleep(delay)
@@ -93,23 +91,19 @@ def extract_license_plate(frame, boxes):
                     license_plate_text = "".join(c for c in license_plate_text if c.isalnum()).upper()
                 except Exception as e:
                     print(f"Error in OCR: {e}")
-                    license_plate_text = "Unknown"
             break
     return license_plate_text
 
-def calculate_speed(prev_pos, curr_pos, frame_time, pixel_to_meter):
-    """Calculate speed in km/h based on pixel displacement."""
-    if prev_pos is None or curr_pos is None:
-        return 0.0
-    dx = curr_pos[0] - prev_pos[0]
-    dy = curr_pos[1] - prev_pos[1]
-    pixel_distance = np.sqrt(dx**2 + dy**2)
-    meters_per_second = (pixel_distance * pixel_to_meter) / frame_time
+def calculate_speed(kf, frame_time, pixel_to_meter):
+    """Calculate speed in km/h using Kalman Filter velocity estimates."""
+    velocity = kf.x[2:4]  # [vx, vy]
+    pixel_speed = np.sqrt(velocity[0]**2 + velocity[1]**2)
+    meters_per_second = pixel_speed * pixel_to_meter
     km_per_hour = meters_per_second * 3.6  # Convert m/s to km/h
     return km_per_hour
 
 def send_violation_async(violation_data, snapshot_filepath, video_filepath, track_id):
-    """Gửi dữ liệu vi phạm đến API bất đồng bộ và xóa file ngay sau khi gửi."""
+    """Send violation data to API asynchronously and delete files after sending."""
     def send_violation():
         try:
             with open(snapshot_filepath, 'rb') as img_file, open(video_filepath, 'rb') as vid_file:
@@ -124,7 +118,6 @@ def send_violation_async(violation_data, snapshot_filepath, video_filepath, trac
         except Exception as e:
             print(f"[-] Failed to send violation to API for track {track_id}: {e}")
         finally:
-            # Xóa file ngay sau khi gửi, bất kể thành công hay thất bại
             for filepath in [snapshot_filepath, video_filepath]:
                 try:
                     if os.path.exists(filepath):
@@ -153,8 +146,7 @@ def stream_overspeed_service(youtube_url: str, camera_id: int):
     frame_buffer = deque(maxlen=30)
     recording_tasks = {}
     kalman_filters = {}
-    speed_history = {}
-    pixel_to_meter = DISTANCE_REF / PIXEL_REF  # Conversion factor
+    pixel_to_meter = DISTANCE_REF / PIXEL_REF
     frame_time = 1.0 / FRAME_RATE
 
     try:
@@ -205,7 +197,6 @@ def stream_overspeed_service(youtube_url: str, camera_id: int):
             for x1, y1, x2, y2, track_id, class_name in vehicle_boxes:
                 if track_id not in kalman_filters:
                     kalman_filters[track_id] = initialize_kalman_filter()
-                    speed_history[track_id] = deque(maxlen=10)
 
                 kf = kalman_filters[track_id]
                 center_x, center_y = (x1 + x2) / 2, (y1 + y2) / 2
@@ -213,17 +204,12 @@ def stream_overspeed_service(youtube_url: str, camera_id: int):
                 kf.predict()
                 kf.update(np.array([[center_x], [center_y]]))
 
-                smoothed_pos = kf.x[:2].flatten()
-                prev_pos = speed_history[track_id][-1] if speed_history[track_id] else None
-                speed = calculate_speed(prev_pos, smoothed_pos, frame_time, pixel_to_meter)
-                speed_history[track_id].append(smoothed_pos)
+                speed = calculate_speed(kf, frame_time, pixel_to_meter)
+                is_violation = speed > SPEED_LIMIT
 
-                avg_speed = np.mean([calculate_speed(speed_history[track_id][i-1], speed_history[track_id][i], frame_time, pixel_to_meter) 
-                                     for i in range(1, len(speed_history[track_id]))]) if len(speed_history[track_id]) > 1 else speed
-
-                if avg_speed > SPEED_LIMIT and track_id not in vehicle_violations and track_id not in recording_tasks:
+                if is_violation and track_id not in vehicle_violations and track_id not in recording_tasks:
                     vehicle_violations[track_id] = "OVERSPEED"
-                    print(f"[+] OVERSPEED VIOLATION: Vehicle {track_id}, Plate: {license_plate_text}, Speed: {avg_speed:.2f} km/h")
+                    print(f"[+] OVERSPEED VIOLATION: Vehicle {track_id}, Plate: {license_plate_text}, Speed: {speed:.2f} km/h")
 
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     snapshot_filename = f"overspeed_{track_id}_{timestamp}.jpg"
@@ -245,15 +231,15 @@ def stream_overspeed_service(youtube_url: str, camera_id: int):
                     violation_data = {
                         "camera": {"id": camera_id},
                         "vehicle": {"licensePlate": license_plate_text},
-                        "vehicleType": {"id": 1},  # Assuming ID 1 for vehicle
+                        "vehicleType": {"id": 1},
                         "createdAt": datetime.now().isoformat(),
                         "status": "PENDING",
                         "violationDetails": [
                             {
-                                "violationTypeId": 2,  # Assuming ID 2 for OVERSPEED
+                                "violationTypeId": 2,
                                 "location": "Unknown",
                                 "violationTime": datetime.now().isoformat(),
-                                "additionalNotes": f"Track ID: {track_id}, Speed: {avg_speed:.2f} km/h"
+                                "additionalNotes": f"Track ID: {track_id}, Speed: {speed:.2f} km/h"
                             }
                         ]
                     }
@@ -261,8 +247,9 @@ def stream_overspeed_service(youtube_url: str, camera_id: int):
                     print(f"[+] Sending OVERSPEED violation for track {track_id} asynchronously...")
                     send_violation_async(violation_data, snapshot_filepath, video_filepath, track_id)
 
-                color = (0, 0, 255) if vehicle_violations.get(track_id, False) else (0, 255, 0)
-                label = f"ID:{track_id} {class_name} Plate: {license_plate_text} Speed: {avg_speed:.2f} km/h"
+                # Set bounding box color based on speed violation
+                color = (0, 0, 255) if is_violation else (0, 255, 0)
+                label = f"ID:{track_id} {class_name} Plate: {license_plate_text} Speed: {speed:.2f} km/h"
                 cv2.rectangle(frame_annotated, (x1, y1), (x2, y2), color, 2)
                 cv2.putText(frame_annotated, label, (x1, y1 - 10),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
@@ -282,7 +269,6 @@ def stream_overspeed_service(youtube_url: str, camera_id: int):
                 if track_id not in active_track_ids:
                     vehicle_violations.pop(track_id, None)
                     kalman_filters.pop(track_id, None)
-                    speed_history.pop(track_id, None)
 
             _, jpeg = cv2.imencode('.jpg', frame_annotated, [cv2.IMWRITE_JPEG_QUALITY, 85])
             yield (
@@ -300,14 +286,9 @@ def stream_overspeed_service(youtube_url: str, camera_id: int):
         print("[+] Closed stream for camera")
 
 def cleanup_on_exit():
-    """Dọn dẹp thread pool khi thoát."""
+    """Clean up thread pool on exit."""
     print("[+] Shutting down violation executor...")
     violation_executor.shutdown(wait=True)
     print("[+] Violation executor shutdown complete")
 
-# Đăng ký hàm cleanup
 atexit.register(cleanup_on_exit)
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
