@@ -41,10 +41,6 @@ const getNotificationIcon = (type: string, size = 16) => {
       return <AlertTriangle size={size} className="text-red-600 flex-shrink-0" />
     case "accident":
       return <AlertTriangle size={size} className="text-orange-600 flex-shrink-0" />
-    case "maintenance":
-      return <Clock size={size} className="text-blue-600 flex-shrink-0" />
-    case "security":
-      return <Shield size={size} className="text-green-600 flex-shrink-0" />
     default:
       return <Bell size={size} className="text-gray-600 flex-shrink-0" />
   }

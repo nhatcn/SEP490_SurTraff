@@ -32,6 +32,7 @@ import ViolationCustomerList from '../Pages/Violations/ViolationCustomerList';
 import VehicleCustomerList from '../Pages/Violations/VehicleCustomerList';
 import ProtectedRoute from './ProtectedRoute';
 import ViolationDetailForUser from '../Pages/Violations/ViolationDetailForUser';
+import NotificationsPage from '../Pages/Notification/notificationlist';
 
 const RoutesConfig = () => {
   return (
@@ -66,6 +67,8 @@ const RoutesConfig = () => {
       <Route path="/v" element={<ProtectedRoute path="/v" element={<ViolationCustomerList />} />} />
       <Route path="/vehiclelistuser" element={<ProtectedRoute path="/vehiclelistuser" element={<VehicleCustomerList />} />} />
       <Route path="/violationsuser/:id" element={<ProtectedRoute path="/violationsuser/:id" element={<ViolationDetailForUser />} />} />
+      <Route path="/notificationlist" element={<ProtectedRoute path="/notificationlist" element={<NotificationsPage />} />} />
+
 
     </Routes>
   );

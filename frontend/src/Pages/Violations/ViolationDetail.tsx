@@ -282,7 +282,7 @@ export default function ViolationDetail() {
   if (loading) {
     return (
       <div className="flex h-screen bg-gradient-to-br from-blue-100 via-gray-50 to-blue-100">
-        <Sidebar />
+        <Sidebar defaultActiveItem="violations"/>
         <div className="flex flex-col flex-grow overflow-hidden">
           <Header title="Violation Detail" />
           <div className="flex items-center justify-center flex-grow">
@@ -304,7 +304,7 @@ export default function ViolationDetail() {
   if (error) {
     return (
       <div className="flex h-screen bg-gradient-to-br from-blue-100 via-gray-50 to-blue-100">
-        <Sidebar />
+        <Sidebar defaultActiveItem="violations"/>
         <div className="flex flex-col flex-grow overflow-hidden">
           <Header title="Violation Detail" />
           <div className="flex items-center justify-center flex-grow">
@@ -342,7 +342,7 @@ export default function ViolationDetail() {
   if (!violation || !violation.violationDetails || violation.violationDetails.length === 0) {
     return (
       <div className="flex h-screen bg-gradient-to-br from-blue-100 via-gray-50 to-blue-100">
-        <Sidebar />
+        <Sidebar defaultActiveItem="violations"/>
         <div className="flex flex-col flex-grow overflow-hidden">
           <Header title="Violation Detail" />
           <div className="flex items-center justify-center flex-grow">
@@ -379,7 +379,7 @@ export default function ViolationDetail() {
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-blue-100 via-gray-50 to-blue-100 overflow-hidden">
-      <Sidebar />
+      <Sidebar defaultActiveItem="violations"/>
       <div className="flex flex-col flex-grow overflow-hidden">
         <Header title="Violation Detail" />
         <div className="p-6 overflow-y-auto">
