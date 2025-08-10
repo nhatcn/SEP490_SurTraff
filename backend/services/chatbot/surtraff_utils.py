@@ -36,7 +36,7 @@ CHAT_LOG_FILE = "services/chatbot/chat_log.jsonl"
 LIMIT_FEEDBACK = 1000
 
 # Thiết lập API key
-API_KEY = os.getenv("GOOGLE_API_KEY", "")
+API_KEY = os.getenv("GOOGLE_API_KEY", "AIzaSyAOC31ljmfZVK91xbqT0Rv9V0-FbJT5hNs")
 genai.configure(api_key=API_KEY)
 
 # Tải mô hình spaCy cho tiếng Việt

@@ -12,6 +12,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 import Footer from "../../components/Layout/Footer";
+import API_URL_BE from "../../components/Link/LinkAPI";
 
 interface TrafficDensity {
   id: number;
@@ -113,8 +114,8 @@ export default function UserTrafficMap() {
       setError(null);
       try {
         const [trafficRes, accidentRes] = await Promise.all([
-          fetch("http://localhost:8081/api/trafficdensity"),
-          fetch("http://localhost:8081/api/accident"),
+          fetch(API_URL_BE +"api/trafficdensity"),
+          fetch(API_URL_BE +"api/accident"),
         ]);
 
         if (!trafficRes.ok) throw new Error(`Traffic API error: ${trafficRes.status}`);

@@ -42,7 +42,7 @@ export default function TableVehicle() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetch('http://localhost:8081/api/vehicle')
+    fetch('API_URL_BEapi/vehicle')
       .then(res => res.json())
       .then(data => {
         setVehicles(data);
@@ -96,7 +96,7 @@ export default function TableVehicle() {
 
   const confirmDelete = async (id: number) => {
     try {
-      const res = await fetch(`http://localhost:8081/api/vehicle/${id}`, { method: 'DELETE' });
+      const res = await fetch(`API_URL_BEapi/vehicle/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Delete failed');
       setVehicles(prev => prev.filter(x => x.id !== id));
       setConfirmDialog(prev => ({ ...prev, isOpen: false }));

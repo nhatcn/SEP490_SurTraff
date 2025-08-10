@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import Sidebar from "../../components/Layout/Sidebar";
 import Header from "../../components/Layout/Header";
+import API_URL_BE from "../../components/Link/LinkAPI";
 
 interface ViolationType {
   id: number;
@@ -32,7 +33,7 @@ export default function EditViolation() {
 
   const fetchViolation = async () => {
     try {
-      const res = await axios.get(`http://localhost:8081/api/violations/${id}`);
+      const res = await axios.get(API_URL_BE+`api/violations/${id}`);
       setViolation(res.data);
       setLoading(false);
     } catch (err) {
@@ -44,7 +45,7 @@ export default function EditViolation() {
 
   const fetchViolationTypes = async () => {
     try {
-      const res = await axios.get("http://localhost:8081/api/violation-types");
+      const res = await axios.get(API_URL_BE+"api/violation-types");
       setViolationTypes(res.data);
     } catch (err) {
       console.error(err);
@@ -53,7 +54,7 @@ export default function EditViolation() {
 
   const handleSave = async () => {
     try {
-      await axios.put(`http://localhost:8081/api/violations/${id}`, {
+      await axios.put(`API_URL_BEapi/violations/${id}`, {
         violationTypeId: violation?.violationType.id,
         licensePlate: violation?.licensePlate,
         violationTime: violation?.violationTime,

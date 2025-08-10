@@ -55,7 +55,7 @@ export default function RecentViolationsSection({
         if (!userId) {
           throw new Error("User ID not found in cookie")
         }
-        const response = await fetch(`http://localhost:8081/api/violations/user/${userId}`)
+        const response = await fetch(`API_URL_BEapi/violations/user/${userId}`)
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`)
         }
@@ -102,7 +102,7 @@ export default function RecentViolationsSection({
     setRequestingId(id)
     setRequestMessage(null)
     try {
-      const response = await fetch(`http://localhost:8081/api/violations/${id}/request`, {
+      const response = await fetch(`API_URL_BEapi/violations/${id}/request`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

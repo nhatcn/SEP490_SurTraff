@@ -3,6 +3,7 @@ import axios, { AxiosError } from 'axios';
 import { motion } from 'framer-motion';
 import { Camera, Car, Clock, MapPin, AlertTriangle, Search, ChevronDown, Filter, X } from 'lucide-react';
 import RequestButton from '../../components/RequestButton/RequestButton';
+import API_URL_BE from '../../components/Link/LinkAPI';
 
 // Define ViolationsDTO interface
 interface ViolationsDTO {
@@ -63,7 +64,6 @@ const ViolationCustomerList: React.FC<ViolationListProps> = ({ userId }) => {
   const [showFilters, setShowFilters] = useState(false);
   const [filterStatus, setFilterStatus] = useState('');
 
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8081';
 
   // Get unique statuses
   const statuses = useMemo(() => {
@@ -90,7 +90,7 @@ const ViolationCustomerList: React.FC<ViolationListProps> = ({ userId }) => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await axios.get<ViolationsDTO[]>(`${API_URL}/api/violations/user/${3}`);
+      const response = await axios.get<ViolationsDTO[]>(`${API_URL_BE}/api/violations/user/${3}`);
       setViolations(response.data);
     } catch (err) {
       const error = err as AxiosError;
@@ -102,7 +102,7 @@ const ViolationCustomerList: React.FC<ViolationListProps> = ({ userId }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [userId, API_URL]);
+  }, [userId, API_URL_BE]);
 
   useEffect(() => {
     loadViolations();

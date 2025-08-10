@@ -17,6 +17,7 @@ import {
 import { getCookie } from "../../utils/cookieUltil"
 import { Header, MobileDropdownMenu } from "../../components/Layout/Menu"
 import Footer from "../../components/Layout/Footer"
+import API_URL_BE from "../../components/Link/LinkAPI"
 
 interface Notification {
   id: number
@@ -103,7 +104,7 @@ export default function NotificationsPage() {
       if (!userId) {
         throw new Error("User ID not found in cookie. Please log in.")
       }
-      const res = await axios.get<Notification[]>(`http://localhost:8081/api/notifications/${userId}`)
+      const res = await axios.get<Notification[]>(`${API_URL_BE}api/notifications/${userId}`)
       const sortedNotifications = res.data.sort(
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       )
@@ -122,7 +123,7 @@ export default function NotificationsPage() {
 
   const markAsRead = async (notificationId: number) => {
     try {
-      await axios.put(`http://localhost:8081/api/notifications/read/${notificationId}`)
+      await axios.put(API_URL_BE +`api/notifications/read/${notificationId}`)
       setNotifications((prev) => prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n)))
     } catch (err) {
       console.error("Failed to mark notification as read", err)

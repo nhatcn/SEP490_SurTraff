@@ -56,7 +56,7 @@ export default function AccidentDetailsTable() {
     setLoading(true)
     setImageLoading(true)
     setDisplayImageUrl(null)
-    fetch(`http://localhost:8081/api/accident/${id}`)
+    fetch(`API_URL_BEapi/accident/${id}`)
       .then((res) => res.json())
       .then((data) => {
         console.log("Fetched accident data:", data)
@@ -87,7 +87,7 @@ export default function AccidentDetailsTable() {
     if (!accident) return
     try {
       const updatedAccident = { description: editDescription }
-      const res = await fetch(`http://localhost:8081/api/accident/${accident.id}`, {
+      const res = await fetch(`API_URL_BEapi/accident/${accident.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedAccident),
@@ -121,7 +121,7 @@ export default function AccidentDetailsTable() {
   const handleApprove = async () => {
     if (!accident) return
     try {
-      const res = await fetch(`http://localhost:8081/api/accident/${accident.id}/approve`, {
+      const res = await fetch(`API_URL_BEapi/accident/${accident.id}/approve`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
       })

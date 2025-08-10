@@ -4,6 +4,7 @@ import GenericTable, { TableColumn, FilterConfig } from '../../components/Table/
 import ConfirmDialog from '../UI/PopUp/ConfirmDialog';
 import DeleteButton from '../Button/DeleteButton';
 import EditButton from '../Button/EditButton';
+import API_URL_BE from '../Link/LinkAPI';
 
 // Hàm helper để lấy cookie
 const getCookie = (name: string) => {
@@ -96,7 +97,7 @@ export default function TableUser() {
   // Lấy userId từ cookie
   const currentUserId = getCookie('userId') && !isNaN(parseInt(getCookie('userId')!)) ? parseInt(getCookie('userId')!) : null;
 
-  const API_BASE_URL = 'http://localhost:8081/api';
+  const API_BASE_URL = API_URL_BE ;
   const token = localStorage.getItem("token");
   const authHeader = {
     headers: {

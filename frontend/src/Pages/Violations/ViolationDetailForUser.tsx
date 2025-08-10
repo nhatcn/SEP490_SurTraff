@@ -22,6 +22,7 @@ import {
 import { format } from "date-fns";
 import axios, { AxiosError } from "axios";
 import jsPDF from "jspdf";
+import API_URL_BE from "../../components/Link/LinkAPI";
 
 // Define interfaces (keeping the same as original)
 interface ViolationType {
@@ -75,7 +76,7 @@ interface ViolationsDTO {
   status?: "Pending" | "Request" | "Approve" | "Reject" | "Processed";
 }
 
-const API_URL = "http://localhost:8081";
+
 
 const ViolationDetailForUser: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -88,7 +89,7 @@ const ViolationDetailForUser: React.FC = () => {
     const fetchViolation = async () => {
       try {
         const response = await axios.get<ViolationsDTO>(
-          `${API_URL}/api/violations/${id}`,
+          `${API_URL_BE}/api/violations/${id}`,
           {
             headers: {
               Accept: "application/json",

@@ -62,7 +62,7 @@ export function SearchBar({ onSearch, initialSearchQuery = "", isSearching }: Se
           throw new Error("Invalid token: missing userId")
         }
 
-        const response = await fetch(`http://localhost:8081/api/vehicle/user/${userId}`, {
+        const response = await fetch(`API_URL_BEapi/vehicle/user/${userId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },

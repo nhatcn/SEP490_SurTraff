@@ -12,8 +12,9 @@ import {
   AuthState
 } from '../../types/Auth/auth';
 import { setCookie } from '../../utils/cookieUltil';
+import API_URL_BE from '../../components/Link/LinkAPI';
 
-const API_BASE_URL = 'http://localhost:8080/api/users';
+const API_BASE_URL = API_URL_BE +'api/users';
 
 export const useLogin = () => {
   const [state, setState] = useState<AuthState>({

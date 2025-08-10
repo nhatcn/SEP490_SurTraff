@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Zone, LaneDirection, LightZoneMapping } from '../../types/Camera/camera';
+import API_URL_BE from '../../components/Link/LinkAPI';
 
 // Type for violation type from API
 interface ViolationType {
@@ -38,7 +39,7 @@ export const useCameraForm = () => {
     const fetchViolationTypes = async () => {
       setIsLoadingViolationTypes(true);
       try {
-        const response = await fetch("http://localhost:8081/api/violation-type");
+        const response = await fetch(API_URL_BE+"api/violation-type");
         if (!response.ok) {
           throw new Error(`Failed to fetch violation types: ${response.status}`);
         }
@@ -94,7 +95,7 @@ export const useCameraForm = () => {
     setThumbnailError(null);
 
     try {
-      const response = await fetch("http://localhost:8000/api/thumbnail/extract", {
+      const response = await fetch(API_URL_BE+"api/thumbnail/extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ stream_url: streamUrl })
@@ -205,7 +206,7 @@ export const useCameraForm = () => {
       console.log('Sending camera setup data:', setupDTO);
       console.log('Thumbnail file:', thumbnailFile.name, thumbnailFile.size, 'bytes');
 
-      const response = await fetch("http://localhost:8081/api/cameras/setup", {
+      const response = await fetch(API_URL_BE+"api/cameras/setup", {
         method: "POST",
         // Don't set Content-Type header, let browser set it with boundary for multipart
         body: formData

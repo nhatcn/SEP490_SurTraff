@@ -21,6 +21,7 @@ import {
 import { getCookie } from '../../utils/cookieUltil'
 import { Header, MobileDropdownMenu } from '../../components/Layout/Menu'
 import Footer from '../../components/Layout/Footer'
+import API_URL_BE from '../../components/Link/LinkAPI'
 
 interface VehicleDTO {
   id: number
@@ -111,7 +112,7 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({
   const [userId, setUserId] = useState<string | null>(null)
   const [showMobileMenu, setShowMobileMenu] = useState(false)
 
-  const API_URL = 'http://localhost:8081'
+
 
   // Fetch userId from cookie or localStorage
   useEffect(() => {
@@ -125,7 +126,7 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({
           return
         }
 
-        const response = await fetch(`${API_URL}/api/users/${cookieUserId}`)
+        const response = await fetch(`${API_URL_BE}/api/users/${cookieUserId}`)
         if (response.ok) {
           const user = await response.json()
           setUserId(user.userId.toString())
@@ -153,7 +154,7 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({
     }
 
     fetchUserData()
-  }, [API_URL])
+  }, [API_URL_BE])
 
   // Load vehicles list
   const loadVehicles = useCallback(async () => {
@@ -165,7 +166,7 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({
     setIsLoading(true)
     setError(null)
     try {
-      const response = await fetch(`${API_URL}/api/vehicle/user/${userId}`)
+      const response = await fetch(`${API_URL_BE}/api/vehicle/user/${userId}`)
       if (!response.ok) {
         if (response.status === 404) {
           setError('No vehicles found for this user.')
@@ -182,14 +183,14 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({
     } finally {
       setIsLoading(false)
     }
-  }, [API_URL, userId])
+  }, [API_URL_BE, userId])
 
   // Check violations for a specific license plate
   const checkViolations = useCallback(
     async (licensePlate: string) => {
       try {
         const response = await fetch(
-          `${API_URL}/api/violations/license-plate/${licensePlate}`
+          `${API_URL_BE}/api/violations/license-plate/${licensePlate}`
         )
         if (response.ok) {
           const violationData: ViolationData[] = await response.json()
@@ -205,7 +206,7 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({
         return []
       }
     },
-    [API_URL]
+    [API_URL_BE]
   )
 
   // Check violations for all vehicles and show robot message
@@ -289,7 +290,7 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({
       setError(null)
       try {
         const response = await fetch(
-          `${API_URL}/api/vehicle/${vehicleId}/activate`,
+          `${API_URL_BE}/api/vehicle/${vehicleId}/activate`,
           {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' }
@@ -315,7 +316,7 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({
         setIsLoading(false)
       }
     },
-    [API_URL]
+    [API_URL_BE]
   )
 
   // Scroll to a specific vehicle row

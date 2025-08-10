@@ -33,7 +33,7 @@ export default function TableVehicleTracking() {
   const chartInstanceRef = useRef<ChartJS<'bar'> | null>(null);
 
   useEffect(() => {
-    fetch('http://localhost:8081/api/vehicle-tracking/all')
+    fetch('API_URL_BEapi/vehicle-tracking/all')
       .then(res => res.json())
       .then(data => setData(data))
       .catch(() => {});

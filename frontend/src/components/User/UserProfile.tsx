@@ -26,6 +26,7 @@ import {
 } from "lucide-react"
 import { getCookie } from "../../utils/cookieUltil"
 import CryptoJS from "crypto-js"
+import API_URL_BE from "../Link/LinkAPI"
 
 interface UserData {
   userId: number
@@ -112,7 +113,7 @@ export default function UserProfile() {
 
   const fetchUserData = async () => {
     try {
-      const response = await fetch(`http://localhost:8081/api/users/${userId}`)
+      const response = await fetch(API_URL_BE +`api/users/${userId}`)
       const userData = await response.json()
       setUser(userData)
     } catch (error) {
@@ -203,7 +204,7 @@ export default function UserProfile() {
         formData.append("avatarFile", updateForm.avatar)
       }
 
-      const response = await fetch(`http://localhost:8081/api/users/update/${user?.userId}`, {
+      const response = await fetch(API_URL_BE +`api/users/update/${user?.userId}`, {
         method: "PUT",
         body: formData,
       })
@@ -284,7 +285,7 @@ export default function UserProfile() {
 
     try {
       // Send plain current password to backend for verification
-      const verifyResponse = await fetch(`http://localhost:8081/api/users/verify-password/${user?.userId}`, {
+      const verifyResponse = await fetch(API_URL_BE +`api/users/verify-password/${user?.userId}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -301,7 +302,7 @@ export default function UserProfile() {
       }
 
       // If verification passes, proceed with password update
-      const updateResponse = await fetch(`http://localhost:8081/api/users/${user?.userId}`, {
+      const updateResponse = await fetch(API_URL_BE +`api/users/${user?.userId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

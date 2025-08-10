@@ -7,6 +7,7 @@ import { useLocation } from "react-router-dom";
 import NewNotificationAlert from "./new-notification-alert";
 import { getCookie } from "../../utils/cookieUltil";
 import { useNavigate } from "react-router-dom" // Thêm dòng này
+import API_URL_BE from "../Link/LinkAPI";
 
 
 interface Notification {
@@ -78,7 +79,7 @@ const NotificationDropdown = () => {
         throw new Error("User ID not found in cookie");
       }
       const res = await axios.get<Notification[]>(
-        `http://localhost:8081/api/notifications/${userId}`
+        API_URL_BE +`api/notifications/${userId}`
       );
       const currentUnread = res.data.filter((n) => !n.read);
 
@@ -162,7 +163,7 @@ const NotificationDropdown = () => {
   const markAsRead = async (notificationId: number) => {
     try {
       await axios.put(
-        `http://localhost:8081/api/notifications/read/${notificationId}`
+       API_URL_BE +`api/notifications/read/${notificationId}`
       );
       setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
     } catch (error) {
@@ -177,7 +178,7 @@ const NotificationDropdown = () => {
       const notificationIds = notifications.map((n) => n.id);
       await Promise.all(
         notificationIds.map((id) =>
-          axios.put(`http://localhost:8081/api/notifications/read/${id}`)
+          axios.put(API_URL_BE +`api/notifications/read/${id}`)
         )
       );
       setNotifications([]);

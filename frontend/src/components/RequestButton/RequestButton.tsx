@@ -64,7 +64,7 @@ const RequestButton: React.FC<RequestButtonProps> = ({ violationId, onStatusUpda
     const fetchViolationStatus = async () => {
       try {
         const response = await axios.get<ViolationsDTO>(
-          `http://localhost:8081/api/violations/${violationId}`,
+          `API_URL_BEapi/violations/${violationId}`,
           {
             headers: {
               Accept: 'application/json',
@@ -99,7 +99,7 @@ const RequestButton: React.FC<RequestButtonProps> = ({ violationId, onStatusUpda
 
     try {
       const response = await axios.post<ViolationsDTO>(
-        `http://localhost:8081/api/violations/${violationId}/request`,
+        `API_URL_BEapi/violations/${violationId}/request`,
         null,
         {
           headers: {

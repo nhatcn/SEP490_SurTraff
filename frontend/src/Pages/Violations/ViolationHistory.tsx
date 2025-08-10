@@ -8,6 +8,7 @@ import { format } from "date-fns";
 import axios, { AxiosError } from "axios";
 import { Header, MobileDropdownMenu } from "../../components/Layout/Menu";
 import Footer from "../../components/Layout/Footer";
+import API_URL_BE from "../../components/Link/LinkAPI";
 
 // Define interfaces
 interface ViolationsDTO {
@@ -85,7 +86,7 @@ interface RequestButtonProps {
   onStatusUpdate: (updatedViolation: ViolationsDTO) => void;
 }
 
-const API_URL = "http://localhost:8081";
+
 const ITEMS_PER_PAGE = 10;
 
 // RequestButton Component
@@ -101,7 +102,7 @@ const RequestButton: React.FC<RequestButtonProps> = ({ violationId, onStatusUpda
     const fetchViolationStatus = async () => {
       try {
         const response = await axios.get<ViolationsDTO>(
-          `${API_URL}/api/violations/${violationId}`,
+          `${API_URL_BE}/api/violations/${violationId}`,
           {
             headers: {
               Accept: "application/json",
@@ -135,7 +136,7 @@ const RequestButton: React.FC<RequestButtonProps> = ({ violationId, onStatusUpda
 
   try {
     const response = await axios.post<ViolationsDTO>(
-      `${API_URL}/api/violations/${violationId}/request`,
+      `${API_URL_BE}/api/violations/${violationId}/request`,
       null,
       {
         headers: {
@@ -1078,7 +1079,7 @@ export default function ViolationHistory() {
 
   const loadAllVehicles = useCallback(async () => {
     try {
-      const response = await fetch(`${API_URL}/api/vehicle/user/3`);
+      const response = await fetch(`${API_URL_BE}/api/vehicle/user/3`);
       if (!response.ok) {
         throw new Error("Failed to load vehicles.");
       }
@@ -1102,7 +1103,7 @@ export default function ViolationHistory() {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`${API_URL}/api/violations/history/${selectedLicensePlate}`);
+      const response = await fetch(`${API_URL_BE}/api/violations/history/${selectedLicensePlate}`);
       if (!response.ok) {
         if (response.status === 404) {
           setViolations([]);

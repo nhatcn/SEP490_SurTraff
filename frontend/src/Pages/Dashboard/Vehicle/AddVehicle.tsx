@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Save, X, Car, CheckCircle, AlertCircle } from 'lucide-react';
+import API_URL_BE from '../../../components/Link/LinkAPI';
 
 interface VehicleType {
   id: number;
@@ -51,7 +52,7 @@ const AddVehicle = ({ onVehicleAdded }: { onVehicleAdded?: (vehicle: Vehicle) =>
   useEffect(() => {
     const fetchVehicleTypes = async () => {
       try {
-        const response = await fetch('http://localhost:8081/api/violations/vehicle-types', {
+        const response = await fetch(API_URL_BE +'api/violations/vehicle-types', {
           headers: { 'Content-Type': 'application/json' },
         });
         if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
@@ -69,7 +70,7 @@ const AddVehicle = ({ onVehicleAdded }: { onVehicleAdded?: (vehicle: Vehicle) =>
   useEffect(() => {
     const fetchVehicles = async () => {
       try {
-        const response = await fetch('http://localhost:8081/api/vehicle', {
+        const response = await fetch(API_URL_BE +'api/vehicle', {
           headers: { 'Content-Type': 'application/json' },
         });
         if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
@@ -87,7 +88,7 @@ const AddVehicle = ({ onVehicleAdded }: { onVehicleAdded?: (vehicle: Vehicle) =>
   useEffect(() => {
     const fetchUserId = async () => {
       try {
-        const response = await fetch('http://localhost:8081/api/auth/current-user', {
+        const response = await fetch(API_URL_BE +'api/auth/current-user', {
           headers: { 'Content-Type': 'application/json' },
           // 'Authorization': `Bearer ${yourToken}` // Uncomment if authentication is required
         });
@@ -194,7 +195,7 @@ const AddVehicle = ({ onVehicleAdded }: { onVehicleAdded?: (vehicle: Vehicle) =>
         formData.append('imageFile', editForm.image);
       }
 
-      const response = await fetch('http://localhost:8081/api/vehicle', {
+      const response = await fetch('API_URL_BEapi/vehicle', {
         method: 'POST',
         body: formData,
       });

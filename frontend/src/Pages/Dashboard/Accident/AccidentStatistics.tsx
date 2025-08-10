@@ -6,6 +6,7 @@ import CardLineChart from "../../../components/Cards/CardLineChart";
 import CardBarChart from "../../../components/Cards/CardBarChart";
 import CardLineChart2 from "../../../components/Cards/CardLineChart2";
 import CardMapChart from "../../../components/Cards/CardMapChart";
+import API_URL_BE from "../../../components/Link/LinkAPI";
 
 interface Camera {
   id: number;
@@ -31,7 +32,7 @@ const AccidentStatistics: React.FC = () => {
 
   useEffect(() => {
     setLoading(true);
-    fetch("http://localhost:8081/api/accident")
+    fetch(API_URL_BE +"api/accident")
       .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch accident data");
         return res.json();

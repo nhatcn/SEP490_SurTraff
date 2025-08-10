@@ -15,6 +15,7 @@ import {
   Shield, Target, Zap, Activity, Globe, CheckCircle2, XCircle, ChevronLeft,
   ChevronRight
 } from "lucide-react";
+import API_URL_BE from "../../components/Link/LinkAPI";
 
 // Types
 interface ViolationType {
@@ -65,8 +66,7 @@ interface Violation {
   isDelete: boolean; // Added to match backend
 }
 
-// Constants
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8081";
+
 const ITEMS_PER_PAGE_OPTIONS = [5, 10, 15, 20, 25, 50];
 
 export default function ViolationList() {
@@ -208,7 +208,7 @@ export default function ViolationList() {
     try {
       setLoading(true);
       setError(null);
-      const response = await axios.get(`${API_URL}/api/violations`);
+      const response = await axios.get(`${API_URL_BE}/api/violations`);
       const processedData = response.data.map((item: any) => ({
         ...item,
         violationDetails: item.violationDetails || [],
@@ -231,7 +231,7 @@ export default function ViolationList() {
   // Handle delete
   const handleDelete = useCallback(async (id: number) => {
     try {
-      await axios.delete(`${API_URL}/api/violations/${id}`);
+      await axios.delete(`${API_URL_BE}/api/violations/${id}`);
       setViolations((prev) => prev.filter((v) => v.id !== id));
       setOpenDialog(false);
       toast.success("🗑️ Violation deleted successfully!", {
@@ -309,7 +309,7 @@ export default function ViolationList() {
   if (loading) {
     return (
       <div className="flex h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-        <Sidebar />
+        <Sidebar defaultActiveItem="violations"/>
         <div className="flex flex-col flex-grow">
           <Header title="Traffic Violation List" />
           <div className="flex-grow flex items-center justify-center">

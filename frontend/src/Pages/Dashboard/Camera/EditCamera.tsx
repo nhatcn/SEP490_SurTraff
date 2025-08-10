@@ -8,6 +8,7 @@ import L from "leaflet";
 import ZoneCanvas from "../../../components/Camera/ZoneCanvas";
 import LaneDirectionConfig from "../../../components/Camera/LaneDirectionConfig";
 import LightZoneMappingConfig from "../../../components/Camera/LightZoneMappingConfig";
+import API_URL_BE from "../../../components/Link/LinkAPI";
 
 const markerIconUrl = "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png";
 const markerShadowUrl = "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png";
@@ -184,7 +185,7 @@ export default function EditCamera() {
     const fetchViolationTypes = async () => {
       setIsLoadingViolationTypes(true);
       try {
-        const response = await fetch("http://localhost:8081/api/violation-type");
+        const response = await fetch(API_URL_BE +"api/violation-type");
         if (!response.ok) {
           throw new Error(`Failed to fetch violation types: ${response.status}`);
         }
@@ -269,7 +270,7 @@ export default function EditCamera() {
 
       try {
         setLoading(true);
-        const response = await fetch(`http://localhost:8081/api/cameras/${id}`);
+        const response = await fetch(API_URL_BE +`api/cameras/${id}`);
         
         if (!response.ok) {
           throw new Error("Camera not found");
@@ -570,7 +571,7 @@ export default function EditCamera() {
 
       console.log('Sending camera update data:', updateData);
 
-      const response = await fetch(`http://localhost:8081/api/cameras/${id}`, {
+      const response = await fetch(`API_URL_BEapi/cameras/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updateData)

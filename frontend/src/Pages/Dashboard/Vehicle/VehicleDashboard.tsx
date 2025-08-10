@@ -5,6 +5,7 @@ import { Eye, Trash2, Car } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import TableVehicle from "../../../components/Vehicle/TableVehicle";
 import AddVehicle from "./AddVehicle";
+import API_URL_BE from "../../../components/Link/LinkAPI";
 
 interface VehicleType {
   id: number;
@@ -25,7 +26,7 @@ export default function VehicleDashboard() {
   useEffect(() => {
     const fetchVehicles = async () => {
       try {
-        const response = await fetch('http://localhost:8081/api/vehicle', {
+        const response = await fetch(API_URL_BE +'api/vehicle', {
           headers: { 'Content-Type': 'application/json' },
         });
         if (!response.ok) throw new Error(`HTTP error: ${response.status}`);

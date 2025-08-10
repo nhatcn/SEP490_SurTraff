@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import Sidebar from '../../../components/Layout/Sidebar';
 import Header from '../../../components/Layout/Header';
+import API_URL_BE from '../../../components/Link/LinkAPI';
 
 // Custom debounce function
 function debounce<T extends (...args: any[]) => void>(func: T, wait: number): (...args: Parameters<T>) => void {
@@ -109,7 +110,7 @@ const VehicleDetail = () => {
   // Fetch vehicle types
   const fetchVehicleTypes = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:8081/api/violations/vehicle-types', {
+      const response = await fetch(API_URL_BE +'api/violations/vehicle-types', {
         headers: { 'Content-Type': 'application/json' },
       });
       if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
@@ -124,7 +125,7 @@ const VehicleDetail = () => {
   // Fetch vehicles
   const fetchVehicles = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:8081/api/vehicle', {
+      const response = await fetch(API_URL_BE +'api/vehicle', {
         headers: { 'Content-Type': 'application/json' },
       });
       if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
@@ -141,7 +142,7 @@ const VehicleDetail = () => {
     if (!id || id === '0') return;
     setIsLoading(true);
     try {
-      const response = await fetch(`http://localhost:8081/api/vehicle/${id}`, {
+      const response = await fetch(API_URL_BE +`api/vehicle/${id}`, {
         headers: { 'Content-Type': 'application/json' },
       });
       if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
@@ -250,7 +251,7 @@ const VehicleDetail = () => {
       formData.append('dto', new Blob([JSON.stringify(vehicleDTO)], { type: 'application/json' }));
       if (editForm.image) formData.append('imageFile', editForm.image);
 
-      const response = await fetch(`http://localhost:8081/api/vehicle/${id}`, {
+      const response = await fetch(`API_URL_BEapi/vehicle/${id}`, {
         method: 'PUT',
         body: formData,
       });
@@ -279,7 +280,7 @@ const VehicleDetail = () => {
     setSuccessMessage('');
     setErrorMessage('');
     try {
-      const response = await fetch(`http://localhost:8081/api/vehicle/${id}`, {
+      const response = await fetch(`API_URL_BEapi/vehicle/${id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
       });

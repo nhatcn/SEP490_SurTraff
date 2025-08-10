@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { getCookie } from "../../utils/cookieUltil"
 import { Header, MobileDropdownMenu } from '../../components/Layout/Menu';
 import Footer from '../../components/Layout/Footer';
+import API_URL_BE from '../../components/Link/LinkAPI';
 
 const AddVehicle = () => {
   const navigate = useNavigate();
@@ -28,7 +29,7 @@ const AddVehicle = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
 
-  const API_URL = "http://localhost:8081";
+
 
   // Fetch userId using cookie and localStorage
   useEffect(() => {
@@ -43,7 +44,7 @@ const AddVehicle = () => {
           return;
         }
 
-        const response = await fetch(`${API_URL}/api/users/${userId}`);
+        const response = await fetch(`${API_URL_BE}/api/users/${userId}`);
         if (response.ok) {
           const user = await response.json();
           setFormData((prev) => ({ ...prev, userId: user.userId.toString() }));

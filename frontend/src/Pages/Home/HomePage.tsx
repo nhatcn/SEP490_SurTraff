@@ -9,6 +9,7 @@ import { SearchBar } from "../../components/HomeSearch/search-bar"
 import RecentViolationsSection from "../../components/RecentViolationsSection"
 import { getCookie } from "../../utils/cookieUltil"
 import Chatbot from "../../components/Chatbot/chatbot"
+import API_URL_BE from "../../components/Link/LinkAPI"
 
 interface StatCard {
   title: string
@@ -133,7 +134,7 @@ export default function CustomerHome() {
       if (!userId) {
         throw new Error("Không tìm thấy User ID trong cookie");
       }
-      const response = await fetch(`http://localhost:8081/api/violations/user/${userId}`);
+      const response = await fetch(API_URL_BE +`api/violations/user/${userId}`);
       if (!response.ok) {
         throw new Error(`Lỗi HTTP! status: ${response.status}`);
       }

@@ -5,6 +5,7 @@ import { Search, Bell, User, ChevronDown, Activity, Clock } from "lucide-react"
 import { useState, useEffect } from "react"
 import { getCookie } from "../../utils/cookieUltil"
 import { useNavigate } from "react-router-dom"
+import API_URL_BE from "../Link/LinkAPI"
 
 interface HeaderProps {
   title: string
@@ -48,7 +49,7 @@ export default function Header({ title }: HeaderProps) {
           return
         }
 
-        const response = await fetch(`http://localhost:8081/api/users/${userId}`)
+        const response = await fetch(API_URL_BE +`api/users/${userId}`)
 
         if (response.ok) {
           const user = await response.json()

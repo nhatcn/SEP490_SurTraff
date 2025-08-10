@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import API_URL_BE from '../../components/Link/LinkAPI';
 
 export const useZoneId = () => {
   const [nextZoneId, setNextZoneId] = useState<number>(1);
@@ -8,7 +9,7 @@ export const useZoneId = () => {
     const fetchLatestZoneId = async () => {
       try {
         setIsLoadingZoneId(true);
-        const response = await fetch("http://localhost:8081/api/zones/last-zone-id");
+        const response = await fetch(API_URL_BE+"api/zones/last-zone-id");
 
         if (response.ok) {
           const data = await response.json();

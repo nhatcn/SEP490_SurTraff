@@ -138,7 +138,9 @@ def stream_video(camera_id: int, db: Session = Depends(get_db)):
             detect_potholes_in_video(camera.stream_url, camera.id),
             media_type="multipart/x-mixed-replace; boundary=frame"
         )
+
     elif camera.violation_type_id == 8:
+
         return StreamingResponse(
             stream_accident_video_service(camera.stream_url, camera.id),
             media_type="multipart/x-mixed-replace; boundary=frame"
