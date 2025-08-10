@@ -95,7 +95,7 @@ export const useCameraForm = () => {
     setThumbnailError(null);
 
     try {
-      const response = await fetch(API_URL_BE+"api/thumbnail/extract", {
+      const response = await fetch("http://localhost:8000/api/thumbnail/extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ stream_url: streamUrl })
@@ -107,20 +107,16 @@ export const useCameraForm = () => {
           const errorData = await response.json();
           errorMessage = errorData.error || errorMessage;
         } catch {
-          // If response is not JSON, use default error message
         }
         throw new Error(errorMessage);
       }
 
-      // Convert the image response to a blob and create File object
       const blob = await response.blob();
       
-      // Create File object with proper name and type
       const timestamp = new Date().getTime();
       const fileName = `thumbnail_${timestamp}.jpg`;
       const file = new File([blob], fileName, { type: blob.type || 'image/jpeg' });
       
-      // Create object URL for preview
       const imageUrl = URL.createObjectURL(blob);
       
       setThumbnailFile(file); // Lưu file để gửi

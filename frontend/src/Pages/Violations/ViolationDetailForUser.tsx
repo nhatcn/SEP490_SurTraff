@@ -89,7 +89,7 @@ const ViolationDetailForUser: React.FC = () => {
     const fetchViolation = async () => {
       try {
         const response = await axios.get<ViolationsDTO>(
-          `${API_URL_BE}/api/violations/${id}`,
+          `${API_URL_BE}api/violations/${id}`,
           {
             headers: {
               Accept: "application/json",

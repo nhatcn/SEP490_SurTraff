@@ -88,7 +88,7 @@ export default function ViolationDetail() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`${API_URL_BE}/api/violations/${id}`);
+        const response = await axios.get(`${API_URL_BE}api/violations/${id}`);
         setViolation(response.data);
         setFormData({ status: response.data.status });
         const firstDetail = response.data.violationDetails?.[0] || {};
@@ -126,16 +126,16 @@ export default function ViolationDetail() {
 
       switch (statusUpper) {
         case "PROCESSED":
-          response = await axios.post(`${API_URL_BE}/api/violations/${id}/process`);
+          response = await axios.post(`${API_URL_BE}api/violations/${id}/process`);
           break;
         case "APPROVED":
-          response = await axios.post(`${API_URL_BE}/api/violations/${id}/approve`);
+          response = await axios.post(`${API_URL_BE}api/violations/${id}/approve`);
           break;
         case "REJECTED":
-          response = await axios.post(`${API_URL_BE}/api/violations/${id}/reject`);
+          response = await axios.post(`${API_URL_BE}api/violations/${id}/reject`);
           break;
         case "PENDING":
-          response = await axios.put(`${API_URL_BE}/api/violations/${id}`, {
+          response = await axios.put(`${API_URL_BE}api/violations/${id}`, {
             id: Number(id),
             camera: violation?.camera ? { id: violation.camera.id } : null,
             vehicleType: violation?.vehicleType ? { id: violation.vehicleType.id } : null,
@@ -195,7 +195,7 @@ export default function ViolationDetail() {
         additionalNotes: detailFormData.additionalNotes || null,
       };
       const updatedDetail = await axios.put(
-        `${API_URL_BE}/api/violations/details/${violation.violationDetails[0].id}`,
+        `${API_URL_BE}api/violations/details/${violation.violationDetails[0].id}`,
         updateData
       );
       setViolation((prev) => ({
@@ -254,7 +254,7 @@ export default function ViolationDetail() {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const response = await axios.get(`${API_URL_BE}/api/violations/${id}`);
+      const response = await axios.get(`${API_URL_BE}api/violations/${id}`);
       setViolation(response.data);
       setFormData({ status: response.data.status });
       const firstDetail = response.data.violationDetails?.[0] || {};
