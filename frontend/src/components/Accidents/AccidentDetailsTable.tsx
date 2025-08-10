@@ -1,39 +1,24 @@
-"use client";
+"use client"
+import { useParams, useNavigate } from "react-router-dom"
+import type React from "react"
 
-import { useParams, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState } from "react"
 import {
-  ArrowLeft,
   Calendar,
   Camera,
   User,
-  Mail,
-  Car,
   MapPin,
   Clock,
-  Edit3,
   Save,
-  X,
-  Check,
-  ImageIcon,
-  Video,
-  Shield,
   FileText,
-  Sparkles,
   Eye,
   AlertTriangle,
   CheckCircle2,
   XCircle,
   RefreshCw,
-} from "lucide-react";
-import { Button } from "../../components/UI/AccidentUI/button";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-} from "../../components/UI/AccidentUI/card";
-import { Textarea } from "../../components/UI/AccidentUI/textarea";
+} from "lucide-react"
+import { Button } from "../../components/UI/AccidentUI/button"
+import { Textarea } from "../../components/UI/AccidentUI/textarea"
 import {
   Dialog,
   DialogContent,
@@ -41,37 +26,32 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "../../components/UI/AccidentUI/dialog";
-import {
-  LoadingScreen,
-  ErrorScreen,
-} from "../../components/UI/AccidentUI/loading";
-import { getStatusBadge } from "../../components/Accidents/status-badge";
-import { getYouTubeEmbedUrl } from "../../components/Accidents/video-utils";
-import type { AccidentType } from "../../types/Accident/accident";
-import { motion } from "framer-motion";
-import { format } from "date-fns";
-import { toast } from "react-toastify";
+} from "../../components/UI/AccidentUI/dialog"
+import { LoadingScreen, ErrorScreen } from "../../components/UI/AccidentUI/loading"
+import type { AccidentType } from "../../types/Accident/accident"
+import { motion } from "framer-motion"
+import { format } from "date-fns"
+import { toast } from "react-toastify"
 
 export default function AccidentDetailsTable() {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const [accident, setAccident] = useState<AccidentType | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editDescription, setEditDescription] = useState("");
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [imageLoading, setImageLoading] = useState(true);
-  const [imageKey, setImageKey] = useState(Date.now());
-  const [displayImageUrl, setDisplayImageUrl] = useState<string | null>(null);
-  const [descriptionError, setDescriptionError] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [imageExpanded, setImageExpanded] = useState(false);
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const [accident, setAccident] = useState<AccidentType | null>(null)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editDescription, setEditDescription] = useState("")
+  const [showConfirm, setShowConfirm] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [imageLoading, setImageLoading] = useState(true)
+  const [imageKey, setImageKey] = useState(Date.now())
+  const [displayImageUrl, setDisplayImageUrl] = useState<string | null>(null)
+  const [descriptionError, setDescriptionError] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
+  const [imageExpanded, setImageExpanded] = useState(false)
 
   const getStatusColor = (status: string) => {
     const statusMap: {
-      [key: string]: { bg: string; text: string; icon: React.ReactNode };
+      [key: string]: { bg: string; text: string; icon: React.ReactNode }
     } = {
       pending: {
         bg: "bg-gray-100",
@@ -93,41 +73,41 @@ export default function AccidentDetailsTable() {
         text: "text-teal-700",
         icon: <CheckCircle2 className="text-teal-500" size={14} />,
       },
-    };
+    }
     return (
       statusMap[status.toLowerCase()] || {
         bg: "bg-gray-100",
         text: "text-gray-500",
         icon: <div className="w-2 h-2 bg-gray-400 rounded-full" />,
       }
-    );
-  };
+    )
+  }
 
   // Validation function for description
   const validateDescription = (desc: string): string | null => {
     if (!desc.trim()) {
-      return "Description cannot be empty.";
+      return "Description cannot be empty."
     }
     if (/^\d+$/.test(desc.trim())) {
-      return "Description cannot contain only numbers.";
+      return "Description cannot contain only numbers."
     }
     if (/[^a-zA-Z0-9\s,.!?-]/.test(desc)) {
-      return "Description cannot contain special characters (except ,.!?-).";
+      return "Description cannot contain special characters (except ,.!?-)."
     }
     if (desc.length > 1000) {
-      return "Description cannot exceed 1000 characters.";
+      return "Description cannot exceed 1000 characters."
     }
-    return null;
-  };
+    return null
+  }
 
   useEffect(() => {
     const fetchData = async () => {
-      setLoading(true);
-      setImageLoading(true);
-      setDisplayImageUrl(null);
+      setLoading(true)
+      setImageLoading(true)
+      setDisplayImageUrl(null)
       try {
-        const res = await fetch(`API_URL_BEapi/accident/${id}`);
-        const data = await res.json();
+        const res = await fetch(`http://localhost:8081/api/accident/${id}`)
+        const data = await res.json()
         setAccident({
           ...data,
           camera: { id: data.cameraId, name: data.cameraName || "Unknown" },
@@ -137,45 +117,38 @@ export default function AccidentDetailsTable() {
           userEmail: data.userEmail || "No data",
           licensePlate: data.licensePlate || "No data",
           status: data.status ? data.status.toLowerCase() : "unknown",
-        });
-        setEditDescription(data.description || "");
-        setDisplayImageUrl(
-          data.imageUrl ? `${data.imageUrl}?t=${Date.now()}` : null
-        );
+        })
+        setEditDescription(data.description || "")
+        setDisplayImageUrl(data.imageUrl ? `${data.imageUrl}?t=${Date.now()}` : null)
       } catch (error) {
-        console.error("Failed to fetch accident data:", error);
-        setError("Failed to load accident data");
+        console.error("Failed to fetch accident data:", error)
+        setError("Failed to load accident data")
       } finally {
-        setLoading(false);
-        setImageLoading(false);
+        setLoading(false)
+        setImageLoading(false)
       }
-    };
-    fetchData();
-  }, [id]);
+    }
+    fetchData()
+  }, [id])
 
   const handleSave = async () => {
-    if (!accident) return;
-
-    const validationError = validateDescription(editDescription);
+    if (!accident) return
+    const validationError = validateDescription(editDescription)
     if (validationError) {
-      setDescriptionError(validationError);
-      return;
+      setDescriptionError(validationError)
+      return
     }
-
     try {
-      const updatedAccident = { description: editDescription };
-      const res = await fetch(
-        `API_URL_BEapi/accident/${accident.id}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(updatedAccident),
-        }
-      );
+      const updatedAccident = { description: editDescription }
+      const res = await fetch(`http://localhost:8081/api/accident/${accident.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedAccident),
+      })
       if (!res.ok) {
-        throw new Error("Failed to update");
+        throw new Error("Failed to update")
       }
-      const updatedData = await res.json();
+      const updatedData = await res.json()
       setAccident({
         ...updatedData,
         camera: {
@@ -187,34 +160,29 @@ export default function AccidentDetailsTable() {
         userFullName: updatedData.userFullName || "No data",
         userEmail: updatedData.userEmail || "No data",
         licensePlate: updatedData.licensePlate || "No data",
-        status: updatedData.status
-          ? updatedData.status.toLowerCase()
-          : "unknown",
-      });
-      setIsEditing(false);
-      setShowConfirm(false);
-      setDescriptionError(null);
-      toast.success("Description updated successfully!");
+        status: updatedData.status ? updatedData.status.toLowerCase() : "unknown",
+      })
+      setIsEditing(false)
+      setShowConfirm(false)
+      setDescriptionError(null)
+      toast.success("Description updated successfully!")
     } catch (error) {
-      console.error("Error saving description:", error);
-      toast.error("An error occurred while updating the description.");
+      console.error("Error saving description:", error)
+      toast.error("An error occurred while updating the description.")
     }
-  };
+  }
 
   const handleApprove = async () => {
-    if (!accident) return;
+    if (!accident) return
     try {
-      const res = await fetch(
-        `API_URL_BEapi/accident/${accident.id}/approve`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-        }
-      );
+      const res = await fetch(`http://localhost:8081/api/accident/${accident.id}/approve`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+      })
       if (!res.ok) {
-        throw new Error("Failed to approve");
+        throw new Error("Failed to approve")
       }
-      const updatedData = await res.json();
+      const updatedData = await res.json()
       setAccident({
         ...updatedData,
         camera: {
@@ -226,23 +194,21 @@ export default function AccidentDetailsTable() {
         userFullName: updatedData.userFullName || "No data",
         userEmail: updatedData.userEmail || "No data",
         licensePlate: updatedData.licensePlate || "No data",
-        status: updatedData.status
-          ? updatedData.status.toLowerCase()
-          : "unknown",
-      });
-      toast.success("Accident approved!");
-      navigate("/accidentdashboard");
+        status: updatedData.status ? updatedData.status.toLowerCase() : "unknown",
+      })
+      toast.success("Accident approved!")
+      navigate("/accidentdashboard")
     } catch (error) {
-      console.error("Error approving accident:", error);
-      toast.error("An error occurred while approving the accident.");
+      console.error("Error approving accident:", error)
+      toast.error("An error occurred while approving the accident.")
     }
-  };
+  }
 
   const handleRefresh = async () => {
-    setRefreshing(true);
+    setRefreshing(true)
     try {
-      const res = await fetch(`API_URL_BEapi/accident/${id}`);
-      const data = await res.json();
+      const res = await fetch(`http://localhost:8081/api/accident/${id}`)
+      const data = await res.json()
       setAccident({
         ...data,
         camera: { id: data.cameraId, name: data.cameraName || "Unknown" },
@@ -252,31 +218,24 @@ export default function AccidentDetailsTable() {
         userEmail: data.userEmail || "No data",
         licensePlate: data.licensePlate || "No data",
         status: data.status ? data.status.toLowerCase() : "unknown",
-      });
-      setEditDescription(data.description || "");
-      setDisplayImageUrl(
-        data.imageUrl ? `${data.imageUrl}?t=${Date.now()}` : null
-      );
-      toast.success("Data refreshed successfully!");
+      })
+      setEditDescription(data.description || "")
+      setDisplayImageUrl(data.imageUrl ? `${data.imageUrl}?t=${Date.now()}` : null)
+      toast.success("Data refreshed successfully!")
     } catch (error) {
-      console.error("Error refreshing data:", error);
-      toast.error("Unable to refresh data.");
+      console.error("Error refreshing data:", error)
+      toast.error("Unable to refresh data.")
     } finally {
-      setRefreshing(false);
+      setRefreshing(false)
     }
-  };
+  }
 
   if (loading) {
-    return <LoadingScreen />;
+    return <LoadingScreen />
   }
 
   if (error || !accident) {
-    return (
-      <ErrorScreen
-        error={error || "Accident Not Found"}
-        onBackClick={() => navigate("/accidentdashboard")}
-      />
-    );
+    return <ErrorScreen error={error || "Accident Not Found"} onBackClick={() => navigate("/accidentdashboard")} />
   }
 
   return (
@@ -294,12 +253,7 @@ export default function AccidentDetailsTable() {
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center space-x-4">
                   <div className="w-16 h-16 bg-gradient-to-br from-red-500 via-rose-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg shadow-red-500/40 animate-pulse">
-                    <svg
-                      className="w-8 h-8 text-white"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
+                    <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -313,12 +267,7 @@ export default function AccidentDetailsTable() {
                       Accident #{accident.id}
                     </h1>
                     <p className="text-gray-600 flex items-center mt-1">
-                      <svg
-                        className="w-4 h-4 mr-1 text-blue-500"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
+                      <svg className="w-4 h-4 mr-1 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path
                           strokeLinecap="round"
                           strokeLinejoin="round"
@@ -328,10 +277,7 @@ export default function AccidentDetailsTable() {
                       </svg>
                       Recorded at{" "}
                       {accident.accidentTime
-                        ? format(
-                            new Date(accident.accidentTime),
-                            "dd/MM/yyyy 'at' HH:mm:ss"
-                          )
+                        ? format(new Date(accident.accidentTime), "dd/MM/yyyy 'at' HH:mm:ss")
                         : "N/A"}
                     </p>
                   </div>
@@ -343,13 +289,10 @@ export default function AccidentDetailsTable() {
                     } ${getStatusColor(accident.status).text} font-medium`}
                   >
                     {getStatusColor(accident.status).icon}
-                    <span className="ml-2 capitalize">
-                      {accident.status || "Pending"}
-                    </span>
+                    <span className="ml-2 capitalize">{accident.status || "Pending"}</span>
                   </div>
                 </div>
               </div>
-
               {/* Action Buttons */}
               <div className="flex flex-wrap gap-3">
                 <button
@@ -358,12 +301,7 @@ export default function AccidentDetailsTable() {
                   aria-label="Back to dashboard"
                 >
                   <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></span>
-                  <svg
-                    className="w-4 h-4 mr-2 text-blue-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
+                  <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -383,8 +321,7 @@ export default function AccidentDetailsTable() {
                   <RefreshCw size={16} className={refreshing ? "animate-spin mr-2" : "mr-2"} />
                   Refresh
                 </button>
-                
-                {/* Chỉ hiển thị Edit Detail khi status là pending */}
+                {/* Only show Edit Detail when status is pending */}
                 {accident.status === "pending" && (
                   <>
                     {!isEditing ? (
@@ -394,12 +331,7 @@ export default function AccidentDetailsTable() {
                         aria-label="Edit detail"
                       >
                         <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></span>
-                        <svg
-                          className="w-4 h-4 mr-2"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
+                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path
                             strokeLinecap="round"
                             strokeLinejoin="round"
@@ -424,18 +356,8 @@ export default function AccidentDetailsTable() {
                           aria-label="Save changes"
                         >
                           <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></span>
-                          <svg
-                            className="w-4 h-4 mr-2"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M5 13l4 4L19 7"
-                            />
+                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                           </svg>
                           Save Changes
                         </button>
@@ -449,12 +371,7 @@ export default function AccidentDetailsTable() {
                           aria-label="Cancel edit"
                         >
                           <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></span>
-                          <svg
-                            className="w-4 h-4 mr-2"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
+                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path
                               strokeLinecap="round"
                               strokeLinejoin="round"
@@ -470,13 +387,12 @@ export default function AccidentDetailsTable() {
                 )}
               </div>
             </motion.div>
-
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Media Section */}
               <div className="lg:col-span-2 space-y-6">
                 {/* Image */}
                 {displayImageUrl ? (
-                  <motion.div 
+                  <motion.div
                     className="bg-gradient-to-br from-white/95 to-blue-100/95 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-blue-200/50 transform hover:scale-[1.02] transition-all duration-300"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
@@ -484,12 +400,7 @@ export default function AccidentDetailsTable() {
                   >
                     <h3 className="text-xl font-bold bg-gradient-to-r from-blue-800 to-cyan-600 bg-clip-text text-transparent mb-4 flex items-center">
                       <div className="w-6 h-6 mr-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center animate-pulse-slow">
-                        <svg
-                          className="w-4 h-4 text-white"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
+                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path
                             strokeLinecap="round"
                             strokeLinejoin="round"
@@ -502,7 +413,7 @@ export default function AccidentDetailsTable() {
                     </h3>
                     <div className="relative group">
                       <img
-                        src={displayImageUrl}
+                        src={displayImageUrl || "/placeholder.svg"}
                         alt="Accident Image"
                         className="w-full h-auto rounded-xl border-2 border-blue-200/50 cursor-pointer transition-all duration-300 group-hover:border-blue-400 group-hover:shadow-2xl group-hover:shadow-blue-400/40"
                         loading="lazy"
@@ -516,7 +427,7 @@ export default function AccidentDetailsTable() {
                     </div>
                   </motion.div>
                 ) : (
-                  <motion.div 
+                  <motion.div
                     className="bg-gradient-to-br from-white/95 to-gray-100/95 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-gray-200/50"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
@@ -524,12 +435,7 @@ export default function AccidentDetailsTable() {
                   >
                     <div className="text-center py-16 text-gray-500">
                       <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-gray-400 to-blue-400 rounded-full flex items-center justify-center animate-pulse">
-                        <svg
-                          className="w-10 h-10 text-white"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
+                        <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path
                             strokeLinecap="round"
                             strokeLinejoin="round"
@@ -542,10 +448,9 @@ export default function AccidentDetailsTable() {
                     </div>
                   </motion.div>
                 )}
-
                 {/* Video */}
                 {accident.videoUrl ? (
-                  <motion.div 
+                  <motion.div
                     className="bg-gradient-to-br from-white/95 to-blue-100/95 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-blue-200/50 transform hover:scale-[1.02] transition-all duration-300"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
@@ -553,12 +458,7 @@ export default function AccidentDetailsTable() {
                   >
                     <h3 className="text-xl font-bold bg-gradient-to-r from-blue-800 to-cyan-600 bg-clip-text text-transparent mb-4 flex items-center">
                       <div className="w-6 h-6 mr-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center animate-pulse-slow">
-                        <svg
-                          className="w-4 h-4 text-white"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
+                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path
                             strokeLinecap="round"
                             strokeLinejoin="round"
@@ -573,7 +473,7 @@ export default function AccidentDetailsTable() {
                       <video
                         src={accident.videoUrl}
                         controls
-                        className="w-full rounded-xl border-2 border-blue-200/50 transition-all duration-300 hover:border-blue-400 hover:shadow-2xl hover:shadow-blue-400/40"
+                        className="w-full rounded-xl border-2 border-blue-200/50 transition-all duration-300 hover:border-blue-400 hover:shadow-2xl hover:hover:shadow-blue-400/40"
                         preload="metadata"
                       >
                         Your browser does not support the video tag.
@@ -581,7 +481,7 @@ export default function AccidentDetailsTable() {
                     </div>
                   </motion.div>
                 ) : (
-                  <motion.div 
+                  <motion.div
                     className="bg-gradient-to-br from-white/95 to-gray-100/95 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-gray-200/50"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
@@ -589,12 +489,7 @@ export default function AccidentDetailsTable() {
                   >
                     <div className="text-center py-16 text-gray-500">
                       <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-gray-400 to-blue-400 rounded-full flex items-center justify-center animate-pulse">
-                        <svg
-                          className="w-10 h-10 text-white"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
+                        <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path
                             strokeLinecap="round"
                             strokeLinejoin="round"
@@ -607,8 +502,7 @@ export default function AccidentDetailsTable() {
                     </div>
                   </motion.div>
                 )}
-
-                {/* Update Status Section - Chỉ hiển thị khi status là pending */}
+                {/* Update Status Section - Only show when status is pending */}
                 {accident.status === "pending" && (
                   <motion.div
                     className="bg-gradient-to-br from-white/95 to-blue-100/95 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-blue-200/50"
@@ -618,12 +512,7 @@ export default function AccidentDetailsTable() {
                   >
                     <h3 className="text-xl font-bold bg-gradient-to-r from-blue-800 to-cyan-600 bg-clip-text text-transparent mb-4 flex items-center">
                       <div className="w-6 h-6 mr-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center animate-pulse-slow">
-                        <svg
-                          className="w-4 h-4 text-white"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
+                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path
                             strokeLinecap="round"
                             strokeLinejoin="round"
@@ -632,7 +521,7 @@ export default function AccidentDetailsTable() {
                           />
                         </svg>
                       </div>
-                      Update Status 
+                      Update Status
                     </h3>
                     <button
                       onClick={handleApprove}
@@ -640,25 +529,14 @@ export default function AccidentDetailsTable() {
                       aria-label="Approve accident"
                     >
                       <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></span>
-                      <svg
-                        className="w-4 h-4 mr-2"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M5 13l4 4L19 7"
-                        />
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
                       Approve
                     </button>
                   </motion.div>
                 )}
               </div>
-              
               {/* Details Section */}
               <div className="space-y-6">
                 {/* Vehicle Owner Information */}
@@ -676,9 +554,7 @@ export default function AccidentDetailsTable() {
                   </h3>
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                      <span className="text-blue-700 font-medium">
-                        Full Name:
-                      </span>
+                      <span className="text-blue-700 font-medium">Full Name:</span>
                       <span className="font-semibold text-blue-900 bg-blue-100/80 px-3 py-1 rounded-xl">
                         {accident.userFullName}
                       </span>
@@ -690,16 +566,13 @@ export default function AccidentDetailsTable() {
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-blue-700 font-medium">
-                        License Plate:
-                      </span>
+                      <span className="text-blue-700 font-medium">License Plate:</span>
                       <span className="font-semibold text-blue-900 font-mono bg-blue-100/80 px-3 py-1 rounded-xl">
                         {accident.licensePlate}
                       </span>
                     </div>
                   </div>
                 </motion.div>
-
                 {/* Incident Information */}
                 <motion.div
                   className="bg-gradient-to-br from-white/95 to-blue-100/95 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-blue-200/50"
@@ -711,34 +584,25 @@ export default function AccidentDetailsTable() {
                     <div className="w-6 h-6 mr-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center animate-pulse-slow">
                       <Calendar className="w-4 h-4 text-white" />
                     </div>
-                    Incident Information
+                    Accident Information
                   </h3>
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-blue-700 font-medium mb-1">
-                        Incident Time:
-                      </label>
+                      <label className="block text-blue-700 font-medium mb-1">Accident Time:</label>
                       <span className="font-semibold text-blue-900 bg-blue-100/80 px-3 py-1 rounded-xl flex items-center">
                         <Clock className="w-4 h-4 mr-2 text-blue-500" />
-                        {format(
-                          new Date(accident.accidentTime),
-                          "dd/MM/yyyy HH:mm:ss"
-                        )}
+                        {format(new Date(accident.accidentTime), "dd/MM/yyyy HH:mm:ss")}
                       </span>
                     </div>
                     <div>
-                      <label className="block text-blue-700 font-medium mb-1">
-                        Location:
-                      </label>
+                      <label className="block text-blue-700 font-medium mb-1">Location:</label>
                       <span className="font-semibold text-blue-900 bg-blue-100/80 px-3 py-1 rounded-xl flex items-center">
                         <MapPin className="w-4 h-4 mr-2 text-blue-500" />
                         {accident.location || "N/A"}
                       </span>
                     </div>
                     <div>
-                      <label className="block text-blue-700 font-medium mb-1">
-                        Camera:
-                      </label>
+                      <label className="block text-blue-700 font-medium mb-1">Camera:</label>
                       <span className="font-semibold text-blue-900 bg-blue-100/80 px-3 py-1 rounded-xl flex items-center">
                         <Camera className="w-4 h-4 mr-2 text-blue-500" />
                         {accident.camera.name}
@@ -746,7 +610,6 @@ export default function AccidentDetailsTable() {
                     </div>
                   </div>
                 </motion.div>
-
                 {/* Description */}
                 <motion.div
                   className="bg-gradient-to-br from-white/95 to-blue-100/95 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-blue-200/50"
@@ -758,26 +621,43 @@ export default function AccidentDetailsTable() {
                     <div className="w-6 h-6 mr-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center animate-pulse-slow">
                       <FileText className="w-4 h-4 text-white" />
                     </div>
-                    Incident Description
+                    Accident Description
                   </h3>
                   {isEditing ? (
-                    <Textarea
-                      value={editDescription}
-                      onChange={(e) => setEditDescription(e.target.value)}
-                      className="w-full border border-blue-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/70 backdrop-blur-sm transition-all duration-300 min-h-[150px]"
-                      rows={5}
-                    />
+                    <div>
+                      <Textarea
+                        value={editDescription}
+                        onChange={(e) => {
+                          setEditDescription(e.target.value)
+                          // Validate immediately as user types
+                          const validationError = validateDescription(e.target.value)
+                          setDescriptionError(validationError)
+                        }}
+                        className={`w-full border rounded-xl px-4 py-2 focus:outline-none focus:ring-2 bg-white/70 backdrop-blur-sm transition-all duration-300 min-h-[150px] ${
+                          descriptionError ? "border-red-500 focus:ring-red-500" : "border-blue-300 focus:ring-blue-500"
+                        }`}
+                        rows={5}
+                      />
+                      {descriptionError && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.3 }}
+                          className="mt-2 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg flex items-center gap-2 shadow-sm"
+                        >
+                          <AlertTriangle className="h-5 w-5 flex-shrink-0" />
+                          <p className="text-sm font-medium">{descriptionError}</p>
+                        </motion.div>
+                      )}
+                    </div>
                   ) : (
                     <div className="bg-blue-50/80 backdrop-blur-sm rounded-xl p-4">
-                      <p className="text-blue-700">
-                        {accident.description || "No description available"}
-                      </p>
+                      <p className="text-blue-700">{accident.description || "No description available"}</p>
                     </div>
                   )}
                 </motion.div>
               </div>
             </div>
-
             {/* Image Expanded Modal */}
             {imageExpanded && displayImageUrl && (
               <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4 animate-fade-in">
@@ -787,22 +667,12 @@ export default function AccidentDetailsTable() {
                     className="absolute top-4 right-4 text-white hover:text-blue-300 transition-colors duration-300 bg-black/50 rounded-full p-2"
                     aria-label="Close image"
                   >
-                    <svg
-                      className="w-8 h-8"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
-                      />
+                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
                   <img
-                    src={displayImageUrl}
+                    src={displayImageUrl || "/placeholder.svg"}
                     alt="Accident Image"
                     className="max-w-full max-h-full object-contain rounded-xl border-2 border-blue-200/50 shadow-2xl shadow-blue-400/40"
                     onClick={() => setImageExpanded(false)}
@@ -810,7 +680,6 @@ export default function AccidentDetailsTable() {
                 </div>
               </div>
             )}
-
             {/* Confirmation Dialog */}
             <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
               <DialogContent className="bg-white border-2 border-blue-200 shadow-2xl rounded-2xl p-8">
@@ -822,8 +691,7 @@ export default function AccidentDetailsTable() {
                     Confirm Changes
                   </DialogTitle>
                   <DialogDescription className="text-center text-gray-600 text-lg">
-                    Are you sure you want to save the updated description? This
-                    action cannot be undone.
+                    Are you sure you want to save the updated description? This action cannot be undone.
                   </DialogDescription>
                 </DialogHeader>
                 <DialogFooter className="flex justify-center gap-4 mt-8">
@@ -848,5 +716,5 @@ export default function AccidentDetailsTable() {
         </div>
       </div>
     </div>
-  );
+  )
 }

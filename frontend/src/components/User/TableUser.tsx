@@ -194,7 +194,7 @@ export default function TableUser() {
       }
 
       const response = await fetch(
-        `${API_BASE_URL}/users/${userId}`,
+        `${API_BASE_URL}api/users/${userId}`,
         {
           method: 'PUT',
           headers: {
@@ -239,7 +239,7 @@ export default function TableUser() {
   const confirmDeleteUser = async (userId: number) => {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/users/${userId}`,
+        `${API_BASE_URL}api/users/${userId}`,
         {
           method: 'DELETE',
           headers: {
@@ -284,7 +284,7 @@ export default function TableUser() {
       }
 
       const response = await fetch(
-        `${API_BASE_URL}/users/${userId}`,
+        `${API_BASE_URL}api/users/${userId}`,
         {
           method: 'PUT',
           headers: {
@@ -329,7 +329,7 @@ export default function TableUser() {
   useEffect(() => {
     const fetchRoles = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/roles`, {
+        const response = await fetch(`${API_BASE_URL}api/roles`, {
           headers: authHeader.headers
         });
 
@@ -355,7 +355,7 @@ export default function TableUser() {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/users`, {
+        const response = await fetch(`${API_BASE_URL}api/users`, {
           headers: authHeader.headers
         });
 

@@ -5,6 +5,8 @@ import GenericTable, { TableColumn, TableAction, FilterConfig } from '../../comp
 import ConfirmDialog from '../UI/PopUp/ConfirmDialog';
 import DeleteButton from '../Button/DeleteButton';
 import EditButton from '../Button/EditButton';
+import API_URL_BE from "../../components/Link/LinkAPI";
+
 
 interface Vehicle {
   id: number;
@@ -42,7 +44,7 @@ export default function TableVehicle() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetch('API_URL_BEapi/vehicle')
+    fetch(API_URL_BE + 'api/vehicle')
       .then(res => res.json())
       .then(data => {
         setVehicles(data);
@@ -96,7 +98,7 @@ export default function TableVehicle() {
 
   const confirmDelete = async (id: number) => {
     try {
-      const res = await fetch(`API_URL_BEapi/vehicle/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${API_URL_BE}api/vehicle/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Delete failed');
       setVehicles(prev => prev.filter(x => x.id !== id));
       setConfirmDialog(prev => ({ ...prev, isOpen: false }));

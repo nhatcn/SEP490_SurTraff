@@ -6,6 +6,8 @@ import {
   Chart as ChartJS,
 } from 'chart.js';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
+import API_URL_BE from "../../components/Link/LinkAPI";
+
 
 Chart.register(...registerables, ChartDataLabels);
 
@@ -33,7 +35,7 @@ export default function TableVehicleTracking() {
   const chartInstanceRef = useRef<ChartJS<'bar'> | null>(null);
 
   useEffect(() => {
-    fetch('API_URL_BEapi/vehicle-tracking/all')
+    fetch(API_URL_BE + 'api/vehicle-tracking/all')
       .then(res => res.json())
       .then(data => setData(data))
       .catch(() => {});

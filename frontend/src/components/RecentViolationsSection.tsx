@@ -4,6 +4,8 @@ import { Car, Clock, MapPin, AlertTriangle, CheckCircle, XCircle, Activity, Arro
 import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import { getCookie } from "../utils/cookieUltil"
+import API_URL_BE from "../components/Link/LinkAPI";
+
 
 interface Violation {
   id: number
@@ -55,7 +57,7 @@ export default function RecentViolationsSection({
         if (!userId) {
           throw new Error("User ID not found in cookie")
         }
-        const response = await fetch(`API_URL_BEapi/violations/user/${userId}`)
+        const response = await fetch(`${API_URL_BE}api/violations/user/${userId}`)
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`)
         }
@@ -102,7 +104,7 @@ export default function RecentViolationsSection({
     setRequestingId(id)
     setRequestMessage(null)
     try {
-      const response = await fetch(`API_URL_BEapi/violations/${id}/request`, {
+      const response = await fetch(`${API_URL_BE}api/violations/${id}/request`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
