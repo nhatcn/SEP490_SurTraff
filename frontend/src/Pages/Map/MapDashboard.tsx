@@ -5,8 +5,7 @@ import {
   Marker,
   Popup,
   LayersControl,
-  ZoomControl,
-  CircleMarker
+  ZoomControl
 } from "react-leaflet";
 import L, { Icon } from "leaflet";
 import "leaflet/dist/leaflet.css";

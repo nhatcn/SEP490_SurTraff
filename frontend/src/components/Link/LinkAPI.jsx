@@ -1,2 +1,2 @@
-const API_URL_BE ='http://localhost:8081/'
+const API_URL_BE = environment.REACT_APP_API_URL_BE ;
 export default API_URL_BE;

@@ -1,9 +1,7 @@
 import { useState, useEffect, ReactNode } from 'react';
-import { Trash2 } from 'lucide-react';
 import GenericTable, { TableColumn, FilterConfig } from '../../components/Table/GenericTable';
 import ConfirmDialog from '../UI/PopUp/ConfirmDialog';
 import DeleteButton from '../Button/DeleteButton';
-import EditButton from '../Button/EditButton';
 import API_URL_BE from '../Link/LinkAPI';
 
 // Hàm helper để lấy cookie
@@ -44,32 +42,6 @@ interface TableAction<T> {
   onClick: (record: T) => void;
 }
 
-// Extend GenericTableProps to include getRowClassName
-interface GenericTableProps<T> {
-  data: T[];
-  filteredData: T[];
-  columns: TableColumn<T>[];
-  rowKey: keyof T;
-  actions: TableAction<T>[];
-  filters: FilterConfig[];
-  filterValues: FilterState;
-  onFilterChange: (type: string, value: string) => void;
-  onResetFilters: () => void;
-  loading: boolean;
-  error: string | null;
-  onRetry: () => void;
-  emptyMessage: string;
-  pagination: {
-    enabled: boolean;
-    currentPage: number;
-    totalPages: number;
-    pageSize: number;
-    totalItems: number;
-    onPageChange: (page: number) => void;
-    onPageSizeChange: (pageSize: number) => void;
-  };
-  getRowClassName?: (record: T) => string;
-}
 
 export default function TableUser() {
   const [users, setUsers] = useState<User[]>([]);
@@ -194,7 +166,7 @@ export default function TableUser() {
       }
 
       const response = await fetch(
-        `${API_BASE_URL}/users/${userId}`,
+        `${API_BASE_URL}api/users/${userId}`,
         {
           method: 'PUT',
           headers: {
@@ -239,7 +211,7 @@ export default function TableUser() {
   const confirmDeleteUser = async (userId: number) => {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/users/${userId}`,
+        `${API_BASE_URL}api/users/${userId}`,
         {
           method: 'DELETE',
           headers: {
@@ -284,7 +256,7 @@ export default function TableUser() {
       }
 
       const response = await fetch(
-        `${API_BASE_URL}/users/${userId}`,
+        `${API_BASE_URL}api/users/${userId}`,
         {
           method: 'PUT',
           headers: {
@@ -329,7 +301,7 @@ export default function TableUser() {
   useEffect(() => {
     const fetchRoles = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/roles`, {
+        const response = await fetch(`${API_BASE_URL}api/roles`, {
           headers: authHeader.headers
         });
 
@@ -350,12 +322,12 @@ export default function TableUser() {
     };
 
     fetchRoles();
-  }, []);
+  }, [API_BASE_URL,token]);
 
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/users`, {
+        const response = await fetch(`${API_BASE_URL}api/users`, {
           headers: authHeader.headers
         });
 
@@ -407,7 +379,7 @@ export default function TableUser() {
     if (roleObjects.length > 0) {
       fetchUsers();
     }
-  }, [roleObjects]);
+  }, [roleObjects,API_BASE_URL,token]);
 
   const columns: TableColumn<User>[] = [
     {

@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { Shield, Eye, BarChart3, Camera, AlertTriangle, CheckCircle, Activity, Zap } from "lucide-react"
+import { Shield, Eye, BarChart3, Camera, Zap } from "lucide-react"
 import { useState, useEffect } from "react"
 import { Header, MobileDropdownMenu } from "../../components/Layout/Menu"
 import Footer from "../../components/Layout/Footer"
@@ -11,44 +11,8 @@ import { getCookie } from "../../utils/cookieUltil"
 import Chatbot from "../../components/Chatbot/chatbot"
 import API_URL_BE from "../../components/Link/LinkAPI"
 
-interface StatCard {
-  title: string
-  value: string
-  change: string
-  icon: React.ReactNode
-  color: string
-}
 
-const statsData: StatCard[] = [
-  {
-    title: "Active Cameras",
-    value: "1,247",
-    change: "+12%",
-    icon: <Camera className="w-6 h-6" />,
-    color: "from-blue-500 to-cyan-500",
-  },
-  {
-    title: "Violations Today",
-    value: "89",
-    change: "-8%",
-    icon: <AlertTriangle className="w-6 h-6" />,
-    color: "from-red-500 to-pink-500",
-  },
-  {
-    title: "Processed Cases",
-    value: "2,341",
-    change: "+15%",
-    icon: <CheckCircle className="w-6 h-6" />,
-    color: "from-green-500 to-emerald-500",
-  },
-  {
-    title: "System Uptime",
-    value: "99.9%",
-    change: "+0.1%",
-    icon: <Activity className="w-6 h-6" />,
-    color: "from-purple-500 to-indigo-500",
-  },
-]
+
 
 // Background Slideshow Component
 function BackgroundSlideshow() {

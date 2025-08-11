@@ -33,8 +33,7 @@ export default function CameraDashboard() {
     name: ""
   });
 
-  // Get unique locations for dropdown
-  const uniqueLocations = Array.from(new Set(cameras.map(camera => camera.location))).sort();
+ 
 
   useEffect(() => {
     // Fetch camera data from backend
@@ -66,7 +65,7 @@ export default function CameraDashboard() {
         setError("Failed to load cameras. Please try again later.");
         setLoading(false);
       });
-  }, []);
+  }, [selectedCamera]);
 
   const handleCameraClick = (camera: CameraType) => {
     setSelectedCamera(camera);

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Eye, Pencil } from 'lucide-react';
+import { Eye } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import GenericTable, { TableColumn, TableAction, FilterConfig } from '../../components/Table/GenericTable';
 import ConfirmDialog from '../UI/PopUp/ConfirmDialog';
 import DeleteButton from '../Button/DeleteButton';
-import EditButton from '../Button/EditButton';
+import API_URL_BE from '../Link/LinkAPI';
+
 
 interface Vehicle {
   id: number;
@@ -42,7 +43,7 @@ export default function TableVehicle() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetch('API_URL_BEapi/vehicle')
+    fetch(API_URL_BE+'api/vehicle')
       .then(res => res.json())
       .then(data => {
         setVehicles(data);
@@ -59,7 +60,7 @@ export default function TableVehicle() {
     const filtered = applyFilters(vehicles);
     setFilteredVehicles(filtered);
     setCurrentPage(1);
-  }, [vehicles, filters]);
+  });
 
   const applyFilters = (list: Vehicle[]) => {
     let filtered = list;
@@ -96,7 +97,7 @@ export default function TableVehicle() {
 
   const confirmDelete = async (id: number) => {
     try {
-      const res = await fetch(`API_URL_BEapi/vehicle/${id}`, { method: 'DELETE' });
+      const res = await fetch(API_URL_BE+`api/vehicle/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Delete failed');
       setVehicles(prev => prev.filter(x => x.id !== id));
       setConfirmDialog(prev => ({ ...prev, isOpen: false }));

@@ -1,10 +1,7 @@
 import { useEffect, useState } from "react";
 import Sidebar from "../../../components/Layout/Sidebar";
 import Header from "../../../components/Layout/Header";
-import { Eye, Trash2, Car } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import TableVehicle from "../../../components/Vehicle/TableVehicle";
-import AddVehicle from "./AddVehicle";
 import API_URL_BE from "../../../components/Link/LinkAPI";
 
 interface VehicleType {
@@ -18,9 +15,9 @@ interface VehicleType {
 }
 
 export default function VehicleDashboard() {
-  const navigate = useNavigate();
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [vehicles, setVehicles] = useState<VehicleType[]>([]);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshKey] = useState(0);
 
   // Fetch vehicles on mount and when refreshKey changes
   useEffect(() => {
@@ -38,12 +35,6 @@ export default function VehicleDashboard() {
     };
     fetchVehicles();
   }, [refreshKey]);
-
-  // Callback for when a new vehicle is added
-const handleVehicleAdded = (newVehicle: VehicleType) => {
-  setRefreshKey(prev => prev + 1);
-  navigate(`/vehicle/edit/${newVehicle.id}`);
-};
 
   return (
     <div className="flex h-screen">

@@ -340,7 +340,7 @@ const VehicleDetail = () => {
           <div className="relative group flex-grow flex items-center justify-center">
             <img
               src={imageSrc}
-              alt="Vehicle Image"
+              alt="Vehicle"
               className="w-full h-auto max-h-[300px] object-contain rounded-xl border-2 border-blue-200/50 cursor-pointer transition-all duration-300 group-hover:border-blue-400 group-hover:shadow-2xl group-hover:shadow-blue-400/40"
               onClick={() => setIsModalOpen(true)}
               onError={(e) => (e.currentTarget.src = 'https://via.placeholder.com/300')}
@@ -849,7 +849,7 @@ const VehicleDetail = () => {
                   </button>
                   <img
                     src={previewUrl}
-                    alt="Vehicle Image"
+                    alt="Vehicle"
                     className="max-w-full max-h-full object-contain rounded-xl border-2 border-blue-200/50 shadow-2xl shadow-blue-400/40"
                     onClick={() => setIsModalOpen(false)}
                     role="button"

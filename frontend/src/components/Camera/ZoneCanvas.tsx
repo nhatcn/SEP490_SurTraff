@@ -40,13 +40,12 @@ export default function ZoneCanvas({
     
     // Utilities
     getInstructionText,
-    getZoneRequirements,
+
     isFinishButtonDisabled,
     getFinishButtonText,
     
     // Coordinate conversion utilities
-    convertFromPercentageToDisplay,
-    convertFromDisplayToPercentage
+
   } = useZoneCanvas({
     zones,
     setZones,

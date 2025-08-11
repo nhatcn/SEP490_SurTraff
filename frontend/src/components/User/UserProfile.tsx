@@ -25,7 +25,6 @@ import {
   MapPin,
 } from "lucide-react"
 import { getCookie } from "../../utils/cookieUltil"
-import CryptoJS from "crypto-js"
 import API_URL_BE from "../Link/LinkAPI"
 
 interface UserData {
@@ -84,10 +83,6 @@ export default function UserProfile() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const userId = getCookie('userId')
 
-  // MD5 hash function (kept for new password hashing)
-  const hashMD5 = (text: string) => {
-    return CryptoJS.MD5(text).toString()
-  }
 
   useEffect(() => {
     if (userId) {
@@ -441,7 +436,7 @@ export default function UserProfile() {
                 className="w-24 h-24 rounded-2xl border-4 border-white shadow-lg overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 cursor-pointer"
                 onClick={() => fileInputRef.current?.click()}
               >
-                <img
+                <img alt=""
                   src={avatarPreview || user.avatar || "/api/placeholder/96/96"}
                   className="w-full h-full object-cover"
                   onError={(e) => {

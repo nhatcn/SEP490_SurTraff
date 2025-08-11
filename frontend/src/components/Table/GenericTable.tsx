@@ -1,4 +1,4 @@
-import { useState, useEffect, ReactNode } from 'react';
+import { useState,  ReactNode } from 'react';
 import { ChevronRight, ChevronLeft, Filter, AlertCircle, X } from 'lucide-react';
 
 // Generic interfaces

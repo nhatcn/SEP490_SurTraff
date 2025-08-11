@@ -2,7 +2,7 @@
 "use client"
 
 import type React from "react"
-import { Search, Bell, User, ChevronDown, Menu, X, Shield, LogOut, Eye } from "lucide-react"
+import { Search, User, ChevronDown, Menu, X, Shield, LogOut, Eye } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import Logo from "../../components/Logo/Logo"
@@ -25,7 +25,6 @@ interface UserData {
 
 const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
   const [showUserMenu, setShowUserMenu] = useState(false)
-  const [hoveredMenuItem, setHoveredMenuItem] = useState<string | null>(null)
   const [userData, setUserData] = useState<UserData | null>(null)
   const [loading, setLoading] = useState(true)
   const userMenuRef = useRef<HTMLDivElement>(null)

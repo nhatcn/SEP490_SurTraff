@@ -50,42 +50,53 @@ const AccidentStatistics: React.FC = () => {
   const chartContainerClass = "relative h-96 mb-6";
 
   return (
-    <div className="flex h-screen">
-      <Sidebar defaultActiveItem="statistics"/>
-      <div className="flex flex-col flex-1">
-        <Header title="Accident Statistics Dashboard" />
-        <div className="flex-1 overflow-y-auto">
-          <div className="p-6 min-h-full">
-            <div className="w-full">
-              <div className={chartContainerClass} style={{ height: 600, minHeight: 400, maxHeight: 700 }}>
-  <CardMapChart accidents={accidents} />
-</div>
-            </div>
-            {/* First Row */}
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 mb-8">
-              <div className="xl:col-span-8">
-                <div className={chartContainerClass}>
-                  <CardLineChart accidents={accidents} />
-                </div>
-              </div>
-              <div className="xl:col-span-4">
-                <div className={chartContainerClass}>
-                  <CardBarChart accidents={accidents} />
-                </div>
-              </div>
-            </div>
+  <div className="flex h-screen">
+    <Sidebar defaultActiveItem="statistics"/>
+    <div className="flex flex-col flex-1">
+      <Header title="Accident Statistics Dashboard" />
+      <div className="flex-1 overflow-y-auto">
+        <div className="p-6 min-h-full">
 
-            {/* Second Row - Full Width */}
-            <div className="w-full">
+          {/* Hiển thị loading hoặc error */}
+          {loading && (
+            <p className="text-gray-500 mb-4">Loading accident data...</p>
+          )}
+          {error && (
+            <p className="text-red-500 mb-4">{error}</p>
+          )}
+
+          <div className="w-full">
+            <div className={chartContainerClass} style={{ height: 600, minHeight: 400, maxHeight: 700 }}>
+              <CardMapChart accidents={accidents} />
+            </div>
+          </div>
+
+          {/* First Row */}
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 mb-8">
+            <div className="xl:col-span-8">
               <div className={chartContainerClass}>
-                <CardLineChart2 accidents={accidents} />
+                <CardLineChart accidents={accidents} />
               </div>
+            </div>
+            <div className="xl:col-span-4">
+              <div className={chartContainerClass}>
+                <CardBarChart accidents={accidents} />
+              </div>
+            </div>
+          </div>
+
+          {/* Second Row - Full Width */}
+          <div className="w-full">
+            <div className={chartContainerClass}>
+              <CardLineChart2 accidents={accidents} />
             </div>
           </div>
         </div>
       </div>
     </div>
-  );
+  </div>
+);  
+
 };
 
 export default AccidentStatistics;

@@ -68,13 +68,13 @@ const AddVehicle = () => {
     };
 
     fetchUserData();
-  }, [API_URL]);
+  }, []);
 
   // Fetch vehicle types from API
   useEffect(() => {
     const fetchVehicleTypes = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/violations/vehicle-types`, {
+        const response = await fetch(`${API_URL_BE}/api/violations/vehicle-types`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
         });
@@ -86,13 +86,13 @@ const AddVehicle = () => {
       }
     };
     fetchVehicleTypes();
-  }, [API_URL]);
+  }, []);
 
   // Fetch existing vehicles for the specific user to check license plates
   useEffect(() => {
     const fetchVehicles = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/vehicle/user/${formData.userId}`, {
+        const response = await fetch(`${API_URL_BE}/api/vehicle/user/${formData.userId}`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
         });
@@ -106,7 +106,7 @@ const AddVehicle = () => {
     if (formData.userId) {
       fetchVehicles();
     }
-  }, [API_URL, formData.userId]);
+  }, [ formData.userId]);
 
   const validateForm = () => {
     const newErrors = {};
@@ -184,7 +184,7 @@ const AddVehicle = () => {
     }
 
     try {
-      const response = await fetch(`${API_URL}/api/vehicle`, {
+      const response = await fetch(`${API_URL_BE}/api/vehicle`, {
         method: 'POST',
         body: formDataToSend,
       });

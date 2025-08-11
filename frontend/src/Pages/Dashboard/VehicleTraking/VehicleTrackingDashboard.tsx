@@ -6,31 +6,20 @@ import {
   Search,
   Car,
   MapPin,
-  Clock,
   X,
-  Eye,
   Upload,
   ImageIcon,
-  Zap,
-  Activity,
-  Route,
-  AlertCircle,
-  CheckCircle,
-  Play,
   Pause,
-  RotateCcw,
-  Download,
-  Share2,
   Maximize2,
   Camera,
   Navigation,
   Video,
   Monitor,
   Grid3X3,
-  Maximize,
+
   Minimize,
 } from "lucide-react"
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet"
+import { MapContainer, TileLayer, Marker, Popup} from "react-leaflet"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 import Sidebar from "../../../components/Layout/Sidebar"
@@ -44,19 +33,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 })
 
-// Custom icons for different marker types
-const cameraIcon = new L.Icon({
-  iconUrl: "data:image/svg+xml;base64," + btoa(`
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="blue" width="32" height="32">
-      <rect x="2" y="6" width="20" height="12" rx="2" fill="#3b82f6" stroke="white" stroke-width="1"/>
-      <circle cx="12" cy="12" r="3" fill="white"/>
-      <rect x="20" y="9" width="2" height="6" fill="#3b82f6"/>
-    </svg>
-  `),
-  iconSize: [32, 32],
-  iconAnchor: [16, 16],
-  popupAnchor: [0, -16]
-})
+
 
 const trackingIcon = new L.Icon({
   iconUrl: "data:image/svg+xml;base64=" + btoa(`
@@ -110,12 +87,6 @@ interface TrackingSession {
   totalCameras: number
 }
 
-interface LocationSearchResult {
-  display_name: string
-  lat: string
-  lon: string
-  boundingbox: string[]
-}
 
 // Vietnamese text normalization function
 const normalizeVietnamese = (text: string): string => {

@@ -13,7 +13,7 @@ import { useCameraForm } from "../../../hooks/Camera/useCameraForm";
 import { useCurrentLocation } from "../../../hooks/Camera/useCurrentLocation";
 import { useLocationSearch } from "../../../hooks/Camera/useLocationSearch";
 import { useZoneId } from "../../../hooks/Camera/useZoneId";
-import SubmitButton from "../../../components/Button/SubmitButton";
+
 
 const markerIconUrl = "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png";
 const markerShadowUrl = "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png";
@@ -112,7 +112,7 @@ export default function AddCamera() {
     return () => {
       cameraForm.cleanup();
     };
-  }, []);
+  }, [cameraForm]);
 
   const handleGetCurrentLocation = async () => {
     const result = await getCurrentLocationManually();

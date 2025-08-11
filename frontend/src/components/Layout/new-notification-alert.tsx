@@ -1,6 +1,6 @@
 "use client"
 
-import { Bell, AlertTriangle, Clock, Shield, X } from "lucide-react"
+import { Bell, AlertTriangle, X } from "lucide-react"
 import { useEffect } from "react"
 
 interface Notification {

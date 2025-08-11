@@ -4,8 +4,6 @@ import {
   Camera,
   LayoutDashboard,
   Users,
-  Settings,
-  Bell,
   Map,
   LogOut,
   ChevronLeft,

@@ -604,7 +604,7 @@ export default function EditCamera() {
         URL.revokeObjectURL(thumbnailUrl);
       }
     };
-  }, []);
+  }, [thumbnailUrl]);
 
   if (loading || isLoadingViolationTypes) {
     return (

@@ -11,8 +11,8 @@ import ExportViolationsPDF from "./ExportViolationsPDF";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Eye, Trash2, Camera, MapPin, Clock, Car, AlertTriangle, RefreshCw, TrendingUp, 
-  Filter, Download, BarChart3, Calendar, Search, X, ChevronDown, Sparkles,
-  Shield, Target, Zap, Activity, Globe, CheckCircle2, XCircle, ChevronLeft,
+  Filter, BarChart3, Calendar, Search, X, ChevronDown, Sparkles,
+  Target, Zap, Activity, Globe, CheckCircle2, XCircle, ChevronLeft,
   ChevronRight
 } from "lucide-react";
 import API_URL_BE from "../../components/Link/LinkAPI";
@@ -222,7 +222,7 @@ export default function ViolationList() {
     } finally {
       setLoading(false); // Fixed bug: was setLoading(true)
     }
-  }, [refreshKey]);
+  }, []);
 
   useEffect(() => {
     loadViolations();
@@ -908,7 +908,7 @@ export default function ViolationList() {
 
                   {/* Page numbers */}
                   {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    let pageNumber;
+                    let pageNumber: number;
                     if (totalPages <= 5) {
                       pageNumber = i + 1;
                     } else if (currentPage <= 3) {

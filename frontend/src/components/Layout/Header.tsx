@@ -1,7 +1,7 @@
 
 "use client"
 
-import { Search, Bell, User, ChevronDown, Activity, Clock } from "lucide-react"
+import { Search, Bell, User, ChevronDown, Clock } from "lucide-react"
 import { useState, useEffect } from "react"
 import { getCookie } from "../../utils/cookieUltil"
 import { useNavigate } from "react-router-dom"

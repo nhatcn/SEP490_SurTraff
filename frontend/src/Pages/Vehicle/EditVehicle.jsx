@@ -69,13 +69,13 @@ setFormData((prev) => ({ ...prev, userId: user.userId.toString() }));
     };
 
     fetchUserData();
-  }, [API_URL]);
+  }, []);
 
   // Fetch vehicle types
   useEffect(() => {
     const fetchVehicleTypes = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/violations/vehicle-types`, {
+        const response = await fetch(`${API_URL_BE}/api/violations/vehicle-types`, {
           headers: { 'Content-Type': 'application/json' },
         });
         if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
@@ -86,13 +86,13 @@ setFormData((prev) => ({ ...prev, userId: user.userId.toString() }));
       }
     };
     fetchVehicleTypes();
-  }, [API_URL]);
+  }, []);
 
   // Fetch vehicles for specific user
   useEffect(() => {
     const fetchVehicles = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/vehicle/user/${formData.userId}`, {
+        const response = await fetch(`${API_URL_BE}/api/vehicle/user/${formData.userId}`, {
           headers: { 'Content-Type': 'application/json' },
         });
         if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
@@ -106,7 +106,7 @@ setFormData((prev) => ({ ...prev, userId: user.userId.toString() }));
     if (formData.userId) {
       fetchVehicles();
     }
-  }, [API_URL, formData.userId]);
+  }, [ formData.userId]);
 
   // Fetch vehicle details
   useEffect(() => {
@@ -117,7 +117,7 @@ setFormData((prev) => ({ ...prev, userId: user.userId.toString() }));
       }
       setIsLoading(true);
       try {
-        const response = await fetch(`${API_URL}/api/vehicle/${id}`, {
+        const response = await fetch(`${API_URL_BE}/api/vehicle/${id}`, {
           headers: { 'Content-Type': 'application/json' },
         });
         if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
@@ -145,7 +145,7 @@ setFormData((prev) => ({ ...prev, userId: user.userId.toString() }));
     if (id) {
       fetchVehicle();
     }
-  }, [API_URL, id, formData.userId]);
+  }, [id, formData.userId]);
 
   const validateForm = () => {
     const newErrors = {};
@@ -234,7 +234,7 @@ setFormData((prev) => ({ ...prev, userId: user.userId.toString() }));
     }
 
     try {
-      const response = await fetch(`${API_URL}/api/vehicle/${id}`, {
+      const response = await fetch(`${API_URL_BE}/api/vehicle/${id}`, {
         method: 'PUT',
         body: formDataToSend,
       });
@@ -272,7 +272,7 @@ setFormData((prev) => ({ ...prev, userId: user.userId.toString() }));
     setSuccessMessage('');
     setErrorMessage('');
     try {
-      const response = await fetch(`${API_URL}/api/vehicle/${id}`, {
+      const response = await fetch(`${API_URL_BE}/api/vehicle/${id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
       });

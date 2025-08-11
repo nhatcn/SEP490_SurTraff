@@ -661,7 +661,7 @@ export default function ViolationDetail() {
                     <div className="relative group">
                       <img
                         src={violation.violationDetails[0].imageUrl}
-                        alt="Violation Image"
+                        alt="Violation"
                         className="w-full h-auto rounded-xl border-2 border-blue-200/50 cursor-pointer transition-all duration-300 group-hover:border-blue-400 group-hover:shadow-2xl group-hover:shadow-blue-400/40"
                         loading="lazy"
                         onClick={() => setImageExpanded(true)}
@@ -1198,7 +1198,7 @@ export default function ViolationDetail() {
                   </button>
                   <img
                     src={violation.violationDetails[0].imageUrl}
-                    alt="Violation Image"
+                    alt="Violation"
                     className="max-w-full max-h-full object-contain rounded-xl border-2 border-blue-200/50 shadow-2xl shadow-blue-400/40"
                     onClick={() => setImageExpanded(false)}
                   />

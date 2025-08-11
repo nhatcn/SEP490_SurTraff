@@ -14,7 +14,6 @@ import {
   Edit3,
   Save,
   X,
-  Check,
   ImageIcon,
   Video,
   Shield,

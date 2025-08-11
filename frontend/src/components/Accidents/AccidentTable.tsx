@@ -29,6 +29,7 @@ import {
 } from "lucide-react"
 import { format } from "date-fns"
 import ExportAccidentPDF from "../../components/Accidents/export-accident-pdf" // Import the new component
+import API_URL_BE from "../Link/LinkAPI"
 
 // Types
 interface AccidentType {
@@ -388,8 +389,7 @@ function GenericTable<T extends Record<string, any>>({
   )
 }
 
-// Constants
-const API_URL_ACCIDENTS = "http://localhost:8081"
+// Constant
 
 // ConfirmDialog Component (Placeholder, assuming it's defined elsewhere)
 const ConfirmDialog: React.FC<{
@@ -457,7 +457,7 @@ export default function AccidentTable() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`${API_URL_ACCIDENTS}/api/accident`, authHeader)
+      const res = await fetch(`${API_URL_BE}api/accident`, authHeader)
       if (!res.ok) {
         throw new Error(`HTTP error! status: ${res.status}`)
       }
@@ -795,7 +795,7 @@ export default function AccidentTable() {
     if (modalDeleteId === null) return
     setIsDeleting(true)
     try {
-      const res = await fetch(`${API_URL_ACCIDENTS}/api/accident/${modalDeleteId}`, {
+      const res = await fetch(`${API_URL_BE}api/accident/${modalDeleteId}`, {
         method: "DELETE",
         ...authHeader,
       })
@@ -833,7 +833,7 @@ export default function AccidentTable() {
     async (id: number) => {
       setIsProcessing(true)
       try {
-        const res = await fetch(`${API_URL_ACCIDENTS}/api/accident/${id}/process`, {
+        const res = await fetch(`${API_URL_BE}api/accident/${id}/process`, {
           method: "POST",
           ...authHeader,
         })
@@ -872,7 +872,7 @@ export default function AccidentTable() {
     async (id: number) => {
       setIsRejecting(true)
       try {
-        const res = await fetch(`${API_URL_ACCIDENTS}/api/accident/${id}/reject`, {
+        const res = await fetch(`${API_URL_BE}api/accident/${id}/reject`, {
           method: "POST",
           ...authHeader,
         })

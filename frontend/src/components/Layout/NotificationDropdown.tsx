@@ -124,7 +124,7 @@ const NotificationDropdown = () => {
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 140000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchNotifications]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -139,7 +139,7 @@ const NotificationDropdown = () => {
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () =>
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, [notifications]);
+  }, [notifications,startTitleMarquee]);
 
   useEffect(() => {
     return () => {
@@ -158,7 +158,7 @@ const NotificationDropdown = () => {
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [stopTitleMarquee]);
 
   const markAsRead = async (notificationId: number) => {
     try {

@@ -154,7 +154,7 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({
     }
 
     fetchUserData()
-  }, [API_URL_BE])
+  }, [])
 
   // Load vehicles list
   const loadVehicles = useCallback(async () => {
@@ -183,7 +183,7 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({
     } finally {
       setIsLoading(false)
     }
-  }, [API_URL_BE, userId])
+  }, [userId,])
 
   // Check violations for a specific license plate
   const checkViolations = useCallback(
@@ -206,7 +206,7 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({
         return []
       }
     },
-    [API_URL_BE]
+    []
   )
 
   // Check violations for all vehicles and show robot message
@@ -316,17 +316,9 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({
         setIsLoading(false)
       }
     },
-    [API_URL_BE]
+    []
   )
 
-  // Scroll to a specific vehicle row
-  const scrollToVehicle = useCallback((licensePlate: string) => {
-    const element = document.getElementById(`vehicle-${licensePlate}`)
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      setShowRobotMessage(false)
-    }
-  }, [])
 
   // Filter vehicles
   const filteredVehicles = useMemo(() => {

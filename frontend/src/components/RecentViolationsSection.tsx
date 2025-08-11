@@ -1,6 +1,6 @@
 "use client"
 
-import { Car, Clock, MapPin, AlertTriangle, CheckCircle, XCircle, Activity, ArrowLeft } from "lucide-react"
+import { Car, AlertTriangle, CheckCircle, XCircle, Activity, ArrowLeft } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import { getCookie } from "../utils/cookieUltil"
@@ -265,7 +265,7 @@ export default function RecentViolationsSection({
                             <div className="w-44">
                               {violation.status === "PROCESSED" ? (
                                 <button
-                                  onClick={() => navigate(`/violationsdetails/${violation.id}`)}
+                                  onClick={() => navigate(`/violationsuser/${violation.id}`)}
                                   className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-2 px-4 rounded-xl transition-all duration-300 font-semibold shadow-md hover:shadow-lg"
                                   aria-label={`View details for violation ${violation.id}`}
                                 >

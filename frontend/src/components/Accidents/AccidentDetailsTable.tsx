@@ -3,36 +3,21 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
-  ArrowLeft,
   Calendar,
   Camera,
   User,
-  Mail,
-  Car,
   MapPin,
   Clock,
-  Edit3,
   Save,
-  X,
-  Check,
-  ImageIcon,
-  Video,
-  Shield,
   FileText,
-  Sparkles,
   Eye,
-  AlertTriangle,
+
   CheckCircle2,
   XCircle,
   RefreshCw,
 } from "lucide-react";
 import { Button } from "../../components/UI/AccidentUI/button";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-} from "../../components/UI/AccidentUI/card";
+
 import { Textarea } from "../../components/UI/AccidentUI/textarea";
 import {
   Dialog,
@@ -46,12 +31,11 @@ import {
   LoadingScreen,
   ErrorScreen,
 } from "../../components/UI/AccidentUI/loading";
-import { getStatusBadge } from "../../components/Accidents/status-badge";
-import { getYouTubeEmbedUrl } from "../../components/Accidents/video-utils";
 import type { AccidentType } from "../../types/Accident/accident";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
 import { toast } from "react-toastify";
+import API_URL_BE from "../Link/LinkAPI";
 
 export default function AccidentDetailsTable() {
   const { id } = useParams();
@@ -63,7 +47,6 @@ export default function AccidentDetailsTable() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [imageLoading, setImageLoading] = useState(true);
-  const [imageKey, setImageKey] = useState(Date.now());
   const [displayImageUrl, setDisplayImageUrl] = useState<string | null>(null);
   const [descriptionError, setDescriptionError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -126,7 +109,7 @@ export default function AccidentDetailsTable() {
       setImageLoading(true);
       setDisplayImageUrl(null);
       try {
-        const res = await fetch(`API_URL_BEapi/accident/${id}`);
+        const res = await fetch(API_URL_BE+`api/accident/${id}`);
         const data = await res.json();
         setAccident({
           ...data,
@@ -165,7 +148,7 @@ export default function AccidentDetailsTable() {
     try {
       const updatedAccident = { description: editDescription };
       const res = await fetch(
-        `API_URL_BEapi/accident/${accident.id}`,
+        API_URL_BE+`api/accident/${accident.id}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -205,7 +188,7 @@ export default function AccidentDetailsTable() {
     if (!accident) return;
     try {
       const res = await fetch(
-        `API_URL_BEapi/accident/${accident.id}/approve`,
+        API_URL_BE+`api/accident/${accident.id}/approve`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -241,7 +224,7 @@ export default function AccidentDetailsTable() {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      const res = await fetch(`API_URL_BEapi/accident/${id}`);
+      const res = await fetch(API_URL_BE+`api/accident/${id}`);
       const data = await res.json();
       setAccident({
         ...data,
@@ -503,7 +486,7 @@ export default function AccidentDetailsTable() {
                     <div className="relative group">
                       <img
                         src={displayImageUrl}
-                        alt="Accident Image"
+                        alt="Accident"
                         className="w-full h-auto rounded-xl border-2 border-blue-200/50 cursor-pointer transition-all duration-300 group-hover:border-blue-400 group-hover:shadow-2xl group-hover:shadow-blue-400/40"
                         loading="lazy"
                         onClick={() => setImageExpanded(true)}
@@ -803,7 +786,7 @@ export default function AccidentDetailsTable() {
                   </button>
                   <img
                     src={displayImageUrl}
-                    alt="Accident Image"
+                    alt="Accident"
                     className="max-w-full max-h-full object-contain rounded-xl border-2 border-blue-200/50 shadow-2xl shadow-blue-400/40"
                     onClick={() => setImageExpanded(false)}
                   />
