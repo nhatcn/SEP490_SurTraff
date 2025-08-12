@@ -48,9 +48,6 @@ const trackingIcon = new L.Icon({
 })
 
 interface VehicleInfo {
-  brand: string
-  licensePlate: string
-  color: string
   searchImage?: File | null
 }
 
@@ -83,7 +80,7 @@ interface TrackingSession {
   vehicle: VehicleInfo
   startTime: string
   status: "active" | "inactive"
-  searchMethod: "text" | "image"
+  searchMethod: "image"
   totalCameras: number
 }
 
@@ -98,16 +95,11 @@ const normalizeVietnamese = (text: string): string => {
 
 export default function VehicleTrackingDashboard() {
   const [vehicleInfo, setVehicleInfo] = useState<VehicleInfo>({
-    brand: "",
-    licensePlate: "",
-    color: "",
     searchImage: null,
   })
 
   const [isTracking, setIsTracking] = useState(false)
   const [trackingSession, setTrackingSession] = useState<TrackingSession | null>(null)
-  const [searchHistory, setSearchHistory] = useState<VehicleInfo[]>([])
-  const [searchMethod, setSearchMethod] = useState<"text" | "image">("text")
   const [dragActive, setDragActive] = useState(false)
   const [viewMode, setViewMode] = useState<"grid" | "map" | "single">("grid")
   const [selectedCameraId, setSelectedCameraId] = useState<number | null>(null)
@@ -124,7 +116,6 @@ export default function VehicleTrackingDashboard() {
   // Location search states
   const [locationSearchQuery, setLocationSearchQuery] = useState("")
   const [filteredCameras, setFilteredCameras] = useState<CameraData[]>([])
-  const [selectedCameraIds, setSelectedCameraIds] = useState<number[]>([])
 
   // Load cameras from API
   useEffect(() => {
@@ -180,20 +171,12 @@ export default function VehicleTrackingDashboard() {
     }
   }
 
-  const handleInputChange = (field: keyof VehicleInfo, value: string) => {
-    setVehicleInfo((prev) => ({
-      ...prev,
-      [field]: value,
-    }))
-  }
-
   const handleImageUpload = (file: File) => {
     if (file && file.type.startsWith("image/")) {
       setVehicleInfo((prev) => ({
         ...prev,
         searchImage: file,
       }))
-      setSearchMethod("image")
     }
   }
 
@@ -217,29 +200,17 @@ export default function VehicleTrackingDashboard() {
     }
   }
 
-  const handleCameraSelect = (cameraId: number) => {
-    setSelectedCameraIds(prev => {
-      if (prev.includes(cameraId)) {
-        return prev.filter(id => id !== cameraId)
-      } else {
-        return [...prev, cameraId]
-      }
-    })
-  }
-
   const handleStartTracking = async () => {
-    if (selectedCameraIds.length === 0) {
-      alert("Please select at least one camera for tracking");
-      return;
-    }
-
-    if (searchMethod === "text" && !vehicleInfo.licensePlate.trim()) {
-      alert("Please enter license plate number or upload an image");
-      return;
-    }
-
-    if (searchMethod === "image" && !vehicleInfo.searchImage) {
+    if (!vehicleInfo.searchImage) {
       alert("Please upload an image to search");
+      return;
+    }
+
+    // Get all active cameras automatically
+    const activeCameraIds = filteredCameras.filter(camera => camera.status).map(camera => camera.id);
+    
+    if (activeCameraIds.length === 0) {
+      alert("No active cameras available for tracking");
       return;
     }
 
@@ -247,53 +218,22 @@ export default function VehicleTrackingDashboard() {
     setTrackingSession(null);
 
     try {
-      let response;
+      // Use FormData for image search
+      const formData = new FormData();
 
-      if (searchMethod === "image") {
-        // Use FormData for image search
-        const formData = new FormData();
+      // Send camera_ids as a proper JSON string - use all active cameras
+      formData.append("camera_ids_form", JSON.stringify(activeCameraIds));
 
-        // Send camera_ids as a proper JSON string
-        formData.append("camera_ids_form", JSON.stringify(selectedCameraIds));
+      if (vehicleInfo.searchImage) formData.append("search_image", vehicleInfo.searchImage);
 
-        if (vehicleInfo.brand) formData.append("brand", vehicleInfo.brand);
-        if (vehicleInfo.licensePlate) formData.append("license_plate", vehicleInfo.licensePlate);
-        if (vehicleInfo.color) formData.append("color", vehicleInfo.color);
-        if (vehicleInfo.searchImage) formData.append("search_image", vehicleInfo.searchImage);
-
-        response = await fetch("http://localhost:8000/api/tracking/start_session", {
-          method: "POST",
-          body: formData,
-        });
-      } else {
-        // Use JSON body for text search
-        const body = {
-          camera_ids: selectedCameraIds, // This will be handled as JSON body parameter
-          brand: vehicleInfo.brand || undefined,
-          license_plate: vehicleInfo.licensePlate || undefined,
-          color: vehicleInfo.color || undefined,
-        };
-
-        response = await fetch("http://localhost:8000/api/tracking/start_session", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(body),
-        });
-      }
+      const response = await fetch("http://localhost:8000/api/tracking/start_session", {
+        method: "POST",
+        body: formData,
+      });
 
       if (response.ok) {
         const session: TrackingSession = await response.json();
         setTrackingSession(session);
-
-        if (searchMethod === "text" && vehicleInfo.licensePlate) {
-          setSearchHistory((prev) => {
-            const filtered = prev.filter((item) => item.licensePlate !== vehicleInfo.licensePlate);
-            return [vehicleInfo, ...filtered].slice(0, 5);
-          });
-        }
-
         setViewMode("grid");
       } else {
         const error = await response.json();
@@ -307,17 +247,16 @@ export default function VehicleTrackingDashboard() {
       setIsTracking(false);
     }
   };
+  
   const handleStopTracking = () => {
     setTrackingSession(null)
-    setSelectedCameraIds([])
     setFullscreenCamera(null)
     setSelectedCameraId(null)
   }
 
   const clearSearch = () => {
-    setVehicleInfo({ brand: "", licensePlate: "", color: "", searchImage: null })
+    setVehicleInfo({ searchImage: null })
     setTrackingSession(null)
-    setSelectedCameraIds([])
     setFullscreenCamera(null)
     setSelectedCameraId(null)
   }
@@ -332,54 +271,26 @@ export default function VehicleTrackingDashboard() {
     }
   }
 
-  const searchHistorySearch = (historyItem: VehicleInfo) => {
-    setVehicleInfo(historyItem)
-    setSearchMethod("text")
-  }
-
   const getStreamUrl = (cameraStream: CameraStream) => {
     const baseUrl = "http://localhost:8000"
-    if (searchMethod === "image" && vehicleInfo.searchImage) {
-      return `${baseUrl}/api/tracking/stream_with_image/${cameraStream.cameraId}`
-    } else {
-      const params = new URLSearchParams()
-      if (vehicleInfo.licensePlate) params.append('license_plate', vehicleInfo.licensePlate)
-      if (vehicleInfo.brand) params.append('brand', vehicleInfo.brand)
-      if (vehicleInfo.color) params.append('color', vehicleInfo.color)
-      return `${baseUrl}/api/tracking/stream/${cameraStream.cameraId}?${params.toString()}`
-    }
+    return `${baseUrl}/api/tracking/stream_with_image/${cameraStream.cameraId}`
   }
 
   // Helper function to check if tracking can start
   const canStartTracking = () => {
-    console.log("=== Tracking Check ===")
-    console.log("isTracking:", isTracking)
-    console.log("selectedCameraIds:", selectedCameraIds)
-    console.log("searchMethod:", searchMethod)
-    console.log("licensePlate:", vehicleInfo.licensePlate)
-    console.log("searchImage:", vehicleInfo.searchImage)
-
     if (isTracking) {
-      console.log("❌ Cannot start: Already tracking")
       return false
     }
 
-    if (selectedCameraIds.length === 0) {
-      console.log("❌ Cannot start: No cameras selected")
+    if (!vehicleInfo.searchImage) {
       return false
     }
 
-    if (searchMethod === "text" && !vehicleInfo.licensePlate.trim()) {
-      console.log("❌ Cannot start: Text search but no license plate")
+    const activeCameras = filteredCameras.filter(camera => camera.status);
+    if (activeCameras.length === 0) {
       return false
     }
 
-    if (searchMethod === "image" && !vehicleInfo.searchImage) {
-      console.log("❌ Cannot start: Image search but no image uploaded")
-      return false
-    }
-
-    console.log("✅ Can start tracking!")
     return true
   }
 
@@ -398,29 +309,16 @@ export default function VehicleTrackingDashboard() {
                 <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
                   <Navigation className="w-4 h-4 text-white" />
                 </div>
-                Camera Selection & Location Filter
+                Camera Locations & Filter
               </h2>
-              {(locationSearchQuery || selectedCameraIds.length > 0) && (
-                <div className="flex gap-2">
-                  {locationSearchQuery && (
-                    <button
-                      onClick={clearLocationFilter}
-                      className="px-4 py-2 text-gray-600 hover:text-gray-800 flex items-center gap-2 transition-all hover:bg-gray-100 rounded-lg font-medium"
-                    >
-                      <X size={16} />
-                      Clear Filter
-                    </button>
-                  )}
-                  {selectedCameraIds.length > 0 && (
-                    <button
-                      onClick={() => setSelectedCameraIds([])}
-                      className="px-4 py-2 text-red-600 hover:text-red-800 flex items-center gap-2 transition-all hover:bg-red-100 rounded-lg font-medium"
-                    >
-                      <X size={16} />
-                      Clear Selection
-                    </button>
-                  )}
-                </div>
+              {locationSearchQuery && (
+                <button
+                  onClick={clearLocationFilter}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 flex items-center gap-2 transition-all hover:bg-gray-100 rounded-lg font-medium"
+                >
+                  <X size={16} />
+                  Clear Filter
+                </button>
               )}
             </div>
 
@@ -445,25 +343,22 @@ export default function VehicleTrackingDashboard() {
                 )}
               </div>
 
-              {selectedCameraIds.length > 0 && (
-                <div className="text-sm">
-                  <span className="bg-green-100 text-green-800 px-3 py-2 rounded-lg font-medium">
-                    Selected: {selectedCameraIds.length} cameras
-                  </span>
-                </div>
-              )}
+              <div className="text-sm">
+                <span className="bg-green-100 text-green-800 px-3 py-2 rounded-lg font-medium">
+                  Active: {filteredCameras.filter(camera => camera.status).length} cameras
+                </span>
+              </div>
             </div>
 
-            {/* Camera Selection Grid */}
+            {/* Camera Display Grid */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-3">
               {filteredCameras.map((camera) => (
                 <div
                   key={camera.id}
-                  onClick={() => handleCameraSelect(camera.id)}
-                  className={`p-3 rounded-lg border-2 cursor-pointer transition-all hover:shadow-md ${selectedCameraIds.includes(camera.id)
-                    ? "border-blue-500 bg-blue-50"
-                    : "border-gray-200 hover:border-gray-300"
-                    }`}
+                  className={`p-3 rounded-lg border-2 transition-all ${camera.status 
+                    ? "border-green-200 bg-green-50" 
+                    : "border-gray-200 bg-gray-50"
+                  }`}
                 >
                   <div className="text-sm font-medium text-gray-800 truncate">{camera.name}</div>
                   <div className="text-xs text-gray-600 truncate">{camera.location}</div>
@@ -476,6 +371,10 @@ export default function VehicleTrackingDashboard() {
                 </div>
               ))}
             </div>
+            
+            <div className="mt-4 text-sm text-gray-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p><strong>Note:</strong> All active cameras will be automatically used for tracking when you start the search.</p>
+            </div>
           </div>
 
           {/* Search Section */}
@@ -483,168 +382,75 @@ export default function VehicleTrackingDashboard() {
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-                  <Search className="w-5 h-5 text-white" />
+                  <ImageIcon className="w-5 h-5 text-white" />
                 </div>
-                Vehicle Search & Tracking
+                Vehicle Image Search & Tracking
               </h2>
+            </div>
 
-              <div className="flex bg-gray-100 rounded-xl p-1 shadow-inner">
-                <button
-                  onClick={() => setSearchMethod("text")}
-                  className={`px-6 py-3 rounded-lg text-sm font-semibold transition-all duration-200 ${searchMethod === "text"
-                    ? "bg-white text-blue-600 shadow-md transform scale-105"
-                    : "text-gray-600 hover:text-gray-800"
-                    }`}
-                >
-                  <Search className="w-4 h-4 inline mr-2" />
-                  Text Search
-                </button>
-                <button
-                  onClick={() => setSearchMethod("image")}
-                  className={`px-6 py-3 rounded-lg text-sm font-semibold transition-all duration-200 ${searchMethod === "image"
-                    ? "bg-white text-blue-600 shadow-md transform scale-105"
-                    : "text-gray-600 hover:text-gray-800"
-                    }`}
-                >
-                  <ImageIcon className="w-4 h-4 inline mr-2" />
-                  Image Search
-                </button>
+            <div className="space-y-6">
+              <div
+                className={`relative border-2 border-dashed rounded-xl p-12 transition-all duration-300 ${dragActive
+                  ? "border-blue-500 bg-blue-50 scale-105"
+                  : "border-gray-300 hover:border-gray-400 hover:bg-gray-50"
+                  }`}
+                onDragEnter={handleDrag}
+                onDragLeave={handleDrag}
+                onDragOver={handleDrag}
+                onDrop={handleDrop}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])}
+                  className="hidden"
+                />
+
+                {vehicleInfo.searchImage ? (
+                  <div className="text-center">
+                    <div className="inline-block relative group">
+                      <img
+                        src={URL.createObjectURL(vehicleInfo.searchImage)}
+                        alt="Search vehicle"
+                        className="max-h-48 rounded-xl shadow-lg group-hover:shadow-xl transition-shadow"
+                      />
+                      <button
+                        onClick={() => setVehicleInfo((prev) => ({ ...prev, searchImage: null }))}
+                        className="absolute -top-3 -right-3 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-600 shadow-lg transform hover:scale-110 transition-all"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                    <p className="text-sm text-gray-600 mt-4 font-medium">{vehicleInfo.searchImage.name}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Size: {(vehicleInfo.searchImage.size / 1024 / 1024).toFixed(2)} MB
+                    </p>
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full flex items-center justify-center mx-auto mb-6">
+                      <Upload className="w-10 h-10 text-blue-500" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-700 mb-3">Upload Vehicle Image</h3>
+                    <p className="text-gray-500 mb-8 max-w-md mx-auto">
+                      Drag and drop a clear image of the vehicle here, or click to browse your files. Supported
+                      formats: JPG, PNG, GIF (Max 10MB)
+                    </p>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-8 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-semibold hover:from-blue-600 hover:to-blue-700 transition-all transform hover:scale-105 shadow-lg"
+                    >
+                      <ImageIcon size={18} className="inline mr-3" />
+                      Choose Image
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
-            {searchMethod === "text" ? (
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="space-y-2">
-                    <label className="block text-sm font-semibold text-gray-700">License Plate *</label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={vehicleInfo.licensePlate}
-                        onChange={(e) => handleInputChange("licensePlate", e.target.value.toUpperCase())}
-                        placeholder="e.g., 29A-12345"
-                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium transition-all"
-                      />
-                      <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-                        <Car className="w-5 h-5 text-gray-400" />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="block text-sm font-semibold text-gray-700">Vehicle Brand</label>
-                    <select
-                      value={vehicleInfo.brand}
-                      onChange={(e) => handleInputChange("brand", e.target.value)}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium transition-all"
-                    >
-                      <option value="">Select Brand</option>
-                      <option value="Toyota">Toyota</option>
-                      <option value="Honda">Honda</option>
-                      <option value="Hyundai">Hyundai</option>
-                      <option value="Ford">Ford</option>
-                      <option value="Mazda">Mazda</option>
-                      <option value="Kia">Kia</option>
-                      <option value="Vinfast">VinFast</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="block text-sm font-semibold text-gray-700">Color</label>
-                    <select
-                      value={vehicleInfo.color}
-                      onChange={(e) => handleInputChange("color", e.target.value)}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium transition-all"
-                    >
-                      <option value="">Select Color</option>
-                      <option value="white">White</option>
-                      <option value="black">Black</option>
-                      <option value="silver">Silver</option>
-                      <option value="red">Red</option>
-                      <option value="blue">Blue</option>
-                      <option value="gray">Gray</option>
-                      <option value="yellow">Yellow</option>
-                      <option value="green">Green</option>
-                      <option value="other">Other</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                <div
-                  className={`relative border-2 border-dashed rounded-xl p-12 transition-all duration-300 ${dragActive
-                    ? "border-blue-500 bg-blue-50 scale-105"
-                    : "border-gray-300 hover:border-gray-400 hover:bg-gray-50"
-                    }`}
-                  onDragEnter={handleDrag}
-                  onDragLeave={handleDrag}
-                  onDragOver={handleDrag}
-                  onDrop={handleDrop}
-                >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])}
-                    className="hidden"
-                  />
-
-                  {vehicleInfo.searchImage ? (
-                    <div className="text-center">
-                      <div className="inline-block relative group">
-                        <img
-                          src={URL.createObjectURL(vehicleInfo.searchImage)}
-                          alt="Search vehicle"
-                          className="max-h-48 rounded-xl shadow-lg group-hover:shadow-xl transition-shadow"
-                        />
-                        <button
-                          onClick={() => setVehicleInfo((prev) => ({ ...prev, searchImage: null }))}
-                          className="absolute -top-3 -right-3 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-600 shadow-lg transform hover:scale-110 transition-all"
-                        >
-                          <X size={16} />
-                        </button>
-                      </div>
-                      <p className="text-sm text-gray-600 mt-4 font-medium">{vehicleInfo.searchImage.name}</p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Size: {(vehicleInfo.searchImage.size / 1024 / 1024).toFixed(2)} MB
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="text-center">
-                      <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <Upload className="w-10 h-10 text-blue-500" />
-                      </div>
-                      <h3 className="text-xl font-bold text-gray-700 mb-3">Upload Vehicle Image</h3>
-                      <p className="text-gray-500 mb-8 max-w-md mx-auto">
-                        Drag and drop a clear image of the vehicle here, or click to browse your files. Supported
-                        formats: JPG, PNG, GIF (Max 10MB)
-                      </p>
-                      <button
-                        onClick={() => fileInputRef.current?.click()}
-                        className="px-8 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-semibold hover:from-blue-600 hover:to-blue-700 transition-all transform hover:scale-105 shadow-lg"
-                      >
-                        <ImageIcon size={18} className="inline mr-3" />
-                        Choose Image
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
             <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-200">
               <div className="flex items-center gap-4">
-                {/* Debug Info - Remove in production */}
-                <div className="text-xs bg-gray-100 px-3 py-2 rounded text-gray-600">
-                  Debug: Cameras({selectedCameraIds.length}) |
-                  Method({searchMethod}) |
-                  LP({vehicleInfo.licensePlate || 'none'}) |
-                  Img({vehicleInfo.searchImage ? 'yes' : 'no'}) |
-                  Tracking({isTracking ? 'yes' : 'no'})
-                </div>
-
                 <button
                   onClick={handleStartTracking}
                   disabled={!canStartTracking()}
@@ -676,34 +482,20 @@ export default function VehicleTrackingDashboard() {
                   </button>
                 )}
 
-                {((searchMethod === "text" && (vehicleInfo.licensePlate || vehicleInfo.brand || vehicleInfo.color)) ||
-                  (searchMethod === "image" && vehicleInfo.searchImage)) && (
-                    <button
-                      onClick={clearSearch}
-                      className="px-6 py-3 text-gray-600 hover:text-gray-800 flex items-center gap-2 transition-all hover:bg-gray-100 rounded-xl font-medium"
-                    >
-                      <X size={16} />
-                      Clear Search
-                    </button>
-                  )}
+                {vehicleInfo.searchImage && (
+                  <button
+                    onClick={clearSearch}
+                    className="px-6 py-3 text-gray-600 hover:text-gray-800 flex items-center gap-2 transition-all hover:bg-gray-100 rounded-xl font-medium"
+                  >
+                    <X size={16} />
+                    Clear Search
+                  </button>
+                )}
               </div>
 
-              {searchMethod === "text" && searchHistory.length > 0 && (
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-semibold text-gray-600">Recent Searches:</span>
-                  <div className="flex gap-2">
-                    {searchHistory.slice(0, 3).map((item, index) => (
-                      <button
-                        key={index}
-                        onClick={() => searchHistorySearch(item)}
-                        className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-sm text-gray-700 rounded-full transition-all hover:shadow-md transform hover:scale-105 font-medium"
-                      >
-                        {item.licensePlate}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <div className="text-sm text-gray-600">
+                {filteredCameras.filter(camera => camera.status).length} active cameras will be used for tracking
+              </div>
             </div>
           </div>
 
@@ -766,44 +558,26 @@ export default function VehicleTrackingDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6 text-sm">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-6 text-sm">
                   <div>
                     <span className="font-semibold text-gray-700 block mb-1">Search Method:</span>
-                    <div
-                      className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${trackingSession.searchMethod === "image"
-                        ? "bg-purple-100 text-purple-700"
-                        : "bg-blue-100 text-blue-700"
-                        }`}
-                    >
-                      {trackingSession.searchMethod === "image" ? <ImageIcon size={12} /> : <Search size={12} />}
-                      {trackingSession.searchMethod === "image" ? "Image Search" : "Text Search"}
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+                      <ImageIcon size={12} />
+                      Image Search
                     </div>
                   </div>
-
-                  {trackingSession.searchMethod === "text" && trackingSession.vehicle.licensePlate && (
-                    <div>
-                      <span className="font-semibold text-gray-700 block mb-1">License Plate:</span>
-                      <div className="text-lg font-bold text-blue-600">{trackingSession.vehicle.licensePlate}</div>
-                    </div>
-                  )}
-
-                  {trackingSession.vehicle.brand && (
-                    <div>
-                      <span className="font-semibold text-gray-700 block mb-1">Brand:</span>
-                      <div className="text-gray-800 font-medium">{trackingSession.vehicle.brand}</div>
-                    </div>
-                  )}
-
-                  {trackingSession.vehicle.color && (
-                    <div>
-                      <span className="font-semibold text-gray-700 block mb-1">Color:</span>
-                      <div className="text-gray-800 font-medium capitalize">{trackingSession.vehicle.color}</div>
-                    </div>
-                  )}
 
                   <div>
                     <span className="font-semibold text-gray-700 block mb-1">Active Cameras:</span>
                     <div className="text-2xl font-bold text-green-600">{trackingSession.totalCameras}</div>
+                  </div>
+
+                  <div>
+                    <span className="font-semibold text-gray-700 block mb-1">Status:</span>
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                      Auto-tracking all cameras
+                    </div>
                   </div>
                 </div>
               </div>

@@ -54,7 +54,7 @@ export default function EditViolation() {
 
   const handleSave = async () => {
     try {
-      await axios.put(`API_URL_BEapi/violations/${id}`, {
+      await axios.put(API_URL_BE+`api/violations/${id}`, {
         violationTypeId: violation?.violationType.id,
         licensePlate: violation?.licensePlate,
         violationTime: violation?.violationTime,

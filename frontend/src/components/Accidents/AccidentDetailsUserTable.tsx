@@ -37,6 +37,7 @@ import { getStatusBadge } from "../../components/Accidents/status-badge"
 import { getYouTubeEmbedUrl } from "../../components/Accidents/video-utils"
 import type { AccidentType } from "../../types/Accident/accident"
 import { motion } from "framer-motion"
+import API_URL_BE from "../Link/LinkAPI"
 
 export default function AccidentDetailsTable() {
   const { id } = useParams()
@@ -55,7 +56,7 @@ export default function AccidentDetailsTable() {
     setLoading(true)
     setImageLoading(true)
     setDisplayImageUrl(null)
-    fetch(`API_URL_BEapi/accident/${id}`)
+    fetch(API_URL_BE+`api/accident/${id}`)
       .then((res) => res.json())
       .then((data) => {
         console.log("Fetched accident data:", data)
@@ -86,7 +87,7 @@ export default function AccidentDetailsTable() {
     if (!accident) return
     try {
       const updatedAccident = { description: editDescription }
-      const res = await fetch(`API_URL_BEapi/accident/${accident.id}`, {
+      const res = await fetch(API_URL_BE+`api/accident/${accident.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedAccident),
@@ -120,7 +121,7 @@ export default function AccidentDetailsTable() {
   const handleApprove = async () => {
     if (!accident) return
     try {
-      const res = await fetch(`API_URL_BEapi/accident/${accident.id}/approve`, {
+      const res = await fetch(API_URL_BE+`api/accident/${accident.id}/approve`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
       })

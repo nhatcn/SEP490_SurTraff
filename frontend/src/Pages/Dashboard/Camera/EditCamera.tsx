@@ -571,7 +571,7 @@ export default function EditCamera() {
 
       console.log('Sending camera update data:', updateData);
 
-      const response = await fetch(`API_URL_BEapi/cameras/${id}`, {
+      const response = await fetch(API_URL_BE+`api/cameras/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updateData)

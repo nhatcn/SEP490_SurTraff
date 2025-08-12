@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios, { AxiosError } from 'axios';
+import API_URL_BE from '../Link/LinkAPI';
 
 // Define ViolationsDTO interface
 interface ViolationsDTO {
@@ -64,7 +65,7 @@ const RequestButton: React.FC<RequestButtonProps> = ({ violationId, onStatusUpda
     const fetchViolationStatus = async () => {
       try {
         const response = await axios.get<ViolationsDTO>(
-          `API_URL_BEapi/violations/${violationId}`,
+          API_URL_BE+ `api/violations/${violationId}`,
           {
             headers: {
               Accept: 'application/json',
@@ -99,7 +100,7 @@ const RequestButton: React.FC<RequestButtonProps> = ({ violationId, onStatusUpda
 
     try {
       const response = await axios.post<ViolationsDTO>(
-        `API_URL_BEapi/violations/${violationId}/request`,
+        API_URL_BE+`api/violations/${violationId}/request`,
         null,
         {
           headers: {

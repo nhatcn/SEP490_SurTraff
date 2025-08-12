@@ -251,7 +251,7 @@ const VehicleDetail = () => {
       formData.append('dto', new Blob([JSON.stringify(vehicleDTO)], { type: 'application/json' }));
       if (editForm.image) formData.append('imageFile', editForm.image);
 
-      const response = await fetch(`API_URL_BEapi/vehicle/${id}`, {
+      const response = await fetch(API_URL_BE+`api/vehicle/${id}`, {
         method: 'PUT',
         body: formData,
       });
@@ -280,7 +280,7 @@ const VehicleDetail = () => {
     setSuccessMessage('');
     setErrorMessage('');
     try {
-      const response = await fetch(`API_URL_BEapi/vehicle/${id}`, {
+      const response = await fetch(API_URL_BE+`api/vehicle/${id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
       });
