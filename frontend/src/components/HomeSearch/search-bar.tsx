@@ -3,6 +3,7 @@
 import type React from "react"
 import { useState, useEffect, useRef } from "react"
 import { Search, Car } from "lucide-react"
+import API_URL_BE from "../Link/LinkAPI"
 
 interface Vehicle {
   id: number
@@ -62,7 +63,7 @@ export function SearchBar({ onSearch, initialSearchQuery = "", isSearching }: Se
           throw new Error("Invalid token: missing userId")
         }
 
-        const response = await fetch(`API_URL_BEapi/vehicle/user/${userId}`, {
+        const response = await fetch(API_URL_BE+`api/vehicle/user/${userId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },

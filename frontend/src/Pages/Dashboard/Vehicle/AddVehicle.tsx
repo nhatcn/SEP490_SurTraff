@@ -195,7 +195,7 @@ const AddVehicle = ({ onVehicleAdded }: { onVehicleAdded?: (vehicle: Vehicle) =>
         formData.append('imageFile', editForm.image);
       }
 
-      const response = await fetch('API_URL_BEapi/vehicle', {
+      const response = await fetch(API_URL_BE+'api/vehicle', {
         method: 'POST',
         body: formData,
       });

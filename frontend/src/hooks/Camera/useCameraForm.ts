@@ -46,7 +46,7 @@ export const useCameraForm = () => {
         const data: ViolationType[] = await response.json();
         setViolationTypes(data);
         
-        // Set default violation type to the first one if available
+        // Set default violation type to the first one if available (only if not set)
         if (data.length > 0 && violationTypeId === null) {
           setViolationTypeId(data[0].id);
         }
@@ -60,7 +60,7 @@ export const useCameraForm = () => {
     };
 
     fetchViolationTypes();
-  }, [violationTypeId]); // Empty dependency array - chỉ gọi 1 lần khi component mount
+  }, []); // Remove violationTypeId from dependencies to avoid loop
 
   const handleLocationSelect = (lat: number, lng: number, address: string) => {
     setLocation({
@@ -140,11 +140,14 @@ export const useCameraForm = () => {
   const handleStreamUrlChange = (url: string) => {
     setStreamUrl(url);
     // Clear thumbnail when URL changes and revoke previous object URL to prevent memory leaks
-    if (thumbnailUrl) {
+    if (thumbnailUrl && thumbnailUrl.startsWith('blob:')) {
       URL.revokeObjectURL(thumbnailUrl);
     }
-    setThumbnailUrl("");
-    setThumbnailFile(null); // Clear file when URL changes
+    // Only clear if it was an extracted thumbnail, not a saved one
+    if (thumbnailFile) {
+      setThumbnailUrl("");
+      setThumbnailFile(null); // Clear file when URL changes
+    }
     setThumbnailError(null);
   };
 
@@ -154,7 +157,7 @@ export const useCameraForm = () => {
       return;
     }
 
-    if (!thumbnailFile) {
+    if (!thumbnailUrl) {
       alert("Please extract a thumbnail from the stream URL first.");
       return;
     }
@@ -200,7 +203,10 @@ export const useCameraForm = () => {
       });
       formData.append('setupDTO', setupDTOBlob);
       
-      // Add thumbnail file
+      // Add thumbnail file (must have a file for new camera)
+      if (!thumbnailFile) {
+        throw new Error("No thumbnail file available");
+      }
       formData.append('thumbnailFile', thumbnailFile, thumbnailFile.name);
 
       console.log('Sending camera setup data:', setupDTO);
@@ -220,7 +226,7 @@ export const useCameraForm = () => {
       alert("Camera setup successfully!");
       
       // Clean up object URL before navigating
-      if (thumbnailUrl) {
+      if (thumbnailUrl && thumbnailUrl.startsWith('blob:')) {
         URL.revokeObjectURL(thumbnailUrl);
       }
       
@@ -233,9 +239,61 @@ export const useCameraForm = () => {
 
   // Cleanup function to revoke object URLs
   const cleanup = () => {
-    if (thumbnailUrl) {
+    if (thumbnailUrl && thumbnailUrl.startsWith('blob:')) {
       URL.revokeObjectURL(thumbnailUrl);
     }
+  };
+
+  // Helper functions for form population (useful for edit mode)
+  const populateForm = (data: {
+    name: string;
+    streamUrl: string;
+    location: { lat: number; lng: number; address: string };
+    speedLimit?: number;
+    violationTypeId?: number;
+    thumbnailUrl?: string;
+    zones?: Zone[];
+    laneDirections?: LaneDirection[];
+    lightZoneMappings?: LightZoneMapping[];
+  }) => {
+    setName(data.name);
+    setStreamUrl(data.streamUrl);
+    setLocationAddress(data.location.address);
+    setLocation({
+      lat: data.location.lat,
+      lng: data.location.lng,
+      selected: true
+    });
+    
+    if (data.speedLimit !== undefined) setSpeedLimit(data.speedLimit);
+    if (data.violationTypeId !== undefined) setViolationTypeId(data.violationTypeId);
+    if (data.thumbnailUrl) setThumbnailUrl(data.thumbnailUrl);
+    if (data.zones) setZones(data.zones);
+    if (data.laneDirections) setLaneDirections(data.laneDirections);
+    if (data.lightZoneMappings) setLightZoneMappings(data.lightZoneMappings);
+  };
+
+  // Reset form to initial state
+  const resetForm = () => {
+    setName("");
+    setStreamUrl("");
+    setLocationAddress("");
+    setLocation({ lat: 0, lng: 0, selected: false });
+    setZones([]);
+    setActiveZoneType(null);
+    setSpeedLimit(50);
+    setViolationTypeId(violationTypes.length > 0 ? violationTypes[0].id : null);
+    
+    // Clean up thumbnail
+    if (thumbnailUrl && thumbnailUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(thumbnailUrl);
+    }
+    setThumbnailUrl("");
+    setThumbnailFile(null);
+    setThumbnailError(null);
+    
+    setLaneDirections([]);
+    setLightZoneMappings([]);
   };
 
   return {
@@ -276,6 +334,10 @@ export const useCameraForm = () => {
     handleSubmit,
     extractThumbnail,
     cleanup,
-    navigate
+    navigate,
+    
+    // Helper functions for form management
+    populateForm,
+    resetForm
   };
 };

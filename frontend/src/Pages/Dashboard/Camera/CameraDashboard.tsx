@@ -65,7 +65,7 @@ export default function CameraDashboard() {
         setError("Failed to load cameras. Please try again later.");
         setLoading(false);
       });
-  }, [selectedCamera]);
+  }, []);
 
   const handleCameraClick = (camera: CameraType) => {
     setSelectedCamera(camera);
