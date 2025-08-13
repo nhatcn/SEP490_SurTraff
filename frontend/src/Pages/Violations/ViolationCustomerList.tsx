@@ -90,7 +90,7 @@ const ViolationCustomerList: React.FC<ViolationListProps> = ({ userId }) => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await axios.get<ViolationsDTO[]>(`${API_URL_BE}/api/violations/user/${3}`);
+      const response = await axios.get<ViolationsDTO[]>(`${API_URL_BE}api/violations/user/${3}`);
       setViolations(response.data);
     } catch (err) {
       const error = err as AxiosError;

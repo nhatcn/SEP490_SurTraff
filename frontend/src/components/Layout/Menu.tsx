@@ -144,7 +144,7 @@ const Header = ({ showMobileMenu, setShowMobileMenu }: HeaderProps) => {
           <a href="/home" className="text-blue-700 font-medium hover:text-blue-900 transition-colors duration-200">
             Home
           </a>
-          <a href="/search" className="text-gray-500 hover:text-gray-800 transition-colors duration-200">
+          <a href="/vehiclelistuser" className="text-gray-500 hover:text-gray-800 transition-colors duration-200">
             Vehicle
           </a>
           <a href="/usermap" className="text-gray-500 hover:text-gray-800 transition-colors duration-200">

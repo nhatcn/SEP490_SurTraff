@@ -44,7 +44,7 @@ const AddVehicle = () => {
           return;
         }
 
-        const response = await fetch(`${API_URL_BE}/api/users/${userId}`);
+        const response = await fetch(`${API_URL_BE}api/users/${userId}`);
         if (response.ok) {
           const user = await response.json();
           setFormData((prev) => ({ ...prev, userId: user.userId.toString() }));
@@ -74,7 +74,7 @@ const AddVehicle = () => {
   useEffect(() => {
     const fetchVehicleTypes = async () => {
       try {
-        const response = await fetch(`${API_URL_BE}/api/violations/vehicle-types`, {
+        const response = await fetch(`${API_URL_BE}api/violations/vehicle-types`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
         });
@@ -92,7 +92,7 @@ const AddVehicle = () => {
   useEffect(() => {
     const fetchVehicles = async () => {
       try {
-        const response = await fetch(`${API_URL_BE}/api/vehicle/user/${formData.userId}`, {
+        const response = await fetch(`${API_URL_BE}api/vehicle/user/${formData.userId}`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
         });
@@ -184,7 +184,7 @@ const AddVehicle = () => {
     }
 
     try {
-      const response = await fetch(`${API_URL_BE}/api/vehicle`, {
+      const response = await fetch(`${API_URL_BE}api/vehicle`, {
         method: 'POST',
         body: formDataToSend,
       });

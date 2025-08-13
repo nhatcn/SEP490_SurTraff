@@ -126,7 +126,7 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({
           return
         }
 
-        const response = await fetch(`${API_URL_BE}/api/users/${cookieUserId}`)
+        const response = await fetch(`${API_URL_BE}api/users/${cookieUserId}`)
         if (response.ok) {
           const user = await response.json()
           setUserId(user.userId.toString())
@@ -166,7 +166,7 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({
     setIsLoading(true)
     setError(null)
     try {
-      const response = await fetch(`${API_URL_BE}/api/vehicle/user/${userId}`)
+      const response = await fetch(`${API_URL_BE}api/vehicle/user/${userId}`)
       if (!response.ok) {
         if (response.status === 404) {
           setError('No vehicles found for this user.')
@@ -190,7 +190,7 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({
     async (licensePlate: string) => {
       try {
         const response = await fetch(
-          `${API_URL_BE}/api/violations/license-plate/${licensePlate}`
+          `${API_URL_BE}api/violations/license-plate/${licensePlate}`
         )
         if (response.ok) {
           const violationData: ViolationData[] = await response.json()
@@ -290,7 +290,7 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({
       setError(null)
       try {
         const response = await fetch(
-          `${API_URL_BE}/api/vehicle/${vehicleId}/activate`,
+          `${API_URL_BE}api/vehicle/${vehicleId}/activate`,
           {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' }
