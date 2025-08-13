@@ -152,6 +152,7 @@ class VehicleInfo(BaseModel):
     color: Optional[str] = None
 
 
+
 @router.get("/tracking/stream/{camera_id}")
 async def stream_tracking_video(
     camera_id: int,
