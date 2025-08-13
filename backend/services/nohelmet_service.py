@@ -25,6 +25,7 @@ MIN_HEAD_SIZE = 20  # Kích thước tối thiểu vùng đầu (pixel)
 RECONNECT_ATTEMPTS = 3
 RECONNECT_DELAY = 1
 VIOLATION_API_URL = "http://localhost:8081/api/violations"
+VIOLATION_DELAY_FRAMES = int(0.7 * FRAME_RATE)  # Số frame tương ứng 0.7 giây (21 frames tại 30 FPS)
 
 # Load the YOLO models
 helmet_model = YOLO("besthl.pt")  # Model phát hiện mũ bảo hiểm
@@ -128,10 +129,11 @@ def find_closest_license_plate(rider_center, cached_plates, max_distance=200):
     Tìm biển số gần nhất với người lái xe từ cache
     """
     if not cached_plates:
-        return "Unknown"
+        return "Unknown", None
     
     min_distance = float('inf')
     closest_plate = "Unknown"
+    closest_plate_bbox = None
     
     rider_x, rider_y = rider_center
     
@@ -142,8 +144,9 @@ def find_closest_license_plate(rider_center, cached_plates, max_distance=200):
         if distance < min_distance and distance < max_distance:
             min_distance = distance
             closest_plate = plate_info['text']
+            closest_plate_bbox = plate_info['bbox']
     
-    return closest_plate
+    return closest_plate, closest_plate_bbox
 
 async def fetch_camera_config(cid: int, retries=3, delay=1):
     """
@@ -263,6 +266,9 @@ async def stream_no_helmet_service(youtube_url: str, camera_id: int):
     # Cooldown để tránh gửi quá nhiều vi phạm cho cùng 1 track_id
     violation_cooldown = {}  # {track_id: last_violation_time}
     VIOLATION_COOLDOWN_TIME = 10  # 10 giây
+
+    # Dictionary để lưu trữ các vi phạm đang chờ xử lý
+    pending_violations = {}  # {track_id: {'detected_frame': int, 'license_plate': str, 'rider_center': tuple, 'rider_bbox': tuple, 'plate_bbox': tuple, 'class_name': str}}
 
     try:
         while True:
@@ -403,6 +409,66 @@ async def stream_no_helmet_service(youtube_url: str, camera_id: int):
                     active_track_ids.add(track_id)
                     rider_boxes.append((x1, y1, x2, y2, track_id, class_name))
 
+            # Process pending violations
+            violations_to_process = []
+            for track_id, violation_info in list(pending_violations.items()):
+                frames_elapsed = frame_count - violation_info['detected_frame']
+                if frames_elapsed >= VIOLATION_DELAY_FRAMES:
+                    violations_to_process.append((track_id, violation_info))
+                    del pending_violations[track_id]
+
+            # Process violations that are ready
+            for track_id, violation_info in violations_to_process:
+                license_plate_text = violation_info['license_plate']
+                rider_bbox = violation_info['rider_bbox']
+                plate_bbox = violation_info['plate_bbox']
+                class_name = violation_info['class_name']
+                
+                # Use original frame without annotations
+                violation_frame = frame.copy()
+                
+                # Create temporary files for violation
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_image, \
+                     tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as temp_video:
+                    image_path = temp_image.name
+                    video_path = temp_video.name
+
+                    # Save original frame as image (no bounding boxes or text)
+                    cv2.imwrite(image_path, violation_frame)
+
+                    # Create violation video from buffer
+                    violation_frames = list(frame_buffer)
+                    if len(violation_frames) > 0:
+                        save_success = save_temp_violation_video(violation_frames, fps, video_path, frame_width, frame_height)
+                        
+                        if save_success:
+                            # Prepare violation data for API
+                            violation_data = {
+                                "camera": {"id": camera_id},
+                                "status": "PENDING",
+                                "vehicle": {
+                                    "id": 26,},
+                                "createdAt": datetime.now().isoformat(),
+                                "violationDetails": [{
+                                    "violationTypeId": 5,  
+                                    "violationTime": datetime.now().isoformat(),
+                                    "licensePlate": license_plate_text
+                                }]
+                            }
+
+                            # Send violation asynchronously
+                            print(f"📤 Sending NO_HELMET violation for track {track_id} asynchronously...")
+                            send_violation_async(violation_data, image_path, video_path, track_id)
+                        else:
+                            # Clean up files if video save failed
+                            try:
+                                if os.path.exists(image_path):
+                                    os.remove(image_path)
+                                if os.path.exists(video_path):
+                                    os.remove(video_path)
+                            except Exception as cleanup_error:
+                                print(f"[-] Error cleaning up files after video save failure: {cleanup_error}")
+
             # Process each rider
             for x1, y1, x2, y2, track_id, class_name in rider_boxes:
                 # Calculate rider center for license plate matching
@@ -436,7 +502,7 @@ async def stream_no_helmet_service(youtube_url: str, camera_id: int):
                                 break
 
                 # Find closest license plate for this rider from cache
-                license_plate_text = find_closest_license_plate((rider_center_x, rider_center_y), license_plate_cache)
+                license_plate_text, plate_bbox = find_closest_license_plate((rider_center_x, rider_center_y), license_plate_cache)
 
                 # Check for NO HELMET violation
                 if no_helmet:
@@ -454,100 +520,15 @@ async def stream_no_helmet_service(youtube_url: str, camera_id: int):
                         # Update cooldown
                         violation_cooldown[track_id] = current_time
                         
-                        # Wait 0.7 seconds before capturing
-                        await asyncio.sleep(0.7)
-                        
-                        # Capture new frame after delay
-                        ret, delayed_frame = cap.read()
-                        if not ret or delayed_frame is None or delayed_frame.size == 0:
-                            print(f"[-] Failed to capture delayed frame for violation {track_id}")
-                            continue
-                        
-                        # Annotate delayed frame with bounding boxes
-                        delayed_frame_annotated = delayed_frame.copy()
-                        
-                        # Re-run detection on delayed frame to get updated bounding boxes
-                        try:
-                            delayed_helmet_results = helmet_model.track(source=delayed_frame, persist=True, conf=0.4, iou=0.4, tracker="bytetrack.yaml")[0]
-                            delayed_plate_results = plate_model(delayed_frame, conf=0.3, iou=0.4)
-                            
-                            # Draw rider bounding box
-                            for box in delayed_helmet_results.boxes:
-                                if box.id is not None and int(box.id) == track_id:
-                                    cls_id = int(box.cls)
-                                    if cls_id in helmet_class_names and helmet_class_names[cls_id] in ["helmet", "no helmet"]:
-                                        dx1, dy1, dx2, dy2 = map(int, box.xyxy[0])
-                                        color = (0, 0, 255) if helmet_class_names[cls_id] == "no helmet" else (0, 255, 0)
-                                        cv2.rectangle(delayed_frame_annotated, (dx1, dy1), (dx2, dy2), color, 2)
-                                        label = f"ID:{track_id} {helmet_class_names[cls_id]} VIOLATION"
-                                        cv2.putText(delayed_frame_annotated, label, (dx1, dy1 - 30),
-                                                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
-                                        # Draw head ROI
-                                        d_head_height = int((dy2 - dy1) / 3 * ROI_SCALE)
-                                        d_head_width = int((dx2 - dx1) * ROI_SCALE)
-                                        d_head_x1 = max(0, int(dx1 - (d_head_width - (dx2 - dx1)) / 2))
-                                        d_head_y1 = max(0, dy1)
-                                        d_head_x2 = min(w, d_head_x1 + d_head_width)
-                                        d_head_y2 = min(h, d_head_y1 + d_head_height)
-                                        if d_head_x2 > d_head_x1 and d_head_y2 > d_head_y1:
-                                            cv2.rectangle(delayed_frame_annotated, (d_head_x1, d_head_y1), (d_head_x2, d_head_y2), color, 1)
-                                        # Draw license plate info
-                                        plate_label = f"Plate: {license_plate_text}"
-                                        cv2.putText(delayed_frame_annotated, plate_label, (dx1, dy1 - 10),
-                                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
-                                        
-                            # Draw license plate bounding boxes
-                            if delayed_plate_results and len(delayed_plate_results) > 0 and delayed_plate_results[0].boxes is not None:
-                                for box in delayed_plate_results[0].boxes:
-                                    px1, py1, px2, py2 = map(int, box.xyxy[0])
-                                    cv2.rectangle(delayed_frame_annotated, (px1, py1), (px2, py2), (255, 255, 0), 2)
-                                    plate_text = license_plate_cache.get(f"plate_{(px1+px2)//100}_{(py1+py2)//100}", {}).get('text', 'Unknown')
-                                    cv2.putText(delayed_frame_annotated, f"LP: {plate_text}", (px1, py1 - 10),
-                                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
-                        
-                        except Exception as e:
-                            print(f"[-] Error re-running detection on delayed frame: {str(e)}")
-                            delayed_frame_annotated = delayed_frame  # Fallback to unannotated frame
-                        
-                        # Create temporary files for violation
-                        with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_image, \
-                             tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as temp_video:
-                            image_path = temp_image.name
-                            video_path = temp_video.name
-
-                            # Save delayed frame as image
-                            cv2.imwrite(image_path, delayed_frame_annotated)
-
-                            # Create violation video from buffer (1 second before and current frame)
-                            violation_frames = list(frame_buffer) + [delayed_frame]
-                            if len(violation_frames) > 0:
-                                save_success = save_temp_violation_video(violation_frames, fps, video_path, frame_width, frame_height)
-                                
-                                if save_success:
-                                    # Prepare violation data for API
-                                    violation_data = {
-                                        "camera": {"id": camera_id},
-                                        "status": "PENDING",
-                                        "createdAt": datetime.now().isoformat(),
-                                        "violationDetails": [{
-                                            "violationTypeId": 5,  
-                                            "violationTime": datetime.now().isoformat(),
-                                            "licensePlate": license_plate_text
-                                        }]
-                                    }
-
-                                    # Send violation asynchronously (non-blocking)
-                                    print(f"📤 Sending NO_HELMET violation for track {track_id} asynchronously...")
-                                    send_violation_async(violation_data, image_path, video_path, track_id)
-                                else:
-                                    # Clean up files if video save failed
-                                    try:
-                                        if os.path.exists(image_path):
-                                            os.remove(image_path)
-                                        if os.path.exists(video_path):
-                                            os.remove(video_path)
-                                    except Exception as cleanup_error:
-                                        print(f"[-] Error cleaning up files after video save failure: {cleanup_error}")
+                        # Store violation in pending list with bounding box info
+                        pending_violations[track_id] = {
+                            'detected_frame': frame_count,
+                            'license_plate': license_plate_text,
+                            'rider_center': (rider_center_x, rider_center_y),
+                            'rider_bbox': (x1, y1, x2, y2),
+                            'plate_bbox': plate_bbox,
+                            'class_name': class_name
+                        }
 
                 color = (0, 0, 255) if no_helmet else (0, 255, 0)  # Red for no helmet, Green for helmet
                 violation_status = "VIOLATION" if no_helmet else "OK"
@@ -576,6 +557,11 @@ async def stream_no_helmet_service(youtube_url: str, camera_id: int):
                                  if current_time - last_time > VIOLATION_COOLDOWN_TIME * 2]
             for tid in cooldowns_to_remove:
                 del violation_cooldown[tid]
+
+            # Clean up old pending violations (if track_id no longer active)
+            for track_id in list(pending_violations.keys()):
+                if track_id not in active_track_ids:
+                    del pending_violations[track_id]
 
             # Hiển thị thông tin cache trên frame
             cache_info = f"Cached Plates: {len(license_plate_cache)} | Frame: {frame_count} | Active: {len(active_track_ids)}"

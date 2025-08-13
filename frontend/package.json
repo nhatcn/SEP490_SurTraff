@@ -24,6 +24,7 @@
     "jspdf": "^3.0.1",
     "jspdf-autotable": "^5.0.2",
     "leaflet": "^1.9.4",
+    "leaflet-polylinedecorator": "^1.6.0",
     "lodash": "^4.17.21",
     "lucide-react": "^0.503.0",
     "react": "^19.1.0",
@@ -47,8 +48,8 @@
       "react-app/jest"
     ],
     "rules": {
-    "react-hooks/exhaustive-deps": "off"
-  }
+      "react-hooks/exhaustive-deps": "off"
+    }
   },
   "browserslist": {
     "production": [

@@ -263,7 +263,7 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
 
                     bottom_y = int(np.max(light_zone["polygon"][:, 1]))
                     status_text = "Red" if is_red else "Red"
-                    status_color = (0, 255, 0) if is_red else (0, 255, 0)
+                    status_color = ( 0, 0, 255) if is_red else (0, 0, 255)
                     cv2.putText(frame_annotated, status_text, (cx, bottom_y + 20), 
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, status_color, 2)
 

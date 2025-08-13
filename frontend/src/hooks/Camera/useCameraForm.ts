@@ -95,7 +95,7 @@ export const useCameraForm = () => {
     setThumbnailError(null);
 
     try {
-      const response = await fetch(API_URL_BE+"api/thumbnail/extract", {
+      const response = await fetch("http://localhost:8000/api/thumbnail/extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ stream_url: streamUrl })

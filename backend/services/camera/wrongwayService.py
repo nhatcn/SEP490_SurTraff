@@ -23,20 +23,48 @@ VIOLATION_API_URL = "http://localhost:8081/api/violations"
 # Thread pool for async violation sending
 violation_executor = ThreadPoolExecutor(max_workers=5)
 
-# Helper function for text with background
-def put_text_with_background(img, text, org, font_scale, color, thickness=1, bg_color=(0, 0, 0)):
-    (text_width, text_height), baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)
+# Improved text display functions
+def put_text_with_outline(img, text, org, font_scale, color, outline_color=(0, 0, 0), thickness=1, outline_thickness=3):
+    """Hiển thị text với viền outline thay vì background box"""
     x, y = org
-    # Ensure coordinates are within image bounds
-    x = max(0, x)
-    # y is the baseline for put_text_with_background, so ensure it's below the top edge for text to be visible
-    y = max(text_height + baseline, y)
-    x_end = min(img.shape[1], x + text_width)
-    y_end = min(img.shape[0], y + baseline)
-    # Draw background rectangle
-    cv2.rectangle(img, (x, y - text_height - baseline), (x_end, y_end), bg_color, -1)
-    # Put text
-    cv2.putText(img, text, (x, y - baseline), cv2.FONT_HERSHEY_SIMPLEX, font_scale, color, thickness)
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    
+    # Vẽ outline (viền) trước
+    cv2.putText(img, text, (x, y), font, font_scale, outline_color, thickness + outline_thickness, cv2.LINE_AA)
+    # Vẽ text chính
+    cv2.putText(img, text, (x, y), font, font_scale, color, thickness, cv2.LINE_AA)
+
+def put_text_with_shadow(img, text, org, font_scale, color, shadow_color=(0, 0, 0), thickness=1, shadow_offset=(2, 2)):
+    """Hiển thị text với shadow (bóng đổ)"""
+    x, y = org
+    shadow_x, shadow_y = x + shadow_offset[0], y + shadow_offset[1]
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    
+    # Vẽ shadow trước
+    cv2.putText(img, text, (shadow_x, shadow_y), font, font_scale, shadow_color, thickness, cv2.LINE_AA)
+    # Vẽ text chính
+    cv2.putText(img, text, (x, y), font, font_scale, color, thickness, cv2.LINE_AA)
+
+def put_text_with_semi_transparent_bg(img, text, org, font_scale, color, bg_color=(0, 0, 0), bg_alpha=0.6, thickness=1, padding=5):
+    """Hiển thị text với nền trong suốt"""
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    (text_width, text_height), baseline = cv2.getTextSize(text, font, font_scale, thickness)
+    x, y = org
+    
+    # Tạo overlay cho background trong suốt
+    overlay = img.copy()
+    
+    # Vẽ rectangle với padding
+    cv2.rectangle(overlay, 
+                 (x - padding, y - text_height - padding), 
+                 (x + text_width + padding, y + baseline + padding), 
+                 bg_color, -1)
+    
+    # Áp dụng alpha blending
+    cv2.addWeighted(overlay, bg_alpha, img, 1 - bg_alpha, 0, img)
+    
+    # Vẽ text
+    cv2.putText(img, text, (x, y), font, font_scale, color, thickness, cv2.LINE_AA)
 
 def save_temp_violation_video(frames, fps, output_path, width, height):
     """Save a list of frames to a temporary video file."""
@@ -239,10 +267,6 @@ def stream_violation_wrongway_video_service1(youtube_url: str, camera_id: int):
                 cv2.fillPoly(overlay, [pts], color)
                 cv2.addWeighted(overlay, alpha, annotated_frame, 1 - alpha, 0, annotated_frame)
                 cv2.polylines(annotated_frame, [pts], True, color, 2)
-                # User requested NOT to display zone names/numbers, so this part is commented out
-                # if len(zone_data["polygon"]) > 0:
-                #    cx_zone, cy_zone = np.mean(zone_data["polygon"], axis=0).astype(int)
-                #    put_text_with_background(annotated_frame, f"Zone {zone_data['name']}", (cx_zone, cy_zone), 0.5, (255, 255, 255))
                         
             # Traffic Sign Detection
             results_sign = model_sign(resized_frame, conf=0.1)
@@ -277,10 +301,13 @@ def stream_violation_wrongway_video_service1(youtube_url: str, camera_id: int):
                 # Draw bounding box around the sign thumbnail
                 cv2.rectangle(annotated_frame, (x_thumb, sign_display_y_fixed),
                                 (x_thumb + OBJECT_SIZE, sign_display_y_fixed + OBJECT_SIZE), (0, 165, 255), 2)
-                # Position text below the thumbnail. org is the baseline for put_text_with_background.
+                
+                # Improved text display for sign labels - sử dụng outline thay vì background box
                 text_org_x = x_thumb
-                text_org_y = sign_display_y_fixed + OBJECT_SIZE + MARGIN
-                put_text_with_background(annotated_frame, label, (text_org_x, text_org_y), font_scale=0.6, color=(255, 255, 255))
+                text_org_y = sign_display_y_fixed + OBJECT_SIZE + MARGIN + 15
+                put_text_with_outline(annotated_frame, label, (text_org_x, text_org_y), 
+                                    font_scale=0.5, color=(255, 255, 255), outline_color=(0, 0, 0), thickness=1)
+                
                 # Update x for the next sign (move further left, including margin)
                 current_sign_x = x_thumb - MARGIN
                         
@@ -315,7 +342,7 @@ def stream_violation_wrongway_video_service1(youtube_url: str, camera_id: int):
                             if cls_name not in z_data["allowed_vehicles"]:
                                 vehicle_violation_status[track_id]["is_wrong_way"] = True
                                 bbox_color = (0, 0, 255) # Red for violation
-                                label += f" - WRONG WAY ({z_data['name']})"
+                                label += f" - SAI LÀN ({z_data['name']})"
                                 print(f"WRONG WAY VIOLATION (Zone): Vehicle {track_id} ({cls_name}) in zone {z_data['name']} (ID: {z_id}) - not allowed.")
                                 
                                 # Save violation to API (only if not already recorded for this track_id)
@@ -364,14 +391,22 @@ def stream_violation_wrongway_video_service1(youtube_url: str, camera_id: int):
                     # Determine final label and color based on the single 'is_wrong_way' flag
                     if vehicle_violation_status[track_id]["is_wrong_way"]:
                         bbox_color = (0, 0, 255) # Red
-                        label = f"ID:{track_id} {cls_name} - WRONG WAY"
+                        label = f"ID:{track_id} {cls_name} - Wronng Way"
                     else:
                         bbox_color = (0, 255, 0) # Green if no violation
-                        label = f"ID:{track_id} {cls_name} - OK"
+                        label = f"ID:{track_id} {cls_name}"
                                         
-                    # Draw bounding box and label
+                    # Draw bounding box
                     cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), bbox_color, 2)
-                    put_text_with_background(annotated_frame, label, (x1, y1 - 5), font_scale=0.5, color=bbox_color)
+                    
+                    # Improved text display for vehicle labels
+                    # Sử dụng semi-transparent background cho text của vehicle
+                    text_y = max(y1 - 8, 20)  # Đảm bảo text không bị cắt ở phía trên
+                    put_text_with_semi_transparent_bg(annotated_frame, label, (x1, text_y), 
+                                                    font_scale=0.5, color=(255, 255, 255), 
+                                                    bg_color=bbox_color, bg_alpha=0.7, padding=3)
+                    
+                    # Vẽ điểm trung tâm
                     cv2.circle(annotated_frame, (cx, cy), 4, (0, 255, 255), -1)
                                         
             # Clean up tracks of objects no longer appearing in the current frame

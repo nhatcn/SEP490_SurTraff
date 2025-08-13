@@ -10,7 +10,7 @@ import {
   Upload,
   ImageIcon,
   Pause,
-  Maximize2,
+  Maximize,Maximize2,
   Camera,
   Navigation,
   Video,
@@ -18,9 +18,10 @@ import {
   Grid3X3,
   Minimize,
 } from "lucide-react"
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet"
+import { MapContainer, TileLayer, Marker, Popup, Polyline, Pane } from "react-leaflet"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
+import 'leaflet-polylinedecorator';
 import Sidebar from "../../../components/Layout/Sidebar"
 import Header from "../../../components/Layout/Header"
 
@@ -100,6 +101,7 @@ export default function VehicleTrackingDashboard() {
   const [mapZoom, setMapZoom] = useState(10)
   const [locationSearchQuery, setLocationSearchQuery] = useState("")
   const [filteredCameras, setFilteredCameras] = useState<CameraData[]>([])
+  const [routeCoordinates, setRouteCoordinates] = useState<[number, number][]>([])
 
   useEffect(() => {
     loadCameras()
@@ -136,6 +138,87 @@ export default function VehicleTrackingDashboard() {
       }
     }
   }, [mapRef, trackingSession, cameras])
+
+  // Fetch route from OSRM
+  const fetchRoute = async (coordinates: [number, number][]) => {
+    if (coordinates.length < 2) return []
+
+    const coordsString = coordinates
+      .map(coord => `${coord[1]},${coord[0]}`)
+      .join(';')
+    const osrmUrl = `http://router.project-osrm.org/route/v1/driving/${coordsString}?overview=full&geometries=geojson`
+
+    try {
+      const response = await fetch(osrmUrl)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.routes && data.routes.length > 0) {
+          const route = data.routes[0].geometry.coordinates.map(([lng, lat]: [number, number]) => [lat, lng])
+          return route
+        }
+      }
+      console.error('Failed to fetch route')
+      return coordinates // Fallback to straight line if routing fails
+    } catch (error) {
+      console.error('Error fetching route:', error)
+      return coordinates // Fallback to straight line
+    }
+  }
+
+  // Update Polyline Decorator for map view with actual routes
+  useEffect(() => {
+    if (viewMode !== "map" || !mapRef || !trackingSession || trackingSession.cameraStreams.length <= 1) {
+      return
+    }
+
+    const coordinates = trackingSession.cameraStreams
+      .map((stream) => {
+        const camera = cameras.find((c) => c.id === stream.cameraId)
+        return camera && !isNaN(camera.latitude) && !isNaN(camera.longitude)
+          ? [camera.latitude, camera.longitude]
+          : null
+      })
+      .filter((coord): coord is [number, number] => coord !== null)
+      .sort((a, b) => {
+        const cameraA = cameras.find(
+          (c) => c.latitude === a[0] && c.longitude === a[1]
+        )
+        const cameraB = cameras.find(
+          (c) => c.latitude === b[0] && c.longitude === b[1]
+        )
+        return (cameraB?.id || 0) - (cameraA?.id || 0)
+      })
+
+    if (coordinates.length > 1) {
+      fetchRoute(coordinates).then((route) => {
+        setRouteCoordinates(route)
+        const decorator = (L as any).polylineDecorator(route, {
+          patterns: [
+            {
+              offset: "5%",
+              repeat: "20%",
+              symbol: (L as any).Symbol.arrowHead({
+                pixelSize: 15,
+                polygon: false,
+                pathOptions: {
+                  stroke: true,
+                  color: "#3B82F6",
+                  weight: 3,
+                  opacity: 0.8,
+                },
+              }),
+            },
+          ],
+        }).addTo(mapRef)
+
+        return () => {
+          if (mapRef && decorator) {
+            mapRef.removeLayer(decorator)
+          }
+        }
+      })
+    }
+  }, [viewMode, mapRef, trackingSession, cameras])
 
   const loadCameras = async () => {
     setIsLoadingCameras(true)
@@ -234,6 +317,7 @@ export default function VehicleTrackingDashboard() {
     setTrackingSession(null)
     setFullscreenCamera(null)
     setSelectedCameraId(null)
+    setRouteCoordinates([])
   }
 
   const clearSearch = () => {
@@ -241,6 +325,7 @@ export default function VehicleTrackingDashboard() {
     setTrackingSession(null)
     setFullscreenCamera(null)
     setSelectedCameraId(null)
+    setRouteCoordinates([])
   }
 
   const clearLocationFilter = () => {
@@ -447,7 +532,7 @@ export default function VehicleTrackingDashboard() {
                 {vehicleInfo.searchImage && (
                   <button
                     onClick={clearSearch}
-                    className="px-6 py-3 text-gray-600 hover:text-gray-800 flex items-center gap-2 transition-all hover:bg-gray-100 rounded-xl font-medium"
+                    className="px-6 py-3 text-gray-600 hover:text-gray-800 βflex items-center gap-2 transition-all hover:bg-gray-100 rounded-xl font-medium"
                   >
                     <X size={16} />
                     Clear Search
@@ -680,26 +765,33 @@ export default function VehicleTrackingDashboard() {
                             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                           />
-                          {trackingSession.cameraStreams.map((stream) => {
-                            const camera = cameras.find(c => c.id === stream.cameraId)
-                            if (!camera || isNaN(camera.latitude) || isNaN(camera.longitude)) {
-                              console.warn(`Invalid coordinates for camera ${stream.cameraId}`)
-                              return null
-                            }
-                            return (
+                          {trackingSession.cameraStreams
+                            .map((stream) => {
+                              const camera = cameras.find((c) => c.id === stream.cameraId)
+                              return { stream, camera }
+                            })
+                            .filter(({ camera }) => camera && !isNaN(camera.latitude) && !isNaN(camera.longitude))
+                            .sort((a, b) => a.stream.cameraId - b.stream.cameraId)
+                            .map(({ stream, camera }) => (
                               <Marker
                                 key={`tracking-camera-${stream.cameraId}`}
-                                position={[camera.latitude, camera.longitude]}
+                                position={[camera!.latitude, camera!.longitude]}
                                 icon={trackingIcon}
                               >
                                 <Popup>
                                   <div className="p-2">
                                     <h4 className="font-bold text-gray-800">{stream.cameraName}</h4>
                                     <p className="text-sm text-gray-600 mb-2">{stream.location}</p>
-                                    <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium mb-2 ${stream.status === "active" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
-                                      }`}>
-                                      <div className={`w-2 h-2 rounded-full ${stream.status === "active" ? "bg-green-500 animate-pulse" : "bg-gray-500"
-                                        }`}></div>
+                                    <div
+                                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium mb-2 ${
+                                        stream.status === "active" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
+                                      }`}
+                                    >
+                                      <div
+                                        className={`w-2 h-2 rounded-full ${
+                                          stream.status === "active" ? "bg-green-500 animate-pulse" : "bg-gray-500"
+                                        }`}
+                                      ></div>
                                       {stream.status === "active" ? "LIVE TRACKING" : "OFFLINE"}
                                     </div>
                                     <div className="flex gap-2">
@@ -716,8 +808,17 @@ export default function VehicleTrackingDashboard() {
                                   </div>
                                 </Popup>
                               </Marker>
-                            )
-                          })}
+                            ))}
+                          {routeCoordinates.length > 1 && (
+                            <Pane name="polyline-layer" style={{ zIndex: 450 }}>
+                              <Polyline
+                                positions={routeCoordinates}
+                                color="#3B82F6"
+                                weight={4}
+                                opacity={0.7}
+                              />
+                            </Pane>
+                          )}
                         </MapContainer>
                       </div>
                       <div className="p-4 bg-gray-50 border-t border-gray-200">
@@ -769,6 +870,7 @@ export default function VehicleTrackingDashboard() {
                   <div className="absolute top-4 left-4 bg-red-600 text-white px-3 py-2 rounded text-sm font-bold flex items-center gap-2">
                     <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
                     LIVE TRACKING - FULLSCREEN
+ part
                   </div>
                 </div>
               </div>

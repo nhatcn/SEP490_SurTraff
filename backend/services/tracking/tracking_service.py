@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Constants
-YOLO_SCORE_TH = 0.5
+YOLO_SCORE_TH = 0.51
 REID_SCORE_TH = 0.4  # Đặt lại về 0.4 để kiểm tra, có thể điều chỉnh sau khi gỡ lỗi
 TARGET_IDS = [2, 5, 7]  # car, bus, truck
 HARDCODED_IMAGE_PATH = r"D:\multi_camera_tracking\videos\screenshot_1754414441.png"

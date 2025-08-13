@@ -230,7 +230,8 @@ def stream_count_video_service(youtube_url: str, camera_id: int):
 
     # Constants
     frame_buffer = deque(maxlen=30)  # Buffer for 1 second of frames at 30 FPS
-    vehicle_counts = {cls: 0 for cls in vehicle_classes}  # Count for each vehicle type
+    in_counts = {cls: 0 for cls in vehicle_classes}  # Count for vehicles moving "in"
+    out_counts = {cls: 0 for cls in vehicle_classes}  # Count for vehicles moving "out"
     track_position_history = {}  # Store previous positions of tracked vehicles
     counted_vehicles = set()  # Track IDs of vehicles already counted
 
@@ -243,24 +244,14 @@ def stream_count_video_service(youtube_url: str, camera_id: int):
 
     def detect_line_crossing(prev_point, curr_point, line_start, line_end):
         if prev_point is None or curr_point is None:
-            return False
+            return None
         was_below = point_below_line(prev_point, line_start, line_end)
-        is_above = not point_below_line(curr_point, line_start, line_end)
-        return was_below and is_above
-
-    def draw_rounded_rectangle(frame, top_left, bottom_right, color, radius=10):
-        x1, y1 = top_left
-        x2, y2 = bottom_right
-        # Draw four straight lines
-        cv2.line(frame, (x1 + radius, y1), (x2 - radius, y1), color, -1)
-        cv2.line(frame, (x1 + radius, y2), (x2 - radius, y2), color, -1)
-        cv2.line(frame, (x1, y1 + radius), (x1, y2 - radius), color, -1)
-        cv2.line(frame, (x2, y1 + radius), (x2, y2 - radius), color, -1)
-        # Draw four quarter-circle arcs for corners
-        cv2.ellipse(frame, (x1 + radius, y1 + radius), (radius, radius), 180, 0, 90, color, -1)
-        cv2.ellipse(frame, (x2 - radius, y1 + radius), (radius, radius), 270, 0, 90, color, -1)
-        cv2.ellipse(frame, (x1 + radius, y2 - radius), (radius, radius), 90, 0, 90, color, -1)
-        cv2.ellipse(frame, (x2 - radius, y2 - radius), (radius, radius), 0, 0, 90, color, -1)
+        is_below = point_below_line(curr_point, line_start, line_end)
+        if was_below and not is_below:
+            return "in"  # Below to above (upward movement)
+        elif not was_below and is_below:
+            return "out"  # Above to below (downward movement)
+        return None
 
     stream_url = get_stream_url(youtube_url)
     cap = cv2.VideoCapture(stream_url)
@@ -325,10 +316,15 @@ def stream_count_video_service(youtube_url: str, camera_id: int):
                     if prev_position and track_id not in counted_vehicles:
                         line_start = tuple(line_coords[0])
                         line_end = tuple(line_coords[1])
-                        if detect_line_crossing(prev_position, (cx, cy), line_start, line_end):
-                            vehicle_counts[class_name] += 1
+                        direction = detect_line_crossing(prev_position, (cx, cy), line_start, line_end)
+                        if direction == "in":
+                            in_counts[class_name] += 1
                             counted_vehicles.add(track_id)
-                            print(f"Vehicle {track_id} ({class_name}) crossed line, count updated: {vehicle_counts[class_name]}")
+                            print(f"Vehicle {track_id} ({class_name}) crossed line (IN), count updated: {in_counts[class_name]}")
+                        elif direction == "out":
+                            out_counts[class_name] += 1
+                            counted_vehicles.add(track_id)
+                            print(f"Vehicle {track_id} ({class_name}) crossed line (OUT), count updated: {out_counts[class_name]}")
 
                     # Draw bounding box and label (text matches box color, no background)
                     color = (0, 255, 0)  # Green for all vehicles
@@ -337,23 +333,14 @@ def stream_count_video_service(youtube_url: str, camera_id: int):
                     cv2.putText(frame_annotated, label, (x1, y1 - 10), 
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
 
-            # Display vehicle counts (horizontally, with rounded background)
-            x_offset = 10
-            y_position = 30
-            for cls, count in vehicle_counts.items():
-                count_text = f"{cls}: {count}"
-                font = cv2.FONT_HERSHEY_SIMPLEX
-                font_scale = 0.6
-                font_thickness = 2
-                (text_width, text_height), _ = cv2.getTextSize(count_text, font, font_scale, font_thickness)
-                # Draw rounded rectangle as background
-                top_left = (x_offset, y_position - text_height - 5)
-                bottom_right = (x_offset + text_width + 10, y_position + 5)
-                draw_rounded_rectangle(frame_annotated, top_left, bottom_right, (0, 0, 0), radius=10)
-                # Draw text
-                cv2.putText(frame_annotated, count_text, (x_offset + 5, y_position - 3), 
-                            font, font_scale, (255, 255, 255), font_thickness)
-                x_offset += text_width + 20  # Space between counts
+            # Display vehicle counts in two columns, only for non-zero counts
+            y_offset = 30
+            for cls in vehicle_classes:
+                if in_counts[cls] > 0 or out_counts[cls] > 0:  # Only display if counts are non-zero
+                    count_text = f"{cls}: In {in_counts[cls]} | Out {out_counts[cls]}"
+                    cv2.putText(frame_annotated, count_text, (10, y_offset), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                    y_offset += 30
 
             # Save frame to video output
             if out:
@@ -374,6 +361,7 @@ def stream_count_video_service(youtube_url: str, camera_id: int):
         if out:
             out.release()
         print("🧹 Stream cleanup completed")
+
 def stream_accident_video_service(youtube_url: str):
     stream_url = get_stream_url(youtube_url)
     cap = cv2.VideoCapture(stream_url)
