@@ -16,16 +16,14 @@ import {
   Video,
   Monitor,
   Grid3X3,
-
   Minimize,
 } from "lucide-react"
-import { MapContainer, TileLayer, Marker, Popup} from "react-leaflet"
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 import Sidebar from "../../../components/Layout/Sidebar"
 import Header from "../../../components/Layout/Header"
 
-// Fix for default markers in React Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
@@ -33,18 +31,11 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 })
 
-
-
 const trackingIcon = new L.Icon({
-  iconUrl: "data:image/svg+xml;base64=" + btoa(`
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="red" width="28" height="28">
-      <circle cx="12" cy="12" r="10" fill="#ef4444" stroke="white" stroke-width="2"/>
-      <path d="M8 12h8M12 8v8" stroke="white" stroke-width="2"/>
-    </svg>
-  `),
-  iconSize: [28, 28],
-  iconAnchor: [14, 14],
-  popupAnchor: [0, -14]
+  iconUrl: "https://cdn-icons-png.flaticon.com/128/684/684908.png",
+  iconSize: [32, 32],
+  iconAnchor: [16, 32],
+  popupAnchor: [0, -32],
 })
 
 interface VehicleInfo {
@@ -84,8 +75,6 @@ interface TrackingSession {
   totalCameras: number
 }
 
-
-// Vietnamese text normalization function
 const normalizeVietnamese = (text: string): string => {
   return text
     .normalize("NFD")
@@ -97,7 +86,6 @@ export default function VehicleTrackingDashboard() {
   const [vehicleInfo, setVehicleInfo] = useState<VehicleInfo>({
     searchImage: null,
   })
-
   const [isTracking, setIsTracking] = useState(false)
   const [trackingSession, setTrackingSession] = useState<TrackingSession | null>(null)
   const [dragActive, setDragActive] = useState(false)
@@ -105,24 +93,18 @@ export default function VehicleTrackingDashboard() {
   const [selectedCameraId, setSelectedCameraId] = useState<number | null>(null)
   const [fullscreenCamera, setFullscreenCamera] = useState<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-
-  // Map related states
   const [cameras, setCameras] = useState<CameraData[]>([])
   const [isLoadingCameras, setIsLoadingCameras] = useState(false)
   const [mapRef, setMapRef] = useState<L.Map | null>(null)
-  const [mapCenter, setMapCenter] = useState<[number, number]>([10.021892, 105.765306]) // Can Tho default
+  const [mapCenter, setMapCenter] = useState<[number, number]>([10.021892, 105.765306])
   const [mapZoom, setMapZoom] = useState(10)
-
-  // Location search states
   const [locationSearchQuery, setLocationSearchQuery] = useState("")
   const [filteredCameras, setFilteredCameras] = useState<CameraData[]>([])
 
-  // Load cameras from API
   useEffect(() => {
     loadCameras()
   }, [])
 
-  // Filter cameras based on location search
   useEffect(() => {
     if (locationSearchQuery.trim()) {
       const normalizedQuery = normalizeVietnamese(locationSearchQuery)
@@ -130,18 +112,30 @@ export default function VehicleTrackingDashboard() {
         normalizeVietnamese(camera.location).includes(normalizedQuery)
       )
       setFilteredCameras(filtered)
-
-      // Adjust map view to show filtered cameras
-      if (filtered.length > 0) {
+      if (filtered.length > 0 && mapRef) {
         const bounds = L.latLngBounds(filtered.map(camera => [camera.latitude, camera.longitude]))
-        if (mapRef) {
-          mapRef.fitBounds(bounds, { padding: [20, 20] })
-        }
+        mapRef.fitBounds(bounds, { padding: [20, 20] })
       }
     } else {
       setFilteredCameras(cameras)
     }
   }, [locationSearchQuery, cameras, mapRef])
+
+  useEffect(() => {
+    if (mapRef && trackingSession?.cameraStreams?.length) {
+      const bounds = L.latLngBounds(
+        trackingSession.cameraStreams
+          .map((stream) => {
+            const camera = cameras.find((c) => c.id === stream.cameraId)
+            return camera ? [camera.latitude, camera.longitude] : null
+          })
+          .filter((coord): coord is [number, number] => coord !== null)
+      )
+      if (bounds.isValid()) {
+        mapRef.fitBounds(bounds, { padding: [20, 20] })
+      }
+    }
+  }, [mapRef, trackingSession, cameras])
 
   const loadCameras = async () => {
     setIsLoadingCameras(true)
@@ -194,7 +188,6 @@ export default function VehicleTrackingDashboard() {
     e.preventDefault()
     e.stopPropagation()
     setDragActive(false)
-
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleImageUpload(e.dataTransfer.files[0])
     }
@@ -202,52 +195,41 @@ export default function VehicleTrackingDashboard() {
 
   const handleStartTracking = async () => {
     if (!vehicleInfo.searchImage) {
-      alert("Please upload an image to search");
-      return;
+      alert("Please upload an image to search")
+      return
     }
-
-    // Get all active cameras automatically
-    const activeCameraIds = filteredCameras.filter(camera => camera.status).map(camera => camera.id);
-    
+    const activeCameraIds = filteredCameras.filter(camera => camera.status).map(camera => camera.id)
     if (activeCameraIds.length === 0) {
-      alert("No active cameras available for tracking");
-      return;
+      alert("No active cameras available for tracking")
+      return
     }
-
-    setIsTracking(true);
-    setTrackingSession(null);
-
+    setIsTracking(true)
+    setTrackingSession(null)
     try {
-      // Use FormData for image search
-      const formData = new FormData();
-
-      // Send camera_ids as a proper JSON string - use all active cameras
-      formData.append("camera_ids_form", JSON.stringify(activeCameraIds));
-
-      if (vehicleInfo.searchImage) formData.append("search_image", vehicleInfo.searchImage);
-
+      const formData = new FormData()
+      formData.append("camera_ids_form", JSON.stringify(activeCameraIds))
+      if (vehicleInfo.searchImage) formData.append("search_image", vehicleInfo.searchImage)
       const response = await fetch("http://localhost:8000/api/tracking/start_session", {
         method: "POST",
         body: formData,
-      });
-
+      })
       if (response.ok) {
-        const session: TrackingSession = await response.json();
-        setTrackingSession(session);
-        setViewMode("grid");
+        const session: TrackingSession = await response.json()
+        setTrackingSession(session)
+        setViewMode("grid")
       } else {
-        const error = await response.json();
-        console.error("API Error:", error);
-        alert(`Tracking failed: ${error.detail}`);
+        const error = await response.json()
+        console.error("API Error:", error)
+        alert(`Tracking failed: ${error.detail}`)
       }
     } catch (error) {
-      console.error("Tracking failed:", error);
-      alert("Tracking failed. Please try again.");
+      console.error("Tracking failed:", error)
+      alert("Tracking failed. Please try again.")
     } finally {
-      setIsTracking(false);
+      setIsTracking(false)
     }
-  };
-  
+  }
+
   const handleStopTracking = () => {
     setTrackingSession(null)
     setFullscreenCamera(null)
@@ -276,33 +258,26 @@ export default function VehicleTrackingDashboard() {
     return `${baseUrl}/api/tracking/stream_with_image/${cameraStream.cameraId}`
   }
 
-  // Helper function to check if tracking can start
   const canStartTracking = () => {
     if (isTracking) {
       return false
     }
-
     if (!vehicleInfo.searchImage) {
       return false
     }
-
-    const activeCameras = filteredCameras.filter(camera => camera.status);
+    const activeCameras = filteredCameras.filter(camera => camera.status)
     if (activeCameras.length === 0) {
       return false
     }
-
     return true
   }
 
   return (
     <div className="flex h-screen bg-gray-50">
       <Sidebar defaultActiveItem="tracks" />
-
       <div className="flex flex-col flex-grow overflow-hidden">
         <Header title="Vehicle Tracking System" />
-
         <div className="flex-1 overflow-auto p-6">
-          {/* Location Filter Section */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-gray-800 flex items-center gap-3">
@@ -321,7 +296,6 @@ export default function VehicleTrackingDashboard() {
                 </button>
               )}
             </div>
-
             <div className="flex gap-4 items-center mb-4">
               <div className="flex-1 relative max-w-md">
                 <input
@@ -332,7 +306,6 @@ export default function VehicleTrackingDashboard() {
                   className="w-full p-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
-
               <div className="text-sm text-gray-600">
                 {locationSearchQuery ? (
                   <span className="bg-blue-100 text-blue-800 px-3 py-2 rounded-lg font-medium">
@@ -342,15 +315,12 @@ export default function VehicleTrackingDashboard() {
                   <span>Showing all {cameras.length} cameras</span>
                 )}
               </div>
-
               <div className="text-sm">
                 <span className="bg-green-100 text-green-800 px-3 py-2 rounded-lg font-medium">
                   Active: {filteredCameras.filter(camera => camera.status).length} cameras
                 </span>
               </div>
             </div>
-
-            {/* Camera Display Grid */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-3">
               {filteredCameras.map((camera) => (
                 <div
@@ -371,13 +341,10 @@ export default function VehicleTrackingDashboard() {
                 </div>
               ))}
             </div>
-            
             <div className="mt-4 text-sm text-gray-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
               <p><strong>Note:</strong> All active cameras will be automatically used for tracking when you start the search.</p>
             </div>
           </div>
-
-          {/* Search Section */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
@@ -387,7 +354,6 @@ export default function VehicleTrackingDashboard() {
                 Vehicle Image Search & Tracking
               </h2>
             </div>
-
             <div className="space-y-6">
               <div
                 className={`relative border-2 border-dashed rounded-xl p-12 transition-all duration-300 ${dragActive
@@ -406,7 +372,6 @@ export default function VehicleTrackingDashboard() {
                   onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])}
                   className="hidden"
                 />
-
                 {vehicleInfo.searchImage ? (
                   <div className="text-center">
                     <div className="inline-block relative group">
@@ -448,7 +413,6 @@ export default function VehicleTrackingDashboard() {
                 )}
               </div>
             </div>
-
             <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-200">
               <div className="flex items-center gap-4">
                 <button
@@ -471,7 +435,6 @@ export default function VehicleTrackingDashboard() {
                     </>
                   )}
                 </button>
-
                 {trackingSession && (
                   <button
                     onClick={handleStopTracking}
@@ -481,7 +444,6 @@ export default function VehicleTrackingDashboard() {
                     Stop Tracking
                   </button>
                 )}
-
                 {vehicleInfo.searchImage && (
                   <button
                     onClick={clearSearch}
@@ -492,14 +454,11 @@ export default function VehicleTrackingDashboard() {
                   </button>
                 )}
               </div>
-
               <div className="text-sm text-gray-600">
                 {filteredCameras.filter(camera => camera.status).length} active cameras will be used for tracking
               </div>
             </div>
           </div>
-
-          {/* Live Tracking Section */}
           {trackingSession && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="bg-gradient-to-r from-green-50 to-blue-50 px-6 py-6 border-b border-gray-200">
@@ -519,7 +478,6 @@ export default function VehicleTrackingDashboard() {
                       </div>
                     </div>
                   </div>
-
                   <div className="flex items-center gap-3">
                     <div className="flex bg-white rounded-lg p-1 shadow-sm border">
                       <button
@@ -547,7 +505,6 @@ export default function VehicleTrackingDashboard() {
                         Map
                       </button>
                     </div>
-
                     <button
                       onClick={handleStopTracking}
                       className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors flex items-center gap-2 font-medium"
@@ -557,7 +514,6 @@ export default function VehicleTrackingDashboard() {
                     </button>
                   </div>
                 </div>
-
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-6 text-sm">
                   <div>
                     <span className="font-semibold text-gray-700 block mb-1">Search Method:</span>
@@ -566,12 +522,10 @@ export default function VehicleTrackingDashboard() {
                       Image Search
                     </div>
                   </div>
-
                   <div>
                     <span className="font-semibold text-gray-700 block mb-1">Active Cameras:</span>
                     <div className="text-2xl font-bold text-green-600">{trackingSession.totalCameras}</div>
                   </div>
-
                   <div>
                     <span className="font-semibold text-gray-700 block mb-1">Status:</span>
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
@@ -581,7 +535,6 @@ export default function VehicleTrackingDashboard() {
                   </div>
                 </div>
               </div>
-
               <div className="p-6">
                 {viewMode === "grid" && (
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
@@ -596,7 +549,6 @@ export default function VehicleTrackingDashboard() {
                             alt={`Live stream from ${cameraStream.cameraName}`}
                             className="w-full h-full object-cover"
                             onError={(e) => {
-                              // Fallback to placeholder on error
                               const target = e.target as HTMLImageElement
                               target.src = "/placeholder.svg?height=200&width=300&text=Camera+Offline"
                             }}
@@ -643,7 +595,6 @@ export default function VehicleTrackingDashboard() {
                     ))}
                   </div>
                 )}
-
                 {viewMode === "single" && (
                   <div className="space-y-6">
                     <div className="flex justify-between items-center">
@@ -669,7 +620,6 @@ export default function VehicleTrackingDashboard() {
                         </button>
                       </div>
                     </div>
-
                     {selectedCameraId && (
                       <div className="bg-black rounded-xl overflow-hidden">
                         <div className="relative aspect-video">
@@ -697,7 +647,6 @@ export default function VehicleTrackingDashboard() {
                         </div>
                       </div>
                     )}
-
                     {!selectedCameraId && (
                       <div className="text-center py-16 text-gray-500 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300">
                         <Camera size={48} className="mx-auto mb-4 text-gray-400" />
@@ -707,7 +656,6 @@ export default function VehicleTrackingDashboard() {
                     )}
                   </div>
                 )}
-
                 {viewMode === "map" && (
                   <div className="space-y-6">
                     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -734,8 +682,10 @@ export default function VehicleTrackingDashboard() {
                           />
                           {trackingSession.cameraStreams.map((stream) => {
                             const camera = cameras.find(c => c.id === stream.cameraId)
-                            if (!camera) return null
-
+                            if (!camera || isNaN(camera.latitude) || isNaN(camera.longitude)) {
+                              console.warn(`Invalid coordinates for camera ${stream.cameraId}`)
+                              return null
+                            }
                             return (
                               <Marker
                                 key={`tracking-camera-${stream.cameraId}`}
@@ -789,8 +739,6 @@ export default function VehicleTrackingDashboard() {
               </div>
             </div>
           )}
-
-          {/* Fullscreen Camera Modal */}
           {fullscreenCamera && trackingSession && (
             <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50">
               <div className="relative w-full h-full max-w-7xl max-h-screen p-4">
@@ -826,7 +774,6 @@ export default function VehicleTrackingDashboard() {
               </div>
             </div>
           )}
-
           {isLoadingCameras && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
               <div className="flex items-center justify-center gap-3 text-gray-600">
