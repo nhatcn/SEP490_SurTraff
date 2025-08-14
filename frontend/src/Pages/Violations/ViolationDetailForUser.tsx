@@ -23,6 +23,7 @@ import axios, { AxiosError } from "axios";
 import Footer from "../../components/Layout/Footer";
 import { Header, MobileDropdownMenu } from "../../components/Layout/Menu";
 import logoImage from "../../asset/logo/screenshot_1749087176-removebg-preview.png";
+import API_URL_BE from "../../components/Link/LinkAPI";
 
 
 // Extend jsPDF types to include jsPDF-autotable properties
@@ -86,7 +87,7 @@ interface ViolationsDTO {
   status?: "Pending" | "Request" | "Approve" | "Reject" | "Processed";
 }
 
-const API_URL = "http://localhost:8081";
+
 
 const ViolationDetailForUser: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -102,7 +103,7 @@ const ViolationDetailForUser: React.FC = () => {
     const fetchViolation = async () => {
       try {
         const response = await axios.get<ViolationsDTO>(
-          `${API_URL}api/violations/${id}`,
+          `${API_URL_BE}api/violations/${id}`,
           {
             headers: {
               Accept: "application/json",
