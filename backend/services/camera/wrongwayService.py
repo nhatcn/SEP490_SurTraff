@@ -391,7 +391,9 @@ def stream_violation_wrongway_video_service1(youtube_url: str, camera_id: int):
                     # Determine final label and color based on the single 'is_wrong_way' flag
                     if vehicle_violation_status[track_id]["is_wrong_way"]:
                         bbox_color = (0, 0, 255) # Red
+
                         label = f"ID:{track_id} {cls_name} - Wronng Way"
+
                     else:
                         bbox_color = (0, 255, 0) # Green if no violation
                         label = f"ID:{track_id} {cls_name}"
