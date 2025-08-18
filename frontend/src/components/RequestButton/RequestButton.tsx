@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios, { AxiosError } from 'axios';
-import API_URL_BE from '../Link/LinkAPI';
+import {API_URL_BE} from '../Link/LinkAPI';
 
 // Define ViolationsDTO interface
 interface ViolationsDTO {

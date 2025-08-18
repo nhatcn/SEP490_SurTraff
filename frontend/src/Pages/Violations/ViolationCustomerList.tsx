@@ -3,7 +3,7 @@ import axios, { AxiosError } from 'axios';
 import { motion } from 'framer-motion';
 import { Camera, Car, Clock, MapPin, AlertTriangle, Search, ChevronDown, Filter, X } from 'lucide-react';
 import RequestButton from '../../components/RequestButton/RequestButton';
-import API_URL_BE from '../../components/Link/LinkAPI';
+import {API_URL_BE} from '../../components/Link/LinkAPI';
 
 // Define ViolationsDTO interface
 interface ViolationsDTO {

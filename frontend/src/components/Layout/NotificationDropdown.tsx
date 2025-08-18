@@ -7,7 +7,7 @@ import { useLocation } from "react-router-dom";
 import NewNotificationAlert from "./new-notification-alert";
 import { getCookie } from "../../utils/cookieUltil";
 import { useNavigate } from "react-router-dom" // Thêm dòng này
-import API_URL_BE from "../Link/LinkAPI";
+import {API_URL_BE} from "../Link/LinkAPI";
 
 
 interface Notification {

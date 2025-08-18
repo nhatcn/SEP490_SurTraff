@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Save, X, Car, CheckCircle, AlertCircle } from 'lucide-react';
-import API_URL_BE from '../../../components/Link/LinkAPI';
+import {API_URL_BE} from '../../../components/Link/LinkAPI';
 
 interface VehicleType {
   id: number;

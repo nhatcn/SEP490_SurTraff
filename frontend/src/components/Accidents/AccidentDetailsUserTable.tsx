@@ -37,7 +37,7 @@ import { getStatusBadge } from "../../components/Accidents/status-badge"
 import { getYouTubeEmbedUrl } from "../../components/Accidents/video-utils"
 import type { AccidentType } from "../../types/Accident/accident"
 import { motion } from "framer-motion"
-import API_URL_BE from "../Link/LinkAPI"
+import {API_URL_BE} from "../Link/LinkAPI"
 
 export default function AccidentDetailsTable() {
   const { id } = useParams()

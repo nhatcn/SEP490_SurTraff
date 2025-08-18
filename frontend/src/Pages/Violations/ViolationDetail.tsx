@@ -9,7 +9,7 @@ import { Eye, RefreshCw, CheckCircle2, XCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import API_URL_BE from "../../components/Link/LinkAPI";
+import {API_URL_BE} from "../../components/Link/LinkAPI";
 
 interface Camera {
   id: number;

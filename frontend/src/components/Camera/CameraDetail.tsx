@@ -2,6 +2,7 @@ import { MapPin, Maximize2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import FullscreenCameraView from "./FullscreenCameraView";
+import { API_URL_FAST } from "../Link/LinkAPI";
 
 interface CameraProps {
   id: string | number;
@@ -66,7 +67,7 @@ export default function CameraDetail({ camera }: CameraDetailProps) {
     );
   }
 
-  const processedVideoUrl = `http://localhost:8000/api/video/${camera.id}`;
+  const processedVideoUrl = API_URL_FAST+`api/video/${camera.id}`;
 
   return (
     <>

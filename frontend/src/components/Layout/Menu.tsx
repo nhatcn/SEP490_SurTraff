@@ -8,7 +8,7 @@ import { useNavigate } from "react-router-dom"
 import Logo from "../../components/Logo/Logo"
 import NotificationDropdown from "./NotificationDropdown"
 import { eraseCookie, getCookie } from "../../utils/cookieUltil"
-import API_URL_BE from "../Link/LinkAPI"
+import {API_URL_BE} from "../Link/LinkAPI"
 
 interface HeaderProps {
   showMobileMenu: boolean

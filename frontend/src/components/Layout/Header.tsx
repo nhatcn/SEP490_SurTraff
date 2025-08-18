@@ -5,7 +5,7 @@ import { Search, Bell, User, ChevronDown, Clock } from "lucide-react"
 import { useState, useEffect } from "react"
 import { getCookie } from "../../utils/cookieUltil"
 import { useNavigate } from "react-router-dom"
-import API_URL_BE from "../Link/LinkAPI"
+import {API_URL_BE} from "../Link/LinkAPI"
 
 interface HeaderProps {
   title: string

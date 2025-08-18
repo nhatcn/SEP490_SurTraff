@@ -23,7 +23,7 @@ import axios, { AxiosError } from "axios";
 import Footer from "../../components/Layout/Footer";
 import { Header, MobileDropdownMenu } from "../../components/Layout/Menu";
 import logoImage from "../../asset/logo/screenshot_1749087176-removebg-preview.png";
-import API_URL_BE from "../../components/Link/LinkAPI";
+import {API_URL_BE} from "../../components/Link/LinkAPI";
 
 
 // Extend jsPDF types to include jsPDF-autotable properties

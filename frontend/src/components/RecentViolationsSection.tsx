@@ -4,7 +4,7 @@ import { Car, AlertTriangle, CheckCircle, XCircle, Activity, ArrowLeft } from "l
 import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import { getCookie } from "../utils/cookieUltil"
-import API_URL_BE from "./Link/LinkAPI"
+import {API_URL_BE} from "./Link/LinkAPI"
 
 interface Violation {
   id: number

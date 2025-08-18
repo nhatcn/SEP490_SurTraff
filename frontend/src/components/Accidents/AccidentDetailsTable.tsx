@@ -35,7 +35,7 @@ import type { AccidentType } from "../../types/Accident/accident";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
 import { toast } from "react-toastify";
-import API_URL_BE from "../Link/LinkAPI";
+import {API_URL_BE} from "../Link/LinkAPI";
 
 export default function AccidentDetailsTable() {
   const { id } = useParams();

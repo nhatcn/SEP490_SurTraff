@@ -6,7 +6,7 @@ import CardLineChart from "../../../components/Cards/CardLineChart";
 import CardBarChart from "../../../components/Cards/CardBarChart";
 import CardLineChart2 from "../../../components/Cards/CardLineChart2";
 import CardMapChart from "../../../components/Cards/CardMapChart";
-import API_URL_BE from "../../../components/Link/LinkAPI";
+import {API_URL_BE} from "../../../components/Link/LinkAPI";
 
 interface Camera {
   id: number;

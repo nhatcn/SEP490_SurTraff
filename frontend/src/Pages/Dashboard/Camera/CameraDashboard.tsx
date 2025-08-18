@@ -6,6 +6,7 @@ import CameraCard from "../../../components/Camera/CameraCard";
 import CameraDetail from "../../../components/Camera/CameraDetail";
 import { Link } from "react-router-dom";
 import AddButton from "../../../components/Button/AddButton";
+import { API_URL_FAST } from "../../../components/Link/LinkAPI";
 
 interface CameraType {
   id: string | number;
@@ -38,7 +39,7 @@ export default function CameraDashboard() {
   useEffect(() => {
     // Fetch camera data from backend
     setLoading(true);
-    fetch("http://localhost:8000/api/cameras")
+    fetch(API_URL_FAST+"api/cameras")
       .then((res) => {
         if (!res.ok) {
           throw new Error("Failed to fetch camera data");
@@ -50,7 +51,7 @@ export default function CameraDashboard() {
           typeof a.id === 'number' && typeof b.id === 'number' ? a.id - b.id : String(a.id).localeCompare(String(b.id))
         );
 
-        console.log("Fetched cameras:", sortedData);
+   
         setCameras(sortedData);
 
         // Select first camera if none is selected

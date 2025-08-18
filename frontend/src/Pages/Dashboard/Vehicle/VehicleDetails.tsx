@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import Sidebar from '../../../components/Layout/Sidebar';
 import Header from '../../../components/Layout/Header';
-import API_URL_BE from '../../../components/Link/LinkAPI';
+import {API_URL_BE} from '../../../components/Link/LinkAPI';
 
 // Custom debounce function
 function debounce<T extends (...args: any[]) => void>(func: T, wait: number): (...args: Parameters<T>) => void {

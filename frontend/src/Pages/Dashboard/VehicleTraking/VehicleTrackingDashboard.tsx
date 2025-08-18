@@ -10,7 +10,7 @@ import {
   Upload,
   ImageIcon,
   Pause,
-  Maximize,Maximize2,
+  Maximize, Maximize2,
   Camera,
   Navigation,
   Video,
@@ -24,6 +24,7 @@ import "leaflet/dist/leaflet.css"
 import 'leaflet-polylinedecorator';
 import Sidebar from "../../../components/Layout/Sidebar"
 import Header from "../../../components/Layout/Header"
+import { API_URL_FAST } from "../../../components/Link/LinkAPI"
 
 delete (L.Icon.Default.prototype as any)._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -223,7 +224,11 @@ export default function VehicleTrackingDashboard() {
   const loadCameras = async () => {
     setIsLoadingCameras(true)
     try {
-      const response = await fetch('http://localhost:8000/api/cameras')
+      const response = await fetch(API_URL_FAST+'api/cameras', {
+  headers: {
+    'ngrok-skip-browser-warning': '69420',
+  }
+})
       if (response.ok) {
         const data = await response.json()
         const formattedCameras: CameraData[] = data.map((camera: any) => ({
@@ -292,10 +297,14 @@ export default function VehicleTrackingDashboard() {
       const formData = new FormData()
       formData.append("camera_ids_form", JSON.stringify(activeCameraIds))
       if (vehicleInfo.searchImage) formData.append("search_image", vehicleInfo.searchImage)
-      const response = await fetch("http://localhost:8000/api/tracking/start_session", {
+      const response = await fetch(API_URL_FAST+"api/tracking/start_session", {
         method: "POST",
+
         body: formData,
-      })
+        headers: {
+          "ngrok-skip-browser-warning": "69420",
+        },
+      },)
       if (response.ok) {
         const session: TrackingSession = await response.json()
         setTrackingSession(session)
@@ -339,8 +348,8 @@ export default function VehicleTrackingDashboard() {
   }
 
   const getStreamUrl = (cameraStream: CameraStream) => {
-    const baseUrl = "http://localhost:8000"
-    return `${baseUrl}/api/tracking/stream_with_image/${cameraStream.cameraId}`
+    const baseUrl = API_URL_FAST
+    return `${baseUrl}api/tracking/stream_with_image/${cameraStream.cameraId}`
   }
 
   const canStartTracking = () => {
@@ -410,10 +419,10 @@ export default function VehicleTrackingDashboard() {
               {filteredCameras.map((camera) => (
                 <div
                   key={camera.id}
-                  className={`p-3 rounded-lg border-2 transition-all ${camera.status 
-                    ? "border-green-200 bg-green-50" 
+                  className={`p-3 rounded-lg border-2 transition-all ${camera.status
+                    ? "border-green-200 bg-green-50"
                     : "border-gray-200 bg-gray-50"
-                  }`}
+                    }`}
                 >
                   <div className="text-sm font-medium text-gray-800 truncate">{camera.name}</div>
                   <div className="text-xs text-gray-600 truncate">{camera.location}</div>
@@ -783,14 +792,12 @@ export default function VehicleTrackingDashboard() {
                                     <h4 className="font-bold text-gray-800">{stream.cameraName}</h4>
                                     <p className="text-sm text-gray-600 mb-2">{stream.location}</p>
                                     <div
-                                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium mb-2 ${
-                                        stream.status === "active" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
-                                      }`}
+                                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium mb-2 ${stream.status === "active" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
+                                        }`}
                                     >
                                       <div
-                                        className={`w-2 h-2 rounded-full ${
-                                          stream.status === "active" ? "bg-green-500 animate-pulse" : "bg-gray-500"
-                                        }`}
+                                        className={`w-2 h-2 rounded-full ${stream.status === "active" ? "bg-green-500 animate-pulse" : "bg-gray-500"
+                                          }`}
                                       ></div>
                                       {stream.status === "active" ? "LIVE TRACKING" : "OFFLINE"}
                                     </div>
@@ -870,7 +877,7 @@ export default function VehicleTrackingDashboard() {
                   <div className="absolute top-4 left-4 bg-red-600 text-white px-3 py-2 rounded text-sm font-bold flex items-center gap-2">
                     <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
                     LIVE TRACKING - FULLSCREEN
- part
+                    part
                   </div>
                 </div>
               </div>

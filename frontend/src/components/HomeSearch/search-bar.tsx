@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState, useEffect, useRef } from "react"
 import { Search, Car } from "lucide-react"
-import API_URL_BE from "../Link/LinkAPI"
+import {API_URL_BE} from "../Link/LinkAPI"
 
 interface Vehicle {
   id: number

@@ -2,7 +2,7 @@ import { useState, useEffect, ReactNode } from 'react';
 import GenericTable, { TableColumn, FilterConfig } from '../../components/Table/GenericTable';
 import ConfirmDialog from '../UI/PopUp/ConfirmDialog';
 import DeleteButton from '../Button/DeleteButton';
-import API_URL_BE from '../Link/LinkAPI';
+import {API_URL_BE} from '../Link/LinkAPI';
 
 // Hàm helper để lấy cookie
 const getCookie = (name: string) => {

@@ -15,7 +15,7 @@ import {
   Target, Zap, Activity, Globe, CheckCircle2, XCircle, ChevronLeft,
   ChevronRight
 } from "lucide-react";
-import API_URL_BE from "../../components/Link/LinkAPI";
+import {API_URL_BE} from "../../components/Link/LinkAPI";
 
 // Types
 interface ViolationType {

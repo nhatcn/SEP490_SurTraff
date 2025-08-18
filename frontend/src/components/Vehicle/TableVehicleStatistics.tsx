@@ -6,7 +6,7 @@ import {
   Chart as ChartJS,
 } from 'chart.js';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
-import API_URL_BE from '../Link/LinkAPI';
+import {API_URL_BE} from '../Link/LinkAPI';
 
 Chart.register(...registerables, ChartDataLabels);
 

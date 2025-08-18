@@ -8,7 +8,7 @@ import L from "leaflet";
 import ZoneCanvas from "../../../components/Camera/ZoneCanvas";
 import LaneDirectionConfig from "../../../components/Camera/LaneDirectionConfig";
 import LightZoneMappingConfig from "../../../components/Camera/LightZoneMappingConfig";
-import API_URL_BE from "../../../components/Link/LinkAPI";
+import {API_URL_BE,  API_URL_FAST } from "../../../components/Link/LinkAPI";
 
 const markerIconUrl = "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png";
 const markerShadowUrl = "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png";
@@ -372,7 +372,7 @@ export default function EditCamera() {
     setThumbnailError(null);
 
     try {
-      const response = await fetch("http://localhost:8000/api/thumbnail/extract", {
+      const response = await fetch(API_URL_FAST+"api/thumbnail/extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ stream_url: streamUrl })

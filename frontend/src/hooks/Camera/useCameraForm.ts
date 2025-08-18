@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Zone, LaneDirection, LightZoneMapping } from '../../types/Camera/camera';
-import API_URL_BE from '../../components/Link/LinkAPI';
+import {API_URL_BE,  API_URL_FAST } from '../../components/Link/LinkAPI';
 
 // Type for violation type from API
 interface ViolationType {
@@ -95,7 +95,7 @@ export const useCameraForm = () => {
     setThumbnailError(null);
 
     try {
-      const response = await fetch("http://localhost:8000/api/thumbnail/extract", {
+      const response = await fetch(API_URL_FAST+"api/thumbnail/extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ stream_url: streamUrl })

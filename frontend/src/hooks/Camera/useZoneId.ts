@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import API_URL_BE from '../../components/Link/LinkAPI';
+import {API_URL_BE} from '../../components/Link/LinkAPI';
 
 export const useZoneId = () => {
   const [nextZoneId, setNextZoneId] = useState<number>(1);

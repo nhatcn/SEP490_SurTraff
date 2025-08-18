@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import Sidebar from "../../components/Layout/Sidebar";
 import Header from "../../components/Layout/Header";
-import API_URL_BE from "../../components/Link/LinkAPI";
+import {API_URL_BE} from "../../components/Link/LinkAPI";
 
 interface ViolationType {
   id: number;

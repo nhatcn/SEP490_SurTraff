@@ -12,7 +12,7 @@ import {
   AuthState
 } from '../../types/Auth/auth';
 import { setCookie } from '../../utils/cookieUltil';
-import API_URL_BE from '../../components/Link/LinkAPI';
+import {API_URL_BE} from '../../components/Link/LinkAPI';
 
 const API_BASE_URL = API_URL_BE +'api/users';
 

@@ -9,7 +9,7 @@ import CardLineChartViolations3 from "../../components/Cards/CardLineChartViolat
 import CardDonutChart from "../../components/Cards/CardDonutChartViolations";
 import CardDonutChartMonth from "../../components/Cards/CardDonutChartViolations2";
 import CardDonutChartYear from "../../components/Cards/CardDonutChartViolations3";
-import API_URL_BE from "../../components/Link/LinkAPI";
+import {API_URL_BE} from "../../components/Link/LinkAPI";
 
 interface Violation {
   id: number;

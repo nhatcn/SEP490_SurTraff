@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import GenericTable, { TableColumn, TableAction, FilterConfig } from '../../components/Table/GenericTable';
 import ConfirmDialog from '../UI/PopUp/ConfirmDialog';
 import DeleteButton from '../Button/DeleteButton';
-import API_URL_BE from '../Link/LinkAPI';
+import {API_URL_BE} from '../Link/LinkAPI';
 
 
 interface Vehicle {

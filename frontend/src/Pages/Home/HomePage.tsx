@@ -9,7 +9,7 @@ import { SearchBar } from "../../components/HomeSearch/search-bar"
 import RecentViolationsSection from "../../components/RecentViolationsSection"
 import { getCookie } from "../../utils/cookieUltil"
 import Chatbot from "../../components/Chatbot/chatbot"
-import API_URL_BE from "../../components/Link/LinkAPI"
+import {API_URL_BE} from "../../components/Link/LinkAPI"
 
 
 

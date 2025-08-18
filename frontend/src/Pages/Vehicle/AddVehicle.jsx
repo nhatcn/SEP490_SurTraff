@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { getCookie } from "../../utils/cookieUltil"
 import { Header, MobileDropdownMenu } from '../../components/Layout/Menu';
 import Footer from '../../components/Layout/Footer';
-import API_URL_BE from '../../components/Link/LinkAPI';
+import {API_URL_BE} from '../../components/Link/LinkAPI';
 
 const AddVehicle = () => {
   const navigate = useNavigate();

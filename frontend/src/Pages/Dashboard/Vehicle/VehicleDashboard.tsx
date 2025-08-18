@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import Sidebar from "../../../components/Layout/Sidebar";
 import Header from "../../../components/Layout/Header";
 import TableVehicle from "../../../components/Vehicle/TableVehicle";
-import API_URL_BE from "../../../components/Link/LinkAPI";
+import {API_URL_BE} from "../../../components/Link/LinkAPI";
 
 interface VehicleType {
   id: number;

@@ -29,7 +29,7 @@ import {
 } from "lucide-react"
 import { format } from "date-fns"
 import ExportAccidentPDF from "../../components/Accidents/export-accident-pdf" // Import the new component
-import API_URL_BE from "../Link/LinkAPI"
+import {API_URL_BE} from "../Link/LinkAPI"
 
 // Types
 interface AccidentType {

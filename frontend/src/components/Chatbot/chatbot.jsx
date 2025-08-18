@@ -88,7 +88,7 @@ const Chatbot = () => {
     setInput("")
 
     try {
-      const response = await fetch("http://localhost:8000/api/query", {
+      const response = await fetch(API_URL_FAST+"api/query", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -156,7 +156,7 @@ const Chatbot = () => {
     setIsFeedbackLoading(true)
     try {
       const question = messages[feedbackMessageId].text
-      const response = await fetch("http://localhost:8000/api/feedback/", {
+      const response = await fetch(API_URL_FAST+"api/feedback/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
