@@ -224,8 +224,7 @@ export const useZoneCanvas = ({
     // Tọa độ click trên canvas hiển thị
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    
-    const requirements = getZoneRequirements(activeZoneType);
+
     
     if (activeZoneType === 'line') {
       if (currentPoints.length < 2) {

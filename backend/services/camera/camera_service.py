@@ -215,89 +215,152 @@ def stream_violation_video_service(youtube_url: str, camera_id: int):
             task['writer'].release()
 
 
-def stream_count_video_service(youtube_url: str):
+import cv2
+import numpy as np
+from datetime import datetime
+from collections import deque
+from ultralytics import YOLO
+from utils.yt_stream import get_stream_url
+import traceback
+
+def stream_count_video_service(youtube_url: str, camera_id: int):
+    # Load model
+    model_vehicle = YOLO("bestv8m.pt")
+    vehicle_classes = ['Bus', 'Car', 'Cycle', 'Truck', 'Van']  # Classes 0, 1, 2, 3, 4
+
+    # Constants
+    frame_buffer = deque(maxlen=30)  # Buffer for 1 second of frames at 30 FPS
+    in_counts = {cls: 0 for cls in vehicle_classes}  # Count for vehicles moving "in"
+    out_counts = {cls: 0 for cls in vehicle_classes}  # Count for vehicles moving "out"
+    track_position_history = {}  # Store previous positions of tracked vehicles
+    counted_vehicles = set()  # Track IDs of vehicles already counted
+
+    def point_below_line(point, line_start, line_end):
+        x, y = point
+        x1, y1 = line_start
+        x2, y2 = line_end
+        cross_product = (x2 - x1) * (y - y1) - (y2 - y1) * (x - x1)
+        return cross_product > 0
+
+    def detect_line_crossing(prev_point, curr_point, line_start, line_end):
+        if prev_point is None or curr_point is None:
+            return None
+        was_below = point_below_line(prev_point, line_start, line_end)
+        is_below = point_below_line(curr_point, line_start, line_end)
+        if was_below and not is_below:
+            return "in"  # Below to above (upward movement)
+        elif not was_below and is_below:
+            return "out"  # Above to below (downward movement)
+        return None
+
     stream_url = get_stream_url(youtube_url)
     cap = cv2.VideoCapture(stream_url)
     if not cap.isOpened():
         raise ValueError("Cannot open stream")
 
-    model = YOLO("yolov8m.pt")
-    vehicle_ids = {}
-    in_count = {}
-    out_count = {}
+    # Initialize video output
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30
+    out = None
+    frame_size_initialized = False
+    line_coords = None
 
     try:
         while True:
             ret, frame = cap.read()
             if not ret:
+                print("Failed to read frame, reconnecting...")
                 cap.release()
                 cap = cv2.VideoCapture(stream_url)
                 continue
 
+            frame_annotated = frame.copy()
             h, w, _ = frame.shape
-            line_y = int(h * 0.8)
+            frame_buffer.append(frame_annotated.copy())
 
-            results = model.track(source=frame, persist=True, conf=0.3, iou=0.5, tracker="bytetrack.yaml")[0]
+            # Initialize line position (2:8 ratio, bottom to top)
+            if not frame_size_initialized:
+                line_y = int(h * 0.8)  # 80% from top (2:8 ratio)
+                line_coords = np.array([[0, line_y], [w, line_y]], dtype=np.int32)
+                print(f"Line initialized at y={line_y} (frame size: {w}x{h})")
+                frame_size_initialized = True
 
-            if results.boxes is None or results.boxes.id is None:
-                continue
+                # Initialize video output
+                output_video_path = f"output_count_{camera_id}.mp4"
+                out = cv2.VideoWriter(output_video_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
 
-            boxes = results.boxes
-            for i in range(len(boxes)):
-                cls_id = int(boxes.cls[i])
-                class_name = model.names[cls_id]
-                conf = float(boxes.conf[i])
-                track_id = int(boxes.id[i])
+            # Draw counting line
+            cv2.polylines(frame_annotated, [line_coords], isClosed=False, color=(0, 255, 255), thickness=3)
+            mid_point = line_coords[len(line_coords)//2]
+            cv2.putText(frame_annotated, "Counting Line", tuple(mid_point), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
 
-                if class_name not in ['car', 'truck', 'bus', 'motorbike', 'bicycle'] or conf < 0.3:
-                    continue
+            # Detect and track vehicles
+            results = model_vehicle.track(source=frame, persist=True, conf=0.4, iou=0.4, tracker="bytetrack.yaml")[0]
 
-                x1, y1, x2, y2 = map(int, boxes.xyxy[i])
-                center_y = (y1 + y2) // 2
+            if results.boxes is not None and results.boxes.id is not None:
+                for i in range(len(results.boxes)):
+                    cls_id = int(results.boxes.cls[i])
+                    class_name = model_vehicle.names[cls_id]
+                    if class_name not in vehicle_classes:
+                        continue
 
-                if track_id not in vehicle_ids:
-                    vehicle_ids[track_id] = {'prev_y': center_y, 'counted': False, 'class_name': class_name}
-                else:
-                    prev_y = vehicle_ids[track_id]['prev_y']
+                    x1, y1, x2, y2 = map(int, results.boxes.xyxy[i])
+                    cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+                    track_id = int(results.boxes.id[i])
 
-                    if not vehicle_ids[track_id]['counted']:
-                        if prev_y < line_y <= center_y:
-                            in_count[class_name] = in_count.get(class_name, 0) + 1
-                            vehicle_ids[track_id]['counted'] = True
-                        elif prev_y > line_y >= center_y:
-                            out_count[class_name] = out_count.get(class_name, 0) + 1
-                            vehicle_ids[track_id]['counted'] = True
+                    # Save previous position
+                    prev_position = track_position_history.get(track_id)
+                    track_position_history[track_id] = (cx, cy)
 
-                    vehicle_ids[track_id]['prev_y'] = center_y
+                    # Check if vehicle crosses the line
+                    if prev_position and track_id not in counted_vehicles:
+                        line_start = tuple(line_coords[0])
+                        line_end = tuple(line_coords[1])
+                        direction = detect_line_crossing(prev_position, (cx, cy), line_start, line_end)
+                        if direction == "in":
+                            in_counts[class_name] += 1
+                            counted_vehicles.add(track_id)
+                            print(f"Vehicle {track_id} ({class_name}) crossed line (IN), count updated: {in_counts[class_name]}")
+                        elif direction == "out":
+                            out_counts[class_name] += 1
+                            counted_vehicles.add(track_id)
+                            print(f"Vehicle {track_id} ({class_name}) crossed line (OUT), count updated: {out_counts[class_name]}")
 
-                # Draw box and ID
-                color = (255, 255, 255)
-                cv2.rectangle(frame, (x1, y1), (x2, y2), color, 1)
-                cv2.putText(frame, f"ID:{track_id}, {class_name}", (x1, y1 - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.3, color, 1)
+                    # Draw bounding box and label (text matches box color, no background)
+                    color = (0, 255, 0)  # Green for all vehicles
+                    label = f"ID:{track_id} {class_name}"
+                    cv2.rectangle(frame_annotated, (x1, y1), (x2, y2), color, 2)
+                    cv2.putText(frame_annotated, label, (x1, y1 - 10), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
 
-            # Draw count line
-            cv2.line(frame, (0, line_y), (w, line_y), (0, 255, 255), 1)
+            # Display vehicle counts in two columns, only for non-zero counts
+            y_offset = 30
+            for cls in vehicle_classes:
+                if in_counts[cls] > 0 or out_counts[cls] > 0:  # Only display if counts are non-zero
+                    count_text = f"{cls}: In {in_counts[cls]} | Out {out_counts[cls]}"
+                    cv2.putText(frame_annotated, count_text, (10, y_offset), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                    y_offset += 30
 
-            # Display per-class IN and OUT counts
-            y_offset = 40
-            for class_name in sorted(set(in_count.keys()) | set(out_count.keys())):
-                in_c = in_count.get(class_name, 0)
-                out_c = out_count.get(class_name, 0)
-                cv2.putText(frame, f"{class_name.upper()} IN: {in_c}", (10, y_offset),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1)
-                y_offset += 30
-                cv2.putText(frame, f"{class_name.upper()} OUT: {out_c}", (10, y_offset),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 1)
-                y_offset += 30
+            # Save frame to video output
+            if out:
+                out.write(frame_annotated)
 
-            _, jpeg = cv2.imencode('.jpg', frame)
+            # Stream video
+            _, jpeg = cv2.imencode('.jpg', frame_annotated, [cv2.IMWRITE_JPEG_QUALITY, 85])
             yield (
                 b"--frame\r\n"
                 b"Content-Type: image/jpeg\r\n\r\n" + jpeg.tobytes() + b"\r\n"
             )
+
+    except Exception as e:
+        print(f"❌ Error in stream_count_video_service: {e}")
+        traceback.print_exc()
     finally:
         cap.release()
+        if out:
+            out.release()
+        print("🧹 Stream cleanup completed")
 
 def stream_accident_video_service(youtube_url: str):
     stream_url = get_stream_url(youtube_url)

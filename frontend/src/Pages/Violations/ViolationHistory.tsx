@@ -1,88 +1,267 @@
-"use client"
+"use client";
 
-import React, { useEffect, useState, useCallback, useMemo } from "react"
-import { useParams, useNavigate } from "react-router-dom" // Import useNavigate
-import { motion, AnimatePresence } from "framer-motion"
-import { Search, Camera, Clock, Calendar, AlertTriangle, Car, CheckCircle, XCircle, ArrowLeft } from "lucide-react" // Import ArrowLeft
-import { Loader2 } from "lucide-react" // Import Loader2
-import { format } from "date-fns" // Import format
+import React, { useEffect, useState, useCallback, useMemo } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import { Search, Camera, Clock, Calendar, AlertTriangle, Car, ArrowLeft } from "lucide-react";
+import { format } from "date-fns";
+import axios, { AxiosError } from "axios";
+import { Header, MobileDropdownMenu } from "../../components/Layout/Menu";
+import Footer from "../../components/Layout/Footer";
+import {API_URL_BE} from "../../components/Link/LinkAPI";
 
-// Define ViolationsDTO interface
+// Define interfaces
 interface ViolationsDTO {
-  id: number
+  id: number;
   camera?: {
-    id: number
-    name: string
-    location: string
-    streamUrl?: string
-    thumbnail?: string
-    zoneId?: number
-    latitude?: number
-    longitude?: number
-  }
+    id: number;
+    name: string;
+    location: string;
+    streamUrl?: string;
+    thumbnail?: string;
+    zoneId?: number;
+    latitude?: number;
+    longitude?: number;
+  };
   vehicleType?: {
-    id: number
-    typeName: string
-  }
+    id: number;
+    typeName: string;
+  };
   vehicle?: {
-    id: number
-    name?: string
-    licensePlate: string
-    userId?: number
-    vehicleTypeId?: number
-    color?: string
-    brand?: string
-  }
-  createdAt?: string
+    id: number;
+    name?: string;
+    licensePlate: string;
+    userId?: number;
+    vehicleTypeId?: number;
+    color?: string;
+    brand?: string;
+  };
+  createdAt?: string;
   violationDetails?: Array<{
-    id: number
-    violationId?: number
-    violationTypeId?: number
+    id: number;
+    violationId?: number;
+    violationTypeId?: number;
     violationType: {
-      id: number
-      typeName: string
-      description?: string
-    }
-    imageUrl?: string
-    videoUrl?: string
-    location?: string
-    violationTime?: string
-    speed?: number
-    additionalNotes?: string
-    createdAt?: string
-    licensePlate?: string
-  }>
-  status?: "Request" | "Approve" | "Reject" | "Pending" // Explicitly define possible statuses
+      id: number;
+      typeName: string;
+      description?: string;
+    };
+    imageUrl?: string;
+    videoUrl?: string;
+    location?: string;
+    violationTime?: string;
+    speed?: number;
+    additionalNotes?: string;
+    createdAt?: string;
+    licensePlate?: string;
+  }>;
+  status?: "Pending" | "Request" | "Approved" | "Reject" | "Processed";
 }
 
 interface VehicleDTO {
-  id: number
-  name: string
-  licensePlate: string
-  userId: number
-  vehicleTypeId: number
-  color: string
-  brand: string
+  id: number;
+  name: string;
+  licensePlate: string;
+  userId: number;
+  vehicleTypeId: number;
+  color: string;
+  brand: string;
 }
 
 interface PaginationInfo {
-  currentPage: number
-  totalPages: number
-  totalItems: number
-  itemsPerPage: number
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
+  itemsPerPage: number;
 }
 
 interface ViolationType {
-  id: number
-  typeName: string
-  description?: string
+  id: number;
+  typeName: string;
+  description?: string;
 }
 
-// NOTE: In a real application, this API_URL should be an environment variable.
-// For this example, it's hardcoded as per the original request.
-const API_URL = "http://localhost:8081"
-const ITEMS_PER_PAGE = 10
+interface RequestButtonProps {
+  violationId: number;
+  onStatusUpdate: (updatedViolation: ViolationsDTO) => void;
+}
 
+
+const ITEMS_PER_PAGE = 10;
+
+// RequestButton Component
+const RequestButton: React.FC<RequestButtonProps> = ({ violationId, onStatusUpdate }) => {
+  const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(false);
+  const [success, setSuccess] = useState<boolean | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [violationStatus, setViolationStatus] = useState<string | null>(null);
+
+
+  useEffect(() => {
+    const fetchViolationStatus = async () => {
+      try {
+        const response = await axios.get<ViolationsDTO>(
+          `${API_URL_BE}api/violations/${violationId}`,
+          {
+            headers: {
+              Accept: "application/json",
+            },
+          }
+        );
+        setViolationStatus(response.data.status?.toUpperCase() || null);
+      } catch (err) {
+        console.error("Error fetching violation status:", err);
+        setError("Failed to fetch violation status.");
+        setViolationStatus(null);
+      }
+    };
+    fetchViolationStatus();
+  }, [violationId]);
+
+  useEffect(() => {
+    if (success !== null || error !== null) {
+      const timer = setTimeout(() => {
+        setSuccess(null);
+        setError(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [success, error]);
+
+  const handleRequest = async () => {
+  setIsLoading(true);
+  setSuccess(null);
+  setError(null);
+
+  try {
+    const response = await axios.post<ViolationsDTO>(
+      `${API_URL_BE}api/violations/${violationId}/request`,
+      null,
+      {
+        headers: {
+          Accept: "application/json",
+        },
+      }
+    );
+
+    // Nếu violation trả về không có id, xem như là lỗi do backend trả về DTO rỗng
+    if (!response.data || !response.data.id) {
+      throw new Error("Empty or invalid response.");
+    }
+
+    onStatusUpdate(response.data);
+    setViolationStatus(response.data.status?.toUpperCase() || "REQUEST");
+    setSuccess(true);
+  } catch (err) {
+    const error = err as AxiosError;
+
+    const status = error.response?.status;
+
+    if (status === 404) {
+      setError("Violation not found.");
+    } else if (status === 400) {
+      setError("Invalid request. Violation must be in APPROVED status.");
+    } else {
+      setError("An unexpected error occurred. Please try again.");
+    }
+
+    console.error("Request failed:", {
+      status,
+      data: error.response?.data,
+      headers: error.response?.headers,
+      url: error.config?.url,
+    });
+
+    setSuccess(false);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+  const handleViewDetails = () => {
+    navigate(`/violationsuser/${violationId}`);
+  };
+
+  const isRequestAllowed = violationStatus === "APPROVED";
+  const isProcessed = violationStatus === "PROCESSED";
+  const buttonText = isLoading
+    ? "Processing..."
+    : success === true
+    ? "Success"
+    : success === false
+    ? "Failed"
+    : violationStatus === "APPROVED"
+    ? "Send Request"
+    : violationStatus === "PROCESSED"
+    ? "View Details"
+    : violationStatus === "REQUEST"
+    ? "Requested"
+    : violationStatus === "REJECT"
+    ? "Rejected"
+    : "Pending";
+
+  return (
+    <div className="flex flex-col items-center">
+      <button
+        onClick={isProcessed ? handleViewDetails : handleRequest}
+        disabled={isLoading || (!isRequestAllowed && !isProcessed)}
+        className={`
+          relative px-6 py-3 rounded-lg font-semibold text-white 
+          ${success === true ? "bg-green-600 hover:bg-green-700" : 
+            success === false ? "bg-red-600 hover:bg-red-700" : 
+            isProcessed ? "bg-purple-600 hover:bg-purple-700" : 
+            !isRequestAllowed ? "bg-gray-600 hover:bg-gray-700" : 
+            "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"}
+          transition-all duration-300 ease-in-out
+          transform hover:scale-105 hover:shadow-xl
+          disabled:from-gray-500 disabled:to-gray-600 disabled:cursor-not-allowed
+          ${isLoading ? "animate-pulse" : ""}
+        `}
+      >
+        {isLoading ? (
+          <span className="flex items-center">
+            <svg
+              className="animate-spin h-5 w-5 mr-2 text-white"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              ></circle>
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+            {buttonText}
+          </span>
+        ) : (
+          buttonText
+        )}
+      </button>
+      {error && (
+        <motion.p
+          className="text-red-400 text-sm mt-3"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          {error}
+        </motion.p>
+      )}
+    </div>
+  );
+};
+
+// LoadingSpinner Component
 const LoadingSpinner: React.FC = () => (
   <motion.div
     style={{
@@ -129,8 +308,9 @@ const LoadingSpinner: React.FC = () => (
       transition={{ duration: 1.5, repeat: Number.POSITIVE_INFINITY, delay: 0.4 }}
     />
   </motion.div>
-)
+);
 
+// ErrorMessage Component
 const ErrorMessage: React.FC<{ message: string; onRetry?: () => void }> = ({ message, onRetry }) => (
   <motion.div
     style={{
@@ -182,8 +362,9 @@ const ErrorMessage: React.FC<{ message: string; onRetry?: () => void }> = ({ mes
       </motion.button>
     )}
   </motion.div>
-)
+);
 
+// EmptyState Component
 const EmptyState: React.FC = () => (
   <motion.div
     style={{
@@ -201,27 +382,28 @@ const EmptyState: React.FC = () => (
     </h3>
     <p style={{ color: "#6B7280", fontSize: "0.875rem" }}>The list of violations will appear here.</p>
   </motion.div>
-)
+);
 
+// Pagination Component
 const Pagination: React.FC<{
-  currentPage: number
-  totalPages: number
-  onPageChange: (page: number) => void
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
 }> = ({ currentPage, totalPages, onPageChange }) => {
-  if (totalPages <= 1) return null
+  if (totalPages <= 1) return null;
   const getPageNumbers = () => {
-    const pages = []
-    const showPages = 5
-    let start = Math.max(1, currentPage - Math.floor(showPages / 2))
-    const end = Math.min(totalPages, start + showPages - 1)
+    const pages = [];
+    const showPages = 5;
+    let start = Math.max(1, currentPage - Math.floor(showPages / 2));
+    const end = Math.min(totalPages, start + showPages - 1);
     if (end - start + 1 < showPages) {
-      start = Math.max(1, end - showPages + 1)
+      start = Math.max(1, end - showPages + 1);
     }
     for (let i = start; i <= end; i++) {
-      pages.push(i)
+      pages.push(i);
     }
-    return pages
-  }
+    return pages;
+  };
   return (
     <motion.div
       style={{
@@ -302,18 +484,19 @@ const Pagination: React.FC<{
         Page {currentPage} of {totalPages}
       </p>
     </motion.div>
-  )
-}
+  );
+};
 
+// SearchAndFilter Component
 const SearchAndFilter: React.FC<{
-  searchTerm: string
-  onSearchChange: (value: string) => void
-  filterType: string
-  onFilterChange: (value: string) => void
-  violationTypes: ViolationType[]
-  selectedLicensePlate: string | null
-  onVehicleSelect: (licensePlate: string) => void
-  vehicles: VehicleDTO[]
+  searchTerm: string;
+  onSearchChange: (value: string) => void;
+  filterType: string;
+  onFilterChange: (value: string) => void;
+  violationTypes: ViolationType[];
+  selectedLicensePlate: string | null;
+  onVehicleSelect: (licensePlate: string) => void;
+  vehicles: VehicleDTO[];
 }> = ({
   searchTerm,
   onSearchChange,
@@ -381,12 +564,12 @@ const SearchAndFilter: React.FC<{
               outline: "none",
             }}
             onFocus={(e) => {
-              e.target.style.borderColor = "#3B82F6"
-              e.target.style.boxShadow = "0 0 0 4px rgba(59, 130, 246, 0.1)"
+              e.target.style.borderColor = "#3B82F6";
+              e.target.style.boxShadow = "0 0 0 4px rgba(59, 130, 246, 0.1)";
             }}
             onBlur={(e) => {
-              e.target.style.borderColor = "#E5E7EB"
-              e.target.style.boxShadow = "none"
+              e.target.style.borderColor = "#E5E7EB";
+              e.target.style.boxShadow = "none";
             }}
           />
         </div>
@@ -420,12 +603,12 @@ const SearchAndFilter: React.FC<{
             outline: "none",
           }}
           onFocus={(e) => {
-            e.target.style.borderColor = "#F59E0B"
-            e.target.style.boxShadow = "0 0 0 4px rgba(245, 158, 11, 0.2)"
+            e.target.style.borderColor = "#F59E0B";
+            e.target.style.boxShadow = "0 0 0 4px rgba(245, 158, 11, 0.2)";
           }}
           onBlur={(e) => {
-            e.target.style.borderColor = "#E5E7EB"
-            e.target.style.boxShadow = "none"
+            e.target.style.borderColor = "#E5E7EB";
+            e.target.style.boxShadow = "none";
           }}
         >
           <option value="">All Violation Types</option>
@@ -465,12 +648,12 @@ const SearchAndFilter: React.FC<{
             outline: "none",
           }}
           onFocus={(e) => {
-            e.target.style.borderColor = "#6366F1"
-            e.target.style.boxShadow = "0 0 0 4px rgba(99, 102, 241, 0.2)"
+            e.target.style.borderColor = "#6366F1";
+            e.target.style.boxShadow = "0 0 0 4px rgba(99, 102, 241, 0.2)";
           }}
           onBlur={(e) => {
-            e.target.style.borderColor = "#E5E7EB"
-            e.target.style.boxShadow = "none"
+            e.target.style.borderColor = "#E5E7EB";
+            e.target.style.boxShadow = "none";
           }}
         >
           <option value="">Select a vehicle</option>
@@ -482,22 +665,15 @@ const SearchAndFilter: React.FC<{
         </select>
       </div>
     </motion.div>
-  )
-}
+  );
+};
 
+// ViolationRow Component
 const ViolationRow: React.FC<{
-  violation: ViolationsDTO
-  onStatusUpdate: (violationId: number, newStatus: "Approve" | "Reject" | "Request") => void
+  violation: ViolationsDTO;
+  onStatusUpdate: (violationId: number, newStatus: "Pending" | "Request" | "Approved" | "Reject" | "Processed") => void;
 }> = React.memo(({ violation, onStatusUpdate }) => {
-  const detail = violation.violationDetails?.[0] || null
-  const [currentStatus, setCurrentStatus] = useState<"Request" | "Approve" | "Reject" | "Pending">(
-    violation.status || "Pending",
-  )
-  const [isUpdating, setIsUpdating] = useState(false)
-
-  useEffect(() => {
-    setCurrentStatus(violation.status || "Pending")
-  }, [violation.status])
+  const detail = violation.violationDetails?.[0] || null;
 
   const getStatusColor = (status: string | null | undefined) => {
     const statusMap: { [key: string]: { bg: string; text: string; icon: React.ReactNode } } = {
@@ -521,7 +697,12 @@ const ViolationRow: React.FC<{
           />
         ),
       },
-      Approve: {
+      Processed: {
+        bg: "bg-blue-100",
+        text: "text-blue-700",
+        icon: <div style={{ width: "0.5rem", height: "0.5rem", backgroundColor: "#3B82F6", borderRadius: "50%" }} />,
+      },
+      Approved: {
         bg: "bg-green-100",
         text: "text-green-700",
         icon: <div style={{ width: "0.5rem", height: "0.5rem", backgroundColor: "#10B981", borderRadius: "50%" }} />,
@@ -531,91 +712,21 @@ const ViolationRow: React.FC<{
         text: "text-red-700",
         icon: <div style={{ width: "0.5rem", height: "0.5rem", backgroundColor: "#EF4444", borderRadius: "50%" }} />,
       },
-    }
+    };
     return (
       statusMap[status || "Pending"] || {
         bg: "bg-gray-100",
         text: "text-gray-500",
         icon: <div style={{ width: "0.5rem", height: "0.5rem", backgroundColor: "#9CA3AF", borderRadius: "50%" }} />,
       }
-    )
-  }
-
-  const handleActionButtonClick = useCallback(async () => {
-    if (isUpdating) return
-
-    setIsUpdating(true)
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    let newStatus: "Approve" | "Reject" | "Request" = "Request"
-    if (currentStatus === "Request" || currentStatus === "Pending") {
-      // Simulate success/failure
-      if (Math.random() > 0.5) {
-        newStatus = "Approve"
-      } else {
-        newStatus = "Reject"
-      }
-    } else if (currentStatus === "Approve" || currentStatus === "Reject") {
-      newStatus = "Request" // Allow re-request
-    }
-
-    setCurrentStatus(newStatus)
-    onStatusUpdate(violation.id, newStatus)
-    setIsUpdating(false)
-  }, [currentStatus, isUpdating, onStatusUpdate, violation.id])
-
-  const getActionButtonProps = () => {
-    let text = "Request Action"
-    let bgColor = "linear-gradient(to right, #3B82F6, #8B5CF6)"
-    let hoverBgColor = "linear-gradient(to right, #2563EB, #7C3AED)"
-    let icon = <AlertTriangle style={{ width: "1rem", height: "1rem" }} />
-
-    if (isUpdating) {
-      text = "Updating..."
-      bgColor = "linear-gradient(to right, #9CA3AF, #6B7280)"
-      hoverBgColor = "linear-gradient(to right, #6B7280, #4B5563)"
-      icon = (
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
-        >
-          <Loader2 size={16} />
-        </motion.div>
-      )
-    } else {
-      switch (currentStatus) {
-        case "Approve":
-          text = "Approved"
-          bgColor = "linear-gradient(to right, #10B981, #059669)"
-          hoverBgColor = "linear-gradient(to right, #059669, #047857)"
-          icon = <CheckCircle style={{ width: "1rem", height: "1rem" }} />
-          break
-        case "Reject":
-          text = "Rejected"
-          bgColor = "linear-gradient(to right, #EF4444, #DC2626)"
-          hoverBgColor = "linear-gradient(to right, #DC2626, #B91C1C)"
-          icon = <XCircle style={{ width: "1rem", height: "1rem" }} />
-          break
-        case "Request":
-        case "Pending":
-        default:
-          text = "Request Action"
-          bgColor = "linear-gradient(to right, #3B82F6, #8B5CF6)"
-          hoverBgColor = "linear-gradient(to right, #2563EB, #7C3AED)"
-          icon = <AlertTriangle style={{ width: "1rem", height: "1rem" }} />
-          break
-      }
-    }
-
-    return { text, bgColor, hoverBgColor, icon, disabled: isUpdating }
-  }
+    );
+  };
 
   const formatDate = useCallback((dateString: string | null | undefined) => {
-    if (!dateString) return <span style={{ color: "#9CA3AF", fontStyle: "italic" }}>N/A</span>
+    if (!dateString) return <span style={{ color: "#9CA3AF", fontStyle: "italic" }}>N/A</span>;
     try {
-      const date = new Date(dateString)
-      const isToday = date.toDateString() === new Date().toDateString()
+      const date = new Date(dateString);
+      const isToday = date.toDateString() === new Date().toDateString();
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -663,13 +774,15 @@ const ViolationRow: React.FC<{
             )}
           </div>
         </div>
-      )
+      );
     } catch {
-      return <span style={{ color: "#9CA3AF", fontStyle: "italic" }}>N/A</span>
+      return <span style={{ color: "#9CA3AF", fontStyle: "italic" }}>N/A</span>;
     }
-  }, [])
+  }, []);
 
-  const { text, bgColor, hoverBgColor, icon, disabled } = getActionButtonProps()
+  const handleStatusUpdateFromButton = (updatedViolation: ViolationsDTO) => {
+    onStatusUpdate(violation.id, updatedViolation.status as "Pending" | "Request" | "Approved" | "Reject" | "Processed");
+  };
 
   return (
     <motion.tr
@@ -708,9 +821,9 @@ const ViolationRow: React.FC<{
                 className="group-hover:scale-110"
                 loading="lazy"
                 onError={(e) => {
-                  const target = e.target as HTMLImageElement
-                  target.style.display = "none"
-                  target.nextElementSibling?.classList.remove("hidden")
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = "none";
+                  target.nextElementSibling?.classList.remove("hidden");
                 }}
               />
               <div
@@ -881,7 +994,7 @@ const ViolationRow: React.FC<{
           }}
         >
           {(() => {
-            const { bg, text, icon } = getStatusColor(violation.status)
+            const { bg, text, icon } = getStatusColor(violation.status);
             return (
               <div
                 className={`${bg} ${text}`}
@@ -897,192 +1010,149 @@ const ViolationRow: React.FC<{
                   {violation.status || "Pending"}
                 </span>
               </div>
-            )
+            );
           })()}
         </div>
       </td>
       <td style={{ padding: "0.75rem" }}>
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={handleActionButtonClick}
-          disabled={disabled}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "0.5rem",
-            padding: "0.5rem 1rem",
-            background: bgColor,
-            color: "white",
-            borderRadius: "0.75rem",
-            fontWeight: 600,
-            boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
-            transition: "all 0.3s ease",
-            position: "relative",
-            overflow: "hidden",
-            opacity: disabled ? 0.7 : 1,
-            cursor: disabled ? "not-allowed" : "pointer",
-          }}
-        >
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              background: hoverBgColor,
-              opacity: 0,
-              transition: "opacity 0.3s ease",
-            }}
-            className="group-hover:opacity-100"
-          />
-          <div style={{ position: "relative", zIndex: 10, display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            {icon}
-            <span>{text}</span>
-          </div>
-        </motion.button>
+        <RequestButton violationId={violation.id} onStatusUpdate={handleStatusUpdateFromButton} />
       </td>
     </motion.tr>
-  )
-})
+  );
+});
 
-ViolationRow.displayName = "ViolationRow"
+ViolationRow.displayName = "ViolationRow";
 
+// ViolationHistory Component
 export default function ViolationHistory() {
-  const { plate } = useParams<{ plate: string }>() // Initial plate from URL, will be overridden by selection
-  const navigate = useNavigate() // Initialize useNavigate
-  const [violations, setViolations] = useState<ViolationsDTO[]>([])
-  const [allVehicles, setAllVehicles] = useState<VehicleDTO[]>([])
-  const [selectedLicensePlate, setSelectedLicensePlate] = useState<string | null>(plate || null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [filterType, setFilterType] = useState("")
-  const [currentPage, setCurrentPage] = useState(1)
-  const [refreshKey, setRefreshKey] = useState(0) // Used to trigger re-fetch
+  const { plate } = useParams<{ plate: string }>();
+  const navigate = useNavigate();
+  const [violations, setViolations] = useState<ViolationsDTO[]>([]);
+  const [allVehicles, setAllVehicles] = useState<VehicleDTO[]>([]);
+  const [selectedLicensePlate, setSelectedLicensePlate] = useState<string | null>(plate || null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterType, setFilterType] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
-  // Get unique violation types from current violations
   const violationTypes = useMemo(() => {
-    const types = new Map<string, ViolationType>()
+    const types = new Map<string, ViolationType>();
     violations.forEach((violation) => {
       violation.violationDetails?.forEach((detail) => {
         if (detail?.violationType) {
-          types.set(detail.violationType.typeName, detail.violationType)
+          types.set(detail.violationType.typeName, detail.violationType);
         }
-      })
-    })
-    return Array.from(types.values())
-  }, [violations])
+      });
+    });
+    return Array.from(types.values());
+  }, [violations]);
 
-  // Filter violations based on search term and type filter
   const filteredViolations = useMemo(() => {
     return violations.filter((violation) => {
       const matchesSearch =
-        !searchTerm || violation.vehicle?.licensePlate?.toLowerCase().includes(searchTerm.toLowerCase())
+        !searchTerm || violation.vehicle?.licensePlate?.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesFilter =
-        !filterType || violation.violationDetails?.some((detail) => detail?.violationType?.typeName === filterType)
-      return matchesSearch && matchesFilter
-    })
-  }, [violations, searchTerm, filterType])
+        !filterType || violation.violationDetails?.some((detail) => detail?.violationType?.typeName === filterType);
+      return matchesSearch && matchesFilter;
+    });
+  }, [violations, searchTerm, filterType]);
 
-  // Pagination logic
   const paginationInfo = useMemo((): PaginationInfo => {
-    const totalItems = filteredViolations.length
-    const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE)
+    const totalItems = filteredViolations.length;
+    const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
     return {
       currentPage,
       totalPages,
       totalItems,
       itemsPerPage: ITEMS_PER_PAGE,
-    }
-  }, [filteredViolations.length, currentPage])
+    };
+  }, [filteredViolations.length, currentPage]);
 
-  // Get violations for current page
   const paginatedViolations = useMemo(() => {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
-    const endIndex = startIndex + ITEMS_PER_PAGE
-    return filteredViolations.slice(startIndex, endIndex)
-  }, [filteredViolations, currentPage])
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    return filteredViolations.slice(startIndex, endIndex);
+  }, [filteredViolations, currentPage]);
 
-  // Load all vehicles for the user
   const loadAllVehicles = useCallback(async () => {
     try {
-      const response = await fetch(`${API_URL}/api/vehicle/user/3`) // Hardcoded userId 3
+      const response = await fetch(`${API_URL_BE}api/vehicle/user/3`);
       if (!response.ok) {
-        throw new Error("Failed to load vehicles.")
+        throw new Error("Failed to load vehicles.");
       }
-      const data: VehicleDTO[] = await response.json()
-      setAllVehicles(data)
-      // If no vehicle is selected yet (e.g., first load), select the first one
+      const data: VehicleDTO[] = await response.json();
+      setAllVehicles(data);
       if (!selectedLicensePlate && data.length > 0) {
-        setSelectedLicensePlate(data[0].licensePlate)
+        setSelectedLicensePlate(data[0].licensePlate);
       }
     } catch (err: any) {
-      console.error("Error loading vehicles:", err)
-      setError(err.message || "Failed to load vehicles for selection.")
+      console.error("Error loading vehicles:", err);
+      setError(err.message || "Failed to load vehicles for selection.");
     }
-  }, [selectedLicensePlate])
+  }, [selectedLicensePlate]);
 
-  // Load violations for the selected license plate
   const loadViolations = useCallback(async () => {
     if (!selectedLicensePlate) {
-      setViolations([])
-      setLoading(false)
-      return
+      setViolations([]);
+      setLoading(false);
+      return;
     }
     try {
-      setLoading(true)
-      setError(null)
-      const response = await fetch(`${API_URL}/api/violations/history/${selectedLicensePlate}`)
+      setLoading(true);
+      setError(null);
+      const response = await fetch(`${API_URL_BE}api/violations/history/${selectedLicensePlate}`);
       if (!response.ok) {
         if (response.status === 404) {
-          setViolations([]) // No violations found for this plate
-          setError("No violations found for this vehicle.")
+          setViolations([]);
+          setError("No violations found for this vehicle.");
         } else {
-          throw new Error(`HTTP error! Status: ${response.status}`)
+          throw new Error(`HTTP error! Status: ${response.status}`);
         }
       } else {
-        const data = await response.json()
-        const violationsArray = Array.isArray(data) ? data : [data].filter(Boolean)
+        const data = await response.json();
+        const violationsArray = Array.isArray(data) ? data : [data].filter(Boolean);
         setViolations(
           violationsArray.map((item: any) => ({
             ...item,
             violationDetails: item.violationDetails || [],
-          })),
-        )
+          }))
+        );
       }
     } catch (err: any) {
-      console.error("API Error:", err)
-      setError(err.message || "Failed to load violations. Please try again.")
+      console.error("API Error:", err);
+      setError(err.message || "Failed to load violations. Please try again.");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [selectedLicensePlate, refreshKey])
+  }, [selectedLicensePlate]);
 
-  // Initial load of vehicles and then violations
   useEffect(() => {
-    loadAllVehicles()
-  }, [loadAllVehicles])
+    loadAllVehicles();
+  }, [loadAllVehicles]);
 
-  // Load violations whenever selectedLicensePlate changes or refreshKey updates
   useEffect(() => {
-    loadViolations()
-  }, [loadViolations, selectedLicensePlate]) // Add selectedLicensePlate to dependency array
+    loadViolations();
+  }, [loadViolations, selectedLicensePlate]);
 
-  // Reset page to 1 when search or filter changes
   useEffect(() => {
-    setCurrentPage(1)
-  }, [searchTerm, filterType, selectedLicensePlate])
+    setCurrentPage(1);
+  }, [searchTerm, filterType, selectedLicensePlate]);
 
-  // Handle status update from ViolationRow
-  const handleStatusUpdate = useCallback((violationId: number, newStatus: "Approve" | "Reject" | "Request") => {
-    setViolations((prev) => prev.map((v) => (v.id === violationId ? { ...v, status: newStatus } : v)))
-  }, [])
+  const handleStatusUpdate = useCallback((violationId: number, newStatus: "Pending" | "Request" | "Approved" | "Reject" | "Processed") => {
+    setViolations((prev) => prev.map((v) => (v.id === violationId ? { ...v, status: newStatus } : v)));
+  }, []);
 
-  // Handle retry button click
   const handleRetry = useCallback(() => {
-    setRefreshKey((prev) => prev + 1)
-  }, [])
+    setRefreshKey((prev) => prev + 1);
+  }, []);
 
   return (
+    <div>
+            <Header showMobileMenu={showMobileMenu} setShowMobileMenu={setShowMobileMenu} />
+      <MobileDropdownMenu showMobileMenu={showMobileMenu} setShowMobileMenu={setShowMobileMenu} />
     <div
       style={{
         display: "flex",
@@ -1092,7 +1162,6 @@ export default function ViolationHistory() {
         overflow: "hidden",
       }}
     >
-      {/* Removed Sidebar component */}
       <div style={{ flexGrow: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <motion.div
           style={{
@@ -1100,17 +1169,16 @@ export default function ViolationHistory() {
             background: "linear-gradient(to right, #3B82F6, #8B5CF6)",
             color: "white",
             boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-            display: "flex", // Added flex for alignment
-            alignItems: "center", // Added for vertical alignment
-            gap: "1rem", // Added gap between back button and title
+            display: "flex",
+            alignItems: "center",
+            gap: "1rem",
           }}
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          {/* Back Button */}
           <button
-            onClick={() => navigate("/vehiclelistuser")} // Navigate to the vehicle list route
+            onClick={() => navigate("/vehiclelistuser")}
             style={{
               display: "flex",
               alignItems: "center",
@@ -1292,5 +1360,7 @@ export default function ViolationHistory() {
         </div>
       </div>
     </div>
-  )
+    <Footer/>
+    </div>
+  );
 }

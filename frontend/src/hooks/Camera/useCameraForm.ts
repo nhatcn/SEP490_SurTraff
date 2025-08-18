@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Zone, LaneDirection, LightZoneMapping } from '../../types/Camera/camera';
+import {API_URL_BE,  API_URL_FAST } from '../../components/Link/LinkAPI';
 
 // Type for violation type from API
 interface ViolationType {
@@ -38,14 +39,14 @@ export const useCameraForm = () => {
     const fetchViolationTypes = async () => {
       setIsLoadingViolationTypes(true);
       try {
-        const response = await fetch("http://localhost:8081/api/violation-type");
+        const response = await fetch(API_URL_BE+"api/violation-type");
         if (!response.ok) {
           throw new Error(`Failed to fetch violation types: ${response.status}`);
         }
         const data: ViolationType[] = await response.json();
         setViolationTypes(data);
         
-        // Set default violation type to the first one if available
+        // Set default violation type to the first one if available (only if not set)
         if (data.length > 0 && violationTypeId === null) {
           setViolationTypeId(data[0].id);
         }
@@ -59,7 +60,7 @@ export const useCameraForm = () => {
     };
 
     fetchViolationTypes();
-  }, []); // Empty dependency array - chỉ gọi 1 lần khi component mount
+  }, []); // Remove violationTypeId from dependencies to avoid loop
 
   const handleLocationSelect = (lat: number, lng: number, address: string) => {
     setLocation({
@@ -94,7 +95,7 @@ export const useCameraForm = () => {
     setThumbnailError(null);
 
     try {
-      const response = await fetch("http://localhost:8000/api/thumbnail/extract", {
+      const response = await fetch(API_URL_FAST+"api/thumbnail/extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ stream_url: streamUrl })
@@ -139,11 +140,14 @@ export const useCameraForm = () => {
   const handleStreamUrlChange = (url: string) => {
     setStreamUrl(url);
     // Clear thumbnail when URL changes and revoke previous object URL to prevent memory leaks
-    if (thumbnailUrl) {
+    if (thumbnailUrl && thumbnailUrl.startsWith('blob:')) {
       URL.revokeObjectURL(thumbnailUrl);
     }
-    setThumbnailUrl("");
-    setThumbnailFile(null); // Clear file when URL changes
+    // Only clear if it was an extracted thumbnail, not a saved one
+    if (thumbnailFile) {
+      setThumbnailUrl("");
+      setThumbnailFile(null); // Clear file when URL changes
+    }
     setThumbnailError(null);
   };
 
@@ -153,7 +157,7 @@ export const useCameraForm = () => {
       return;
     }
 
-    if (!thumbnailFile) {
+    if (!thumbnailUrl) {
       alert("Please extract a thumbnail from the stream URL first.");
       return;
     }
@@ -199,13 +203,16 @@ export const useCameraForm = () => {
       });
       formData.append('setupDTO', setupDTOBlob);
       
-      // Add thumbnail file
+      // Add thumbnail file (must have a file for new camera)
+      if (!thumbnailFile) {
+        throw new Error("No thumbnail file available");
+      }
       formData.append('thumbnailFile', thumbnailFile, thumbnailFile.name);
 
       console.log('Sending camera setup data:', setupDTO);
       console.log('Thumbnail file:', thumbnailFile.name, thumbnailFile.size, 'bytes');
 
-      const response = await fetch("http://localhost:8081/api/cameras/setup", {
+      const response = await fetch(API_URL_BE+"api/cameras/setup", {
         method: "POST",
         // Don't set Content-Type header, let browser set it with boundary for multipart
         body: formData
@@ -219,7 +226,7 @@ export const useCameraForm = () => {
       alert("Camera setup successfully!");
       
       // Clean up object URL before navigating
-      if (thumbnailUrl) {
+      if (thumbnailUrl && thumbnailUrl.startsWith('blob:')) {
         URL.revokeObjectURL(thumbnailUrl);
       }
       
@@ -232,9 +239,61 @@ export const useCameraForm = () => {
 
   // Cleanup function to revoke object URLs
   const cleanup = () => {
-    if (thumbnailUrl) {
+    if (thumbnailUrl && thumbnailUrl.startsWith('blob:')) {
       URL.revokeObjectURL(thumbnailUrl);
     }
+  };
+
+  // Helper functions for form population (useful for edit mode)
+  const populateForm = (data: {
+    name: string;
+    streamUrl: string;
+    location: { lat: number; lng: number; address: string };
+    speedLimit?: number;
+    violationTypeId?: number;
+    thumbnailUrl?: string;
+    zones?: Zone[];
+    laneDirections?: LaneDirection[];
+    lightZoneMappings?: LightZoneMapping[];
+  }) => {
+    setName(data.name);
+    setStreamUrl(data.streamUrl);
+    setLocationAddress(data.location.address);
+    setLocation({
+      lat: data.location.lat,
+      lng: data.location.lng,
+      selected: true
+    });
+    
+    if (data.speedLimit !== undefined) setSpeedLimit(data.speedLimit);
+    if (data.violationTypeId !== undefined) setViolationTypeId(data.violationTypeId);
+    if (data.thumbnailUrl) setThumbnailUrl(data.thumbnailUrl);
+    if (data.zones) setZones(data.zones);
+    if (data.laneDirections) setLaneDirections(data.laneDirections);
+    if (data.lightZoneMappings) setLightZoneMappings(data.lightZoneMappings);
+  };
+
+  // Reset form to initial state
+  const resetForm = () => {
+    setName("");
+    setStreamUrl("");
+    setLocationAddress("");
+    setLocation({ lat: 0, lng: 0, selected: false });
+    setZones([]);
+    setActiveZoneType(null);
+    setSpeedLimit(50);
+    setViolationTypeId(violationTypes.length > 0 ? violationTypes[0].id : null);
+    
+    // Clean up thumbnail
+    if (thumbnailUrl && thumbnailUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(thumbnailUrl);
+    }
+    setThumbnailUrl("");
+    setThumbnailFile(null);
+    setThumbnailError(null);
+    
+    setLaneDirections([]);
+    setLightZoneMappings([]);
   };
 
   return {
@@ -275,6 +334,10 @@ export const useCameraForm = () => {
     handleSubmit,
     extractThumbnail,
     cleanup,
-    navigate
+    navigate,
+    
+    // Helper functions for form management
+    populateForm,
+    resetForm
   };
 };

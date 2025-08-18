@@ -15,14 +15,6 @@ import {
   UserCircle,
   Settings,
   Edit3,
-  Award,
-  Car,
-  Palette,
-  Hash,
-  Tag,
-  TrendingUp,
-  Activity,
-  BarChart3,
   Camera,
   Upload,
   Loader2,
@@ -33,6 +25,7 @@ import {
   MapPin,
 } from "lucide-react"
 import { getCookie } from "../../utils/cookieUltil"
+import {API_URL_BE} from "../Link/LinkAPI"
 
 interface UserData {
   userId: number
@@ -48,23 +41,6 @@ interface UserData {
   address?: string | null
 }
 
-interface VehicleData {
-  id: number
-  name: string
-  licensePlate: string
-  userId: number
-  vehicleTypeId: number
-  color: string
-  brand: string
-}
-
-interface TrafficStats {
-  totalViolations: number
-  recentViolations: number
-  cleanDays: number
-  lastViolation: string
-}
-
 interface UpdateUserForm {
   name: string
   userName: string
@@ -77,15 +53,7 @@ interface UpdateUserForm {
 
 export default function UserProfile() {
   const [user, setUser] = useState<UserData | null>(null)
-  const [vehicle, setVehicle] = useState<VehicleData | null>(null)
-  const [trafficStats, setTrafficStats] = useState<TrafficStats>({
-    totalViolations: 3,
-    recentViolations: 1,
-    cleanDays: 45,
-    lastViolation: "2024-06-15",
-  })
   const [loading, setLoading] = useState(true)
-  const [vehicleLoading, setVehicleLoading] = useState(true)
   const [isEditingPassword, setIsEditingPassword] = useState(false)
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
@@ -115,13 +83,12 @@ export default function UserProfile() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const userId = getCookie('userId')
 
+
   useEffect(() => {
     if (userId) {
       fetchUserData()
-      fetchVehicleData()
     } else {
       setLoading(false)
-      setVehicleLoading(false)
     }
   }, [userId])
 
@@ -141,27 +108,13 @@ export default function UserProfile() {
 
   const fetchUserData = async () => {
     try {
-      const response = await fetch(`http://localhost:8081/api/users/${userId}`)
+      const response = await fetch(API_URL_BE +`api/users/${userId}`)
       const userData = await response.json()
       setUser(userData)
     } catch (error) {
       console.error("Error fetching user data:", error)
     } finally {
       setLoading(false)
-    }
-  }
-
-  const fetchVehicleData = async () => {
-    try {
-      const response = await fetch(`http://localhost:8081/api/vehicle/${userId}`)
-      if (response.ok) {
-        const vehicleData = await response.json()
-        setVehicle(vehicleData)
-      }
-    } catch (error) {
-      console.error("Error fetching vehicle data:", error)
-    } finally {
-      setVehicleLoading(false)
     }
   }
 
@@ -197,23 +150,29 @@ export default function UserProfile() {
   const validateUpdateForm = () => {
     const newErrors: { [key: string]: string } = {}
 
+    // Name validation
     if (!updateForm.name.trim()) {
       newErrors.name = "Name is required"
     }
 
+    // Username validation
     if (!updateForm.userName.trim()) {
       newErrors.userName = "Username is required"
     }
 
+    // Email validation
     if (!updateForm.email.trim()) {
       newErrors.email = "Email is required"
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(updateForm.email)) {
-      newErrors.email = "Please enter a valid email address"
+    } else if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(updateForm.email)) {
+      newErrors.email = "Please enter a valid email address (e.g., example@domain.com)"
     }
 
-    // Optional validation for phone
-    if (updateForm.phoneNumber.trim() && !/^[\d\+\-\(\)\s]+$/.test(updateForm.phoneNumber)) {
-      newErrors.phoneNumber = "Please enter a valid phone number"
+    // Phone number validation (Vietnamese format)
+    if (updateForm.phoneNumber.trim()) {
+      const phoneRegex = /^(?:\+84|0)(3[2-9]|5[689]|7[06-9]|8[1-9]|9[0-4,6-9])[0-9]{7}$/
+      if (!phoneRegex.test(updateForm.phoneNumber)) {
+        newErrors.phoneNumber = "Please enter a valid Vietnamese phone number (e.g., +84912345678 or 0912345678)"
+      }
     }
 
     setErrors(newErrors)
@@ -228,19 +187,19 @@ export default function UserProfile() {
 
     try {
       const formData = new FormData()
-      formData.append("fullName", updateForm.name) 
+      formData.append("fullName", updateForm.name)
       formData.append("userName", updateForm.userName)
       formData.append("email", updateForm.email)
-      formData.append("phone", updateForm.phoneNumber)
+      formData.append("phoneNumber", updateForm.phoneNumber)
       formData.append("address", updateForm.address)
       formData.append("roleId", updateForm.roleId.toString())
 
       // Only append avatar if a new file was selected
       if (updateForm.avatar instanceof File) {
-        formData.append("avatarFile", updateForm.avatar) 
+        formData.append("avatarFile", updateForm.avatar)
       }
 
-      const response = await fetch(`http://localhost:8081/api/users/${user?.userId}`, {
+      const response = await fetch(API_URL_BE +`api/users/update/${user?.userId}`, {
         method: "PUT",
         body: formData,
       })
@@ -320,25 +279,42 @@ export default function UserProfile() {
     setErrors({})
 
     try {
-      const response = await fetch(`http://localhost:8081/api/users/${user?.userId}`, {
+      // Send plain current password to backend for verification
+      const verifyResponse = await fetch(API_URL_BE +`api/users/verify-password/${user?.userId}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          currentPassword: passwordForm.currentPassword,
-          newPassword: passwordForm.newPassword,
+          password: passwordForm.currentPassword, // Send plain password
         }),
       })
 
-      if (response.ok) {
+      if (!verifyResponse.ok) {
+        setErrors({ currentPassword: "Incorrect current password" })
+        setIsSubmitting(false)
+        return
+      }
+
+      // If verification passes, proceed with password update
+      const updateResponse = await fetch(API_URL_BE +`api/users/${user?.userId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          password: passwordForm.newPassword,
+        }),
+      })
+
+      if (updateResponse.ok) {
         setSuccess("Password changed successfully!")
         setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" })
         setIsEditingPassword(false)
         setTimeout(() => setSuccess(""), 3000)
       } else {
-        const errorData = await response.json()
-        setErrors({ currentPassword: "Incorrect current password" })
+        const errorData = await updateResponse.json()
+        setErrors({ general: errorData.message || "Failed to update password" })
       }
     } catch (error) {
       setErrors({ general: "An error occurred. Please try again." })
@@ -353,57 +329,21 @@ export default function UserProfile() {
     setErrors({})
   }
 
-  const getVehicleTypeIcon = (vehicleTypeId: number) => {
-    // You can customize this based on your vehicle types
-    switch (vehicleTypeId) {
-      case 1:
-        return "🚗" // Car
-      case 2:
-        return "🏍️" // Motorcycle
-      case 3:
-        return "🚚" // Truck
-      default:
-        return "🚗"
-    }
-  }
-
-  const getColorEmoji = (color: string) => {
-    const colorMap: { [key: string]: string } = {
-      black: "⚫",
-      white: "⚪",
-      red: "🔴",
-      blue: "🔵",
-      green: "🟢",
-      yellow: "🟡",
-      orange: "🟠",
-      purple: "🟣",
-      gray: "⚫",
-      silver: "⚪",
-    }
-    return colorMap[color.toLowerCase()] || "🎨"
-  }
-
   // Show not logged in state when no userId cookie
   if (!userId) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
         <div className="max-w-md w-full">
-          {/* Main Card */}
           <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-8 text-center">
-            {/* Icon */}
             <div className="w-20 h-20 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
               <AlertTriangle className="w-10 h-10 text-white" />
             </div>
-
-            {/* Content */}
             <h1 className="text-2xl font-bold text-gray-900 mb-3">
               Access Restricted
             </h1>
             <p className="text-gray-600 mb-8 leading-relaxed">
               You need to be logged in to view your profile information. Please sign in to continue.
             </p>
-
-            {/* Action Buttons */}
             <div className="space-y-4">
               <button
                 onClick={() => window.location.href = '/login'}
@@ -412,7 +352,6 @@ export default function UserProfile() {
                 <LogIn className="w-5 h-5" />
                 Sign In
               </button>
-              
               <button
                 onClick={() => window.location.href = '/home'}
                 className="w-full bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 text-gray-700 font-medium py-3 px-6 rounded-xl transition-all duration-200 flex items-center justify-center gap-3 hover:shadow-md"
@@ -421,16 +360,12 @@ export default function UserProfile() {
                 Go to Home
               </button>
             </div>
-
-            {/* Additional Info */}
             <div className="mt-8 p-4 bg-blue-50 rounded-xl border border-blue-100">
               <p className="text-sm text-blue-700 font-medium">
                 💡 Need help? Contact our support team
               </p>
             </div>
           </div>
-
-          {/* Decorative Elements */}
           <div className="absolute top-10 left-10 w-20 h-20 bg-blue-200/30 rounded-full blur-xl"></div>
           <div className="absolute bottom-10 right-10 w-32 h-32 bg-purple-200/30 rounded-full blur-xl"></div>
         </div>
@@ -479,7 +414,6 @@ export default function UserProfile() {
 
   return (
     <div className="space-y-6">
-      {/* Success notification */}
       {success && (
         <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top-2 duration-300">
           <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-3 rounded-2xl shadow-xl flex items-center gap-2 backdrop-blur-xl border border-green-400/20">
@@ -489,43 +423,33 @@ export default function UserProfile() {
         </div>
       )}
 
-      {/* Profile Header Card */}
       <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 overflow-hidden">
-        {/* Cover Background */}
-        <div className="relative h-32 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700">
-          <div className="absolute inset-0 bg-black/10"></div>
-          <div className="absolute top-4 right-4 flex items-center gap-2 bg-white/20 backdrop-blur-xl rounded-lg px-3 py-1">
-            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-            <span className="text-white text-sm font-medium">Online</span>
-          </div>
-        </div>
-
-        {/* Profile Content */}
+        <div className="relative h-32 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700" style={{
+          backgroundImage: `url('/traffic-camera.webp')`,
+          backgroundBlendMode: 'overlay',
+          backgroundColor: 'rgba(0,0,0,0.1)'
+        }}></div>
         <div className="relative px-6 pb-6">
-          {/* Avatar */}
           <div className="flex items-end -mt-16 mb-4">
             <div className="relative group">
               <div
                 className="w-24 h-24 rounded-2xl border-4 border-white shadow-lg overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 cursor-pointer"
                 onClick={() => fileInputRef.current?.click()}
               >
-                <img
+                <img alt=""
                   src={avatarPreview || user.avatar || "/api/placeholder/96/96"}
-                 
                   className="w-full h-full object-cover"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement
                     target.style.display = "none"
                     if (target.nextElementSibling) {
-                      ; (target.nextElementSibling as HTMLElement).style.display = "flex"
+                      ;(target.nextElementSibling as HTMLElement).style.display = "flex"
                     }
                   }}
                 />
                 <div className="w-full h-full hidden items-center justify-center bg-gradient-to-br from-blue-100 to-purple-100">
                   <UserCircle className="w-12 h-12 text-gray-400" />
                 </div>
-
-                {/* Hover overlay */}
                 <div className="absolute inset-0 bg-black/50 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center">
                   <Camera className="w-6 h-6 text-white mb-1" />
                   <span className="text-white text-xs font-medium">Update</span>
@@ -533,16 +457,14 @@ export default function UserProfile() {
               </div>
               <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-full border-2 border-white"></div>
             </div>
-
-            {/* User Info */}
             <div className="ml-4 flex-1">
               <h1 className="text-2xl font-bold text-white">{user.fullName}</h1>
               <p className="text-gray-100 mb-2">@{user.userName}</p>
               <div className="flex items-center gap-3">
                 <span
                   className={`px-3 py-1 rounded-full text-xs font-medium ${user.status
-                      ? "bg-green-100 text-green-700 border border-green-200"
-                      : "bg-red-100 text-red-700 border border-red-200"
+                    ? "bg-green-100 text-green-700 border border-green-200"
+                    : "bg-red-100 text-red-700 border border-red-200"
                     }`}
                 >
                   {user.status ? "Active" : "Inactive"}
@@ -552,7 +474,6 @@ export default function UserProfile() {
                 </span>
               </div>
             </div>
-
             <button
               onClick={() => setIsEditingProfile(!isEditingProfile)}
               className="p-2 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors duration-200"
@@ -563,15 +484,11 @@ export default function UserProfile() {
         </div>
       </div>
 
-      {/* Hidden file input */}
       <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
 
-      {/* Main Content Grid */}
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* Personal Information */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Basic Information */}
-          <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-6">
+        <div className="lg:col-span-2">
+          <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-6 min-h-[450px]">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-gray-900 flex items-center gap-3">
                 <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
@@ -599,11 +516,11 @@ export default function UserProfile() {
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Full Name</label>
-                  <div className="text-sm font-medium text-gray-900 bg-gray-50 rounded-lg p-3">{user.fullName}</div>
+                  <div className="text-sm font-medium text-gray-900 bg-gray-50 rounded-lg p-3">{user.fullName|| "Not provided"}</div>
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Username</label>
-                  <div className="text-sm font-medium text-gray-900 bg-gray-50 rounded-lg p-3">{user.userName}</div>
+                  <div className="text-sm font-medium text-gray-900 bg-gray-50 rounded-lg p-3">{user.userName || "Not provided"}</div>
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Email Address</label>
@@ -626,68 +543,54 @@ export default function UserProfile() {
                     {user.address || "Not provided"}
                   </div>
                 </div>
-                
               </div>
             ) : (
               <div className="space-y-4">
                 <div className="grid md:grid-cols-2 gap-4">
-                  {/* Full Name */}
                   <div className="space-y-2">
                     <label className="text-xs font-medium text-gray-700 uppercase tracking-wider">Full Name</label>
                     <input
                       type="text"
                       value={updateForm.name}
                       onChange={(e) => setUpdateForm((prev) => ({ ...prev, name: e.target.value }))}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 text-sm ${errors.name ? "border-red-500 bg-red-50" : "border-gray-200 bg-white"
-                        }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 text-sm ${errors.name ? "border-red-500 bg-red-50" : "border-gray-200 bg-white"}`}
                       placeholder="Enter full name"
                     />
                     {errors.name && <p className="text-red-500 text-xs font-medium">{errors.name}</p>}
                   </div>
-
-                  {/* Username */}
                   <div className="space-y-2">
                     <label className="text-xs font-medium text-gray-700 uppercase tracking-wider">Username</label>
                     <input
                       type="text"
                       value={updateForm.userName}
                       onChange={(e) => setUpdateForm((prev) => ({ ...prev, userName: e.target.value }))}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 text-sm ${errors.userName ? "border-red-500 bg-red-50" : "border-gray-200 bg-white"
-                        }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 text-sm ${errors.userName ? "border-red-500 bg-red-50" : "border-gray-200 bg-white"}`}
                       placeholder="Enter username"
                     />
                     {errors.userName && <p className="text-red-500 text-xs font-medium">{errors.userName}</p>}
                   </div>
-
-                  {/* Email */}
                   <div className="space-y-2">
                     <label className="text-xs font-medium text-gray-700 uppercase tracking-wider">Email Address</label>
                     <input
                       type="email"
                       value={updateForm.email}
                       onChange={(e) => setUpdateForm((prev) => ({ ...prev, email: e.target.value }))}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 text-sm ${errors.email ? "border-red-500 bg-red-50" : "border-gray-200 bg-white"
-                        }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 text-sm ${errors.email ? "border-red-500 bg-red-50" : "border-gray-200 bg-white"}`}
                       placeholder="Enter email address"
                     />
                     {errors.email && <p className="text-red-500 text-xs font-medium">{errors.email}</p>}
                   </div>
-
-                  {/* Phone */}
                   <div className="space-y-2">
                     <label className="text-xs font-medium text-gray-700 uppercase tracking-wider">Phone Number</label>
                     <input
                       type="tel"
                       value={updateForm.phoneNumber}
-                      onChange={(e) => setUpdateForm((prev) => ({ ...prev, phone: e.target.value }))}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 text-sm ${errors.phone ? "border-red-500 bg-red-50" : "border-gray-200 bg-white"
-                        }`}
-                      placeholder="Enter phone number"
+                      onChange={(e) => setUpdateForm((prev) => ({ ...prev, phoneNumber: e.target.value }))}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 text-sm ${errors.phoneNumber ? "border-red-500 bg-red-50" : "border-gray-200 bg-white"}`}
+                      placeholder="Enter phone number (e.g., +84912345678)"
                     />
-                    {errors.phone && <p className="text-red-500 text-xs font-medium">{errors.phone}</p>}
+                    {errors.phoneNumber && <p className="text-red-500 text-xs font-medium">{errors.phoneNumber}</p>}
                   </div>
-
-                  {/* Address */}
                   <div className="md:col-span-2 space-y-2">
                     <label className="text-xs font-medium text-gray-700 uppercase tracking-wider">Address</label>
                     <textarea
@@ -699,14 +602,11 @@ export default function UserProfile() {
                     />
                   </div>
                 </div>
-
-                {/* Avatar Upload */}
                 {errors.avatar && (
                   <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm font-medium">
                     {errors.avatar}
                   </div>
                 )}
-
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-gray-700 uppercase tracking-wider">Profile Picture</label>
                   <div className="flex items-center gap-4">
@@ -734,8 +634,6 @@ export default function UserProfile() {
                     </div>
                   </div>
                 </div>
-
-                {/* Action Buttons */}
                 <div className="flex gap-3 pt-4 border-t border-gray-200">
                   <button
                     type="button"
@@ -758,100 +656,9 @@ export default function UserProfile() {
               </div>
             )}
           </div>
-
-          
-          {/* Vehicle Information */}
-          <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-3">
-                <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-red-600 rounded-lg flex items-center justify-center">
-                  <Car className="w-4 h-4 text-white" />
-                </div>
-                Vehicle Information
-              </h2>
-              <button className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200">
-                <Edit3 className="w-4 h-4 text-gray-600" />
-              </button>
-            </div>
-
-            {vehicleLoading ? (
-              <div className="flex justify-center items-center h-32">
-                <div className="w-8 h-8 border-2 border-orange-200 border-t-orange-600 rounded-full animate-spin"></div>
-              </div>
-            ) : vehicle ? (
-              <div className="space-y-6">
-                {/* Vehicle Overview */}
-                <div className="bg-gradient-to-br from-orange-50 to-red-50 rounded-xl p-4 border border-orange-100">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center text-xl">
-                      {getVehicleTypeIcon(vehicle.vehicleTypeId)}
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-gray-900">{vehicle.name}</h3>
-                      <p className="text-orange-600 font-bold">{vehicle.licensePlate}</p>
-                      <div className="flex items-center gap-1 mt-1">
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <span className="text-xs font-medium text-green-700">Active</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Vehicle Details */}
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wider flex items-center gap-1">
-                      <Tag className="w-3 h-3" />
-                      Vehicle Name
-                    </label>
-                    <div className="text-sm font-medium text-gray-900 bg-gray-50 rounded-lg p-3">{vehicle.name}</div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wider flex items-center gap-1">
-                      <Hash className="w-3 h-3" />
-                      License Plate
-                    </label>
-                    <div className="text-sm font-medium text-gray-900 bg-gray-50 rounded-lg p-3 font-mono">
-                      {vehicle.licensePlate}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wider flex items-center gap-1">
-                      <Award className="w-3 h-3" />
-                      Brand
-                    </label>
-                    <div className="text-sm font-medium text-gray-900 bg-gray-50 rounded-lg p-3">{vehicle.brand}</div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wider flex items-center gap-1">
-                      <Palette className="w-3 h-3" />
-                      Color
-                    </label>
-                    <div className="text-sm font-medium text-gray-900 bg-gray-50 rounded-lg p-3 flex items-center gap-2">
-                      {getColorEmoji(vehicle.color)}
-                      <span className="capitalize">{vehicle.color}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Car className="w-8 h-8 text-gray-400" />
-                </div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">No Vehicle Registered</h3>
-                <p className="text-gray-600 mb-4 text-sm">Register your vehicle for traffic monitoring.</p>
-                <button className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 text-sm">
-                  Register Vehicle
-                </button>
-              </div>
-            )}
-          </div>
         </div>
-
-        {/* Security Settings */}
-        <div className="space-y-6">
-          <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-6">
+        <div>
+          <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-6 min-h-[450px]">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                 <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center">
@@ -861,7 +668,6 @@ export default function UserProfile() {
               </h2>
               <Settings className="w-4 h-4 text-gray-400" />
             </div>
-
             {!isEditingPassword ? (
               <div className="space-y-4">
                 <div className="space-y-2">
@@ -870,19 +676,17 @@ export default function UserProfile() {
                     {user.roleName}
                   </div>
                 </div>
-
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Status</label>
                   <div
                     className={`text-sm font-medium rounded-lg p-3 ${user.status
-                        ? "text-green-700 bg-green-50 border border-green-200"
-                        : "text-red-700 bg-red-50 border border-red-200"
+                      ? "text-green-700 bg-green-50 border border-green-200"
+                      : "text-red-700 bg-red-50 border border-red-200"
                       }`}
                   >
                     {user.status ? "✅ Active & Secure" : "🔒 Account Locked"}
                   </div>
                 </div>
-
                 <button
                   onClick={() => setIsEditingPassword(true)}
                   className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 text-sm"
@@ -898,8 +702,6 @@ export default function UserProfile() {
                     {errors.general}
                   </div>
                 )}
-
-                {/* Current Password */}
                 <div className="space-y-2">
                   <label className="block text-xs font-medium text-gray-700">Current Password</label>
                   <div className="relative">
@@ -907,8 +709,7 @@ export default function UserProfile() {
                       type={showPasswords.current ? "text" : "password"}
                       value={passwordForm.currentPassword}
                       onChange={(e) => setPasswordForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 pr-10 text-sm ${errors.currentPassword ? "border-red-500 bg-red-50" : "border-gray-200 bg-white"
-                        }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 pr-10 text-sm ${errors.currentPassword ? "border-red-500 bg-red-50" : "border-gray-200 bg-white"}`}
                       placeholder="Enter current password"
                     />
                     <button
@@ -923,8 +724,6 @@ export default function UserProfile() {
                     <p className="text-red-500 text-xs font-medium">{errors.currentPassword}</p>
                   )}
                 </div>
-
-                {/* New Password */}
                 <div className="space-y-2">
                   <label className="block text-xs font-medium text-gray-700">New Password</label>
                   <div className="relative">
@@ -932,8 +731,7 @@ export default function UserProfile() {
                       type={showPasswords.new ? "text" : "password"}
                       value={passwordForm.newPassword}
                       onChange={(e) => setPasswordForm((prev) => ({ ...prev, newPassword: e.target.value }))}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 pr-10 text-sm ${errors.newPassword ? "border-red-500 bg-red-50" : "border-gray-200 bg-white"
-                        }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 pr-10 text-sm ${errors.newPassword ? "border-red-500 bg-red-50" : "border-gray-200 bg-white"}`}
                       placeholder="Enter new password"
                     />
                     <button
@@ -946,8 +744,6 @@ export default function UserProfile() {
                   </div>
                   {errors.newPassword && <p className="text-red-500 text-xs font-medium">{errors.newPassword}</p>}
                 </div>
-
-                {/* Confirm Password */}
                 <div className="space-y-2">
                   <label className="block text-xs font-medium text-gray-700">Confirm New Password</label>
                   <div className="relative">
@@ -955,8 +751,7 @@ export default function UserProfile() {
                       type={showPasswords.confirm ? "text" : "password"}
                       value={passwordForm.confirmPassword}
                       onChange={(e) => setPasswordForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 pr-10 text-sm ${errors.confirmPassword ? "border-red-500 bg-red-50" : "border-gray-200 bg-white"
-                        }`}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 pr-10 text-sm ${errors.confirmPassword ? "border-red-500 bg-red-50" : "border-gray-200 bg-white"}`}
                       placeholder="Confirm new password"
                     />
                     <button
@@ -971,8 +766,6 @@ export default function UserProfile() {
                     <p className="text-red-500 text-xs font-medium">{errors.confirmPassword}</p>
                   )}
                 </div>
-
-                {/* Action Buttons */}
                 <div className="flex gap-3 pt-2">
                   <button
                     type="button"

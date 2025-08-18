@@ -9,6 +9,7 @@ import { Eye, RefreshCw, CheckCircle2, XCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import {API_URL_BE} from "../../components/Link/LinkAPI";
 
 interface Camera {
   id: number;
@@ -36,7 +37,6 @@ interface Vehicle {
   id: number;
   name?: string;
   licensePlate: string;
-  userId?: number;
   vehicleTypeId?: number;
   color: string;
   brand: string;
@@ -71,13 +71,12 @@ export default function ViolationDetail() {
   const [violation, setViolation] = useState<Violation | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isEditingViolation, setIsEditingViolation] = useState(false);
   const [isEditingDetail, setIsEditingDetail] = useState(false);
-  const [formData, setFormData] = useState<Partial<Violation>>({});
+  const [formData, setFormData] = useState<Partial<Pick<Violation, 'status'>>>({ status: '' });
   const [detailFormData, setDetailFormData] = useState<Partial<ViolationDetail>>({});
   const [imageExpanded, setImageExpanded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8081";
+
 
   useEffect(() => {
     if (!id || isNaN(Number(id))) {
@@ -89,14 +88,9 @@ export default function ViolationDetail() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`${API_URL}/api/violations/${id}`);
+        const response = await axios.get(`${API_URL_BE}api/violations/${id}`);
         setViolation(response.data);
-        setFormData({
-          camera: response.data.camera,
-          vehicleType: response.data.vehicleType,
-          vehicle: response.data.vehicle,
-          status: response.data.status,
-        });
+        setFormData({ status: response.data.status });
         const firstDetail = response.data.violationDetails?.[0] || {};
         setDetailFormData({
           violationType: firstDetail.violationType,
@@ -107,81 +101,75 @@ export default function ViolationDetail() {
           speed: firstDetail.speed,
           additionalNotes: firstDetail.additionalNotes,
         });
-      } catch (err) {
+      } catch (err: any) {
         console.error("Error fetching data:", err);
-        setError("Unable to load data. Please try again.");
+        setError(err.response?.data?.message || "Unable to load data. Please try again.");
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, [id, API_URL]);
+  }, [id]);
 
-  const handleViolationInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
-
-    if (name === "status") {
-      setFormData((prev) => ({ ...prev, status: value }));
-    } else if (["licensePlate", "vehicleColor", "vehicleBrand"].includes(name)) {
-      const vehicleFieldMap: Record<string, keyof Vehicle> = {
-        licensePlate: "licensePlate",
-        vehicleColor: "color",
-        vehicleBrand: "brand",
-      };
-      const field = vehicleFieldMap[name];
-      setFormData((prev) => ({
-        ...prev,
-        vehicle: {
-          id: prev.vehicle?.id ?? 0,
-          licensePlate: prev.vehicle?.licensePlate ?? "",
-          color: prev.vehicle?.color ?? "",
-          brand: prev.vehicle?.brand ?? "",
-          [field]: value,
-        },
-      }));
-    }
+  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setFormData({ status: e.target.value });
   };
 
-  const handleDetailInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = e.target;
-    setDetailFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleUpdateViolation = async () => {
-    if (!id || !formData) return;
-    if (!formData.vehicle?.licensePlate) {
-      toast.error("Please fill in all required fields (License Plate).");
-      return;
-    }
+  const handleUpdateStatus = async (newStatus: string) => {
+    if (!id) return;
 
     try {
       setLoading(true);
-      const updateData = {
-        id: Number(id),
-        camera: formData.camera ? { id: formData.camera.id } : null,
-        vehicleType: formData.vehicleType ? { id: formData.vehicleType.id } : null,
-        vehicle: formData.vehicle
-          ? {
-              id: formData.vehicle.id,
-              licensePlate: formData.vehicle.licensePlate,
-              color: formData.vehicle.color,
-              brand: formData.vehicle.brand,
-            }
-          : null,
-        status: formData.status,
-      };
-      const updatedViolation = await axios.put(`${API_URL}/api/violations/${id}`, updateData);
-      setViolation(updatedViolation.data);
-      setIsEditingViolation(false);
-      toast.success("Violation updated successfully!");
-    } catch (err) {
-      console.error("Error updating violation:", err);
-      toast.error("Unable to update violation. Please try again.");
+      let response;
+      const statusUpper = newStatus.toUpperCase();
+
+      switch (statusUpper) {
+        case "PROCESSED":
+          response = await axios.post(`${API_URL_BE}api/violations/${id}/process`);
+          break;
+        case "APPROVED":
+          response = await axios.post(`${API_URL_BE}api/violations/${id}/approve`);
+          break;
+        case "REJECTED":
+          response = await axios.post(`${API_URL_BE}api/violations/${id}/reject`);
+          break;
+        case "PENDING":
+          response = await axios.put(`${API_URL_BE}api/violations/${id}`, {
+            id: Number(id),
+            camera: violation?.camera ? { id: violation.camera.id } : null,
+            vehicleType: violation?.vehicleType ? { id: violation.vehicleType.id } : null,
+            vehicle: violation?.vehicle
+              ? {
+                  id: violation.vehicle.id,
+                  name: violation.vehicle.name,
+                  licensePlate: violation.vehicle.licensePlate,
+                  vehicleTypeId: violation.vehicle.vehicleTypeId,
+                  color: violation.vehicle.color,
+                  brand: violation.vehicle.brand,
+                }
+              : null,
+            status: "PENDING",
+          });
+          break;
+        default:
+          throw new Error("Invalid status");
+      }
+
+      setViolation(response.data);
+      setFormData({ status: response.data.status });
+      if (statusUpper === "APPROVED") {
+        toast.success("Violation approved! An email with the violation report has been sent.");
+      } else {
+        toast.success(`Violation status updated to ${statusUpper}!`);
+      }
+    } catch (err: any) {
+      console.error("Error updating status:", err);
+      const errorMessage =
+        err.response?.data?.message ||
+        err.response?.data?.errors?.join(", ") ||
+        "Unable to update status. Please try again.";
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -190,7 +178,7 @@ export default function ViolationDetail() {
   const handleUpdateDetail = async () => {
     if (!id || !detailFormData || !violation?.violationDetails?.[0]?.id) return;
     if (!detailFormData.violationType?.id) {
-      toast.error("Please fill in all required fields (Violation Type).");
+      toast.error("Violation Type is required.");
       return;
     }
 
@@ -207,7 +195,7 @@ export default function ViolationDetail() {
         additionalNotes: detailFormData.additionalNotes || null,
       };
       const updatedDetail = await axios.put(
-        `${API_URL}/api/violations/details/${violation.violationDetails[0].id}`,
+        `${API_URL_BE}api/violations/details/${violation.violationDetails[0].id}`,
         updateData
       );
       setViolation((prev) => ({
@@ -216,12 +204,27 @@ export default function ViolationDetail() {
       }));
       setIsEditingDetail(false);
       toast.success("Violation detail updated successfully!");
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error updating violation detail:", err);
-      toast.error("Unable to update violation detail. Please try again.");
+      const errorMessage =
+        err.response?.data?.message ||
+        err.response?.data?.errors?.join(", ") ||
+        "Unable to update violation detail. Please try again.";
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDetailInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+
+    setDetailFormData((prev) => ({
+      ...prev,
+      [name]: name === "speed" ? (value ? Number(value) : null) : value,
+    }));
   };
 
   const getSeverityBadge = (typeName: string) => {
@@ -239,9 +242,11 @@ export default function ViolationDetail() {
   const getStatusColor = (status: string) => {
     const statusMap: { [key: string]: { bg: string; text: string; icon: React.ReactNode } } = {
       pending: { bg: "bg-gray-100", text: "text-gray-500", icon: <div className="w-2 h-2 bg-gray-400 rounded-full" /> },
-      request: { bg: "bg-yellow-100", text: "text-yellow-700", icon: <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" /> },
-      approve: { bg: "bg-green-100", text: "text-green-700", icon: <CheckCircle2 className="text-green-500" size={14} /> },
-      reject: { bg: "bg-red-100", text: "text-red-700", icon: <XCircle className="text-red-500" size={14} /> },
+      // requested: { bg: "bg-yellow-100", text: "text-yellow-700", icon: <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" /> },
+      approved: { bg: "bg-green-100", text: "text-green-700", icon: <CheckCircle2 className="text-green-500" size={14} /> },
+      rejected: { bg: "bg-red-100", text: "text-red-700", icon: <XCircle className="text-red-500" size={14} /> },
+      processed: { bg: "bg-teal-100", text: "text-teal-700", icon: <CheckCircle2 className="text-teal-500" size={14} /> }
+      ,
     };
     return statusMap[status.toLowerCase()] || { bg: "bg-gray-100", text: "text-gray-500", icon: <div className="w-2 h-2 bg-gray-400 rounded-full" /> };
   };
@@ -249,14 +254,9 @@ export default function ViolationDetail() {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const response = await axios.get(`${API_URL}/api/violations/${id}`);
+      const response = await axios.get(`${API_URL_BE}api/violations/${id}`);
       setViolation(response.data);
-      setFormData({
-        camera: response.data.camera,
-        vehicleType: response.data.vehicleType,
-        vehicle: response.data.vehicle,
-        status: response.data.status,
-      });
+      setFormData({ status: response.data.status });
       const firstDetail = response.data.violationDetails?.[0] || {};
       setDetailFormData({
         violationType: firstDetail.violationType,
@@ -268,13 +268,17 @@ export default function ViolationDetail() {
         additionalNotes: firstDetail.additionalNotes,
       });
       toast.success("Data refreshed successfully!");
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error refreshing data:", err);
-      toast.error("Unable to refresh data. Please try again.");
+      const errorMessage =
+        err.response?.data?.message ||
+        err.response?.data?.errors?.join(", ") ||
+        "Unable to refresh data. Please try again.";
+      toast.error(errorMessage);
     } finally {
       setRefreshing(false);
     }
-  }, [id, API_URL]);
+  }, [id]);
 
   if (loading) {
     return (
@@ -478,57 +482,33 @@ export default function ViolationDetail() {
                   <RefreshCw size={16} className={refreshing ? "animate-spin mr-2" : "mr-2"} />
                   Refresh
                 </button>
-                {!isEditingViolation && !isEditingDetail && (
-                  <>
-                    <button
-                      onClick={() => setIsEditingViolation(true)}
-                      className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-blue-500/40 relative overflow-hidden group"
-                      aria-label="Edit violation information"
+                {!isEditingDetail && (
+                  <button
+                    onClick={() => setIsEditingDetail(true)}
+                    className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-blue-500/40 relative overflow-hidden group"
+                    aria-label="Edit violation detail"
+                  >
+                    <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></span>
+                    <svg
+                      className="w-4 h-4 mr-2"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
                     >
-                      <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></span>
-                      <svg
-                        className="w-4 h-4 mr-2"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                        />
-                      </svg>
-                      Edit Information
-                    </button>
-                    <button
-                      onClick={() => setIsEditingDetail(true)}
-                      className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-blue-500/40 relative overflow-hidden group"
-                      aria-label="Edit violation detail"
-                    >
-                      <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></span>
-                      <svg
-                        className="w-4 h-4 mr-2"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                        />
-                      </svg>
-                      Edit Detail
-                    </button>
-                  </>
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
+                    </svg>
+                    Edit Detail
+                  </button>
                 )}
-
-                {(isEditingViolation || isEditingDetail) && (
+                {isEditingDetail && (
                   <div className="flex space-x-3">
                     <button
-                      onClick={isEditingDetail ? handleUpdateDetail : handleUpdateViolation}
+                      onClick={handleUpdateDetail}
                       disabled={loading}
                       className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl hover:from-green-600 hover:to-emerald-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-green-500/40 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none relative overflow-hidden group"
                       aria-label="Save changes"
@@ -554,10 +534,7 @@ export default function ViolationDetail() {
                       Save Changes
                     </button>
                     <button
-                      onClick={() => {
-                        setIsEditingViolation(false);
-                        setIsEditingDetail(false);
-                      }}
+                      onClick={() => setIsEditingDetail(false)}
                       className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-rose-500 to-red-500 text-white rounded-xl hover:from-rose-600 hover:to-red-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-rose-500/40 relative overflow-hidden group"
                       aria-label="Cancel edit"
                     >
@@ -580,6 +557,76 @@ export default function ViolationDetail() {
                   </div>
                 )}
               </div>
+
+              {/* Status Update Section */}
+              <motion.div
+                className="mt-6 bg-gradient-to-br from-white/95 to-blue-100/95 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-blue-200/50"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+              >
+                <h3 className="text-xl font-bold bg-gradient-to-r from-blue-800 to-cyan-600 bg-clip-text text-transparent mb-4 flex items-center">
+                  <div className="w-6 h-6 mr-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center animate-pulse-slow">
+                    <svg
+                      className="w-4 h-4 text-white"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                  </div>
+                  Update Violation Status 
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-blue-700 font-medium mb-1">Status:</label>
+                    <select
+                      name="status"
+                      value={formData.status || ""}
+                      onChange={handleStatusChange}
+                      className="w-full border border-blue-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/70 backdrop-blur-sm transition-all duration-300"
+                      disabled={loading}
+                    >
+                      <option value="PENDING">Pending</option>
+                      <option value="PROCESSED">Processed</option>
+                      <option value="APPROVED">Approved</option>
+                      <option value="REJECTED">Rejected</option>
+                    </select>
+                  </div>
+                  <button
+                    onClick={() => handleUpdateStatus(formData.status || "")}
+                    disabled={loading || !formData.status}
+                    className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-blue-500/40 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none relative overflow-hidden group"
+                    aria-label="Update status"
+                  >
+                    <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></span>
+                    {loading ? (
+                      <div className="w-4 h-4 mr-2 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                    ) : (
+                      <svg
+                        className="w-4 h-4 mr-2"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                    )}
+                    Update Status
+                  </button>
+                </div>
+              </motion.div>
             </motion.div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -614,7 +661,7 @@ export default function ViolationDetail() {
                     <div className="relative group">
                       <img
                         src={violation.violationDetails[0].imageUrl}
-                        alt="Violation Image"
+                        alt="Violation"
                         className="w-full h-auto rounded-xl border-2 border-blue-200/50 cursor-pointer transition-all duration-300 group-hover:border-blue-400 group-hover:shadow-2xl group-hover:shadow-blue-400/40"
                         loading="lazy"
                         onClick={() => setImageExpanded(true)}
@@ -656,88 +703,88 @@ export default function ViolationDetail() {
 
                 {/* Video */}
                 {violation.violationDetails[0].videoUrl ? (
-                  <motion.div 
-                    className="bg-gradient-to-br from-white/95 to-blue-100/95 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-blue-200/50 transform hover:scale-[1.02] transition-all duration-300"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.5, delay: 0.1 }}
-                  >
-                    <h3 className="text-xl font-bold bg-gradient-to-r from-blue-800 to-cyan-600 bg-clip-text text-transparent mb-4 flex items-center">
-                      <div className="w-6 h-6 mr-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center animate-pulse-slow">
-                        <svg
-                          className="w-4 h-4 text-white"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                          />
-                        </svg>
-                      </div>
-                      Violation Video
-                    </h3>
-                    <div className="relative group">
-                      <video
-                        src={violation.violationDetails[0].videoUrl}
-                        controls
-                        className="w-full rounded-xl border-2 border-blue-200/50 transition-all duration-300 group-hover:border-blue-400 group-hover:shadow-2xl group-hover:shadow-blue-400/40"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent rounded-xl opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
-                        <div className="bg-white/90 backdrop-blur-sm rounded-full p-3 transform scale-90 group-hover:scale-100 transition-all duration-300">
-                          <svg
-                            className="w-8 h-8 text-blue-600"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
-                            />
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                            />
-                          </svg>
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
-                ) : (
-                  <motion.div 
-                    className="bg-gradient-to-br from-white/95 to-gray-100/95 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-gray-200/50"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.5, delay: 0.1 }}
-                  >
-                    <div className="text-center py-16 text-gray-500">
-                      <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-gray-400 to-blue-400 rounded-full flex items-center justify-center animate-pulse">
-                        <svg
-                          className="w-10 h-10 text-white"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                          />
-                        </svg>
-                      </div>
-                      <p className="font-medium text-gray-600">No video available</p>
-                    </div>
-                  </motion.div>
-                )}
+  <motion.div 
+    className="bg-gradient-to-br from-white/95 to-blue-100/95 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-blue-200/50 transform hover:scale-[1.02] transition-all duration-300"
+    initial={{ opacity: 0, x: -20 }}
+    animate={{ opacity: 1, x: 0 }}
+    transition={{ duration: 0.5, delay: 0.1 }}
+  >
+    <h3 className="text-xl font-bold bg-gradient-to-r from-blue-800 to-cyan-600 bg-clip-text text-transparent mb-4 flex items-center">
+      <div className="w-6 h-6 mr-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center animate-pulse-slow">
+        <svg
+          className="w-4 h-4 text-white"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+          />
+        </svg>
+      </div>
+      Violation Video
+    </h3>
+    <div className="relative group">
+      <video
+        src={violation.violationDetails[0].videoUrl}
+        controls
+        className="w-full rounded-xl border-2 border-blue-200/50 transition-all duration-300 group-hover:border-blue-400 group-hover:shadow-2xl group-hover:shadow-blue-400/40"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent rounded-xl opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center pointer-events-none">
+        <div className="bg-white/90 backdrop-blur-sm rounded-full p-3 transform scale-90 group-hover:scale-100 transition-all duration-300">
+          <svg
+            className="w-8 h-8 text-blue-600"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+            />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+        </div>
+      </div>
+    </div>
+  </motion.div>
+) : (
+  <motion.div 
+    className="bg-gradient-to-br from-white/95 to-gray-100/95 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-gray-200/50"
+    initial={{ opacity: 0, x: -20 }}
+    animate={{ opacity: 1, x: 0 }}
+    transition={{ duration: 0.5, delay: 0.1 }}
+  >
+    <div className="text-center py-16 text-gray-500">
+      <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-gray-400 to-blue-400 rounded-full flex items-center justify-center animate-pulse">
+        <svg
+          className="w-10 h-10 text-white"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+          />
+        </svg>
+      </div>
+      <p className="font-medium text-gray-600">No video available</p>
+    </div>
+  </motion.div>
+)}
               </div>
 
               {/* Details Section */}
@@ -774,59 +821,35 @@ export default function ViolationDetail() {
                         {violation.vehicleType?.typeName || "N/A"}
                       </span>
                     </div>
-
+                    <div className="flex justify-between items-center">
+                      <span className="text-blue-700 font-medium">Vehicle Name:</span>
+                      <span className="font-semibold text-blue-900 bg-blue-100/80 px-3 py-1 rounded-xl">
+                        {violation.vehicle?.name || "N/A"}
+                      </span>
+                    </div>
                     <div className="flex justify-between items-center">
                       <span className="text-blue-700 font-medium">License Plate:</span>
-                      {isEditingViolation ? (
-                        <input
-                          type="text"
-                          name="licensePlate"
-                          value={formData.vehicle?.licensePlate || ""}
-                          onChange={handleViolationInputChange}
-                          className="border border-blue-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/70 backdrop-blur-sm transition-all duration-300"
-                          placeholder="Enter license plate"
-                        />
-                      ) : (
-                        <span className="font-semibold text-blue-900 font-mono bg-blue-100/80 px-3 py-1 rounded-xl">
-                          {violation.vehicle?.licensePlate || "N/A"}
-                        </span>
-                      )}
+                      <span className="font-semibold text-blue-900 font-mono bg-blue-100/80 px-3 py-1 rounded-xl">
+                        {violation.vehicle?.licensePlate || "N/A"}
+                      </span>
                     </div>
-
                     <div className="flex justify-between items-center">
                       <span className="text-blue-700 font-medium">Vehicle Color:</span>
-                      {isEditingViolation ? (
-                        <input
-                          type="text"
-                          name="vehicleColor"
-                          value={formData.vehicle?.color || ""}
-                          onChange={handleViolationInputChange}
-                          className="border border-blue-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/70 backdrop-blur-sm transition-all duration-300"
-                          placeholder="Enter vehicle color"
-                        />
-                      ) : (
-                        <span className="font-semibold text-blue-900 bg-blue-100/80 px-3 py-1 rounded-xl">
-                          {violation.vehicle?.color || "N/A"}
-                        </span>
-                      )}
+                      <span className="font-semibold text-blue-900 bg-blue-100/80 px-3 py-1 rounded-xl">
+                        {violation.vehicle?.color || "N/A"}
+                      </span>
                     </div>
-
                     <div className="flex justify-between items-center">
                       <span className="text-blue-700 font-medium">Vehicle Brand:</span>
-                      {isEditingViolation ? (
-                        <input
-                          type="text"
-                          name="vehicleBrand"
-                          value={formData.vehicle?.brand || ""}
-                          onChange={handleViolationInputChange}
-                          className="border border-blue-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/70 backdrop-blur-sm transition-all duration-300"
-                          placeholder="Enter vehicle brand"
-                        />
-                      ) : (
-                        <span className="font-semibold text-blue-900 bg-blue-100/80 px-3 py-1 rounded-xl">
-                          {violation.vehicle?.brand || "N/A"}
-                        </span>
-                      )}
+                      <span className="font-semibold text-blue-900 bg-blue-100/80 px-3 py-1 rounded-xl">
+                        {violation.vehicle?.brand || "N/A"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-blue-700 font-medium">Camera:</span>
+                      <span className="font-semibold text-blue-900 bg-blue-100/80 px-3 py-1 rounded-xl">
+                        {violation.camera?.name || "N/A"}
+                      </span>
                     </div>
                   </div>
                 </motion.div>
@@ -861,15 +884,16 @@ export default function ViolationDetail() {
                       <label className="block text-blue-700 font-medium mb-1">
                         Violation Type:
                       </label>
-                      <span
-                        className={`px-4 py-2 rounded-xl text-sm font-semibold transform hover:scale-105 transition-all duration-300 ${getSeverityBadge(
-                          violation.violationDetails[0].violationType?.typeName || ""
-                        )}`}
-                      >
-                        {violation.violationDetails[0].violationType?.typeName || "N/A"}
-                      </span>
+                      
+                        <span
+                          className={`px-4 py-2 rounded-xl text-sm font-semibold transform hover:scale-105 transition-all duration-300 ${getSeverityBadge(
+                            violation.violationDetails[0].violationType?.typeName || ""
+                          )}`}
+                        >
+                          {violation.violationDetails[0].violationType?.typeName || "N/A"}
+                        </span>
+                      
                     </div>
-
                     <div>
                       <label className="block text-blue-700 font-medium mb-1">
                         Violation Time:
@@ -906,7 +930,6 @@ export default function ViolationDetail() {
                         </span>
                       )}
                     </div>
-
                     <div>
                       <label className="block text-blue-700 font-medium mb-1">Speed:</label>
                       {isEditingDetail ? (
@@ -948,7 +971,6 @@ export default function ViolationDetail() {
                         </span>
                       )}
                     </div>
-
                     <div>
                       <label className="block text-blue-700 font-medium mb-1">Location:</label>
                       {isEditingDetail ? (
@@ -1176,7 +1198,7 @@ export default function ViolationDetail() {
                   </button>
                   <img
                     src={violation.violationDetails[0].imageUrl}
-                    alt="Violation Image"
+                    alt="Violation"
                     className="max-w-full max-h-full object-contain rounded-xl border-2 border-blue-200/50 shadow-2xl shadow-blue-400/40"
                     onClick={() => setImageExpanded(false)}
                   />

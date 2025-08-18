@@ -1,5 +1,9 @@
-export function getYouTubeEmbedUrl(url: string | null): string | undefined {
-  if (!url) return undefined
-  const videoIdMatch = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
-  return videoIdMatch ? `https://www.youtube.com/embed/${videoIdMatch[1]}` : url
+export const getYouTubeEmbedUrl = (url: string): string | null => {
+  const youtubeRegex =
+    /(?:https?:\/\/)?(?:www\.)?(?:m\.)?(?:youtube\.com|youtu\.be)\/(?:watch\?v=|embed\/|v\/|)([\w-]{11})(?:\S+)?/
+  const match = url.match(youtubeRegex)
+  if (match && match[1]) {
+    return `https://www.youtube.com/embed/${match[1]}`
+  }
+  return null
 }

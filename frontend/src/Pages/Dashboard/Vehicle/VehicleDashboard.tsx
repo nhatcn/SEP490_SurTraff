@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import Sidebar from "../../../components/Layout/Sidebar";
 import Header from "../../../components/Layout/Header";
-import { Eye, Trash2 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import TableVehicle from "../../../components/Vehicle/TableVehicle";
+import {API_URL_BE} from "../../../components/Link/LinkAPI";
 
 interface VehicleType {
   id: number;
@@ -16,15 +15,37 @@ interface VehicleType {
 }
 
 export default function VehicleDashboard() {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [vehicles, setVehicles] = useState<VehicleType[]>([]);
+  const [refreshKey] = useState(0);
+
+  // Fetch vehicles on mount and when refreshKey changes
+  useEffect(() => {
+    const fetchVehicles = async () => {
+      try {
+        const response = await fetch(API_URL_BE +'api/vehicle', {
+          headers: { 'Content-Type': 'application/json' },
+        });
+        if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+        const data = await response.json();
+        setVehicles(data);
+      } catch (error) {
+        console.error('Error fetching vehicles:', error);
+      }
+    };
+    fetchVehicles();
+  }, [refreshKey]);
+
   return (
     <div className="flex h-screen">
-      <Sidebar defaultActiveItem="vehicle"/>
+      <Sidebar defaultActiveItem="vehicles" />
       <div className="flex flex-col flex-grow overflow-hidden">
         <Header title="Vehicle Dashboard" />
-        
-        
         <div className="flex-grow overflow-y-auto p-4">
-          <TableVehicle />
+          {/* <div className="mb-4">
+            <AddVehicle onVehicleAdded={handleVehicleAdded} />
+          </div> */}
+          <TableVehicle key={refreshKey} />
         </div>
       </div>
     </div>

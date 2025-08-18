@@ -1,8 +1,11 @@
+
 "use client"
 
-import { Search, Bell, User, ChevronDown, Activity, Clock } from "lucide-react"
+import { Search, Bell, User, ChevronDown, Clock } from "lucide-react"
 import { useState, useEffect } from "react"
 import { getCookie } from "../../utils/cookieUltil"
+import { useNavigate } from "react-router-dom"
+import {API_URL_BE} from "../Link/LinkAPI"
 
 interface HeaderProps {
   title: string
@@ -10,7 +13,7 @@ interface HeaderProps {
 
 interface UserData {
   id: string
-  name: string
+  fullName: string
   email: string
   avatar?: string
   role: string
@@ -22,6 +25,7 @@ export default function Header({ title }: HeaderProps) {
   const [userData, setUserData] = useState<UserData | null>(null)
   const [loading, setLoading] = useState(true)
   const [currentTime, setCurrentTime] = useState(new Date())
+  const navigate = useNavigate()
 
   // Update time every minute
   useEffect(() => {
@@ -39,17 +43,13 @@ export default function Header({ title }: HeaderProps) {
         const role = localStorage.getItem("role") || "Admin"
 
         if (!userId) {
-          setUserData({
-            id: "",
-            name: "Admin",
-            email: "admin@system.com",
-            role: role,
-          })
+          // No cookie found, set userData to null to show "Login"
+          setUserData(null)
           setLoading(false)
           return
         }
 
-        const response = await fetch(`http://localhost:8081/api/users/${userId}`)
+        const response = await fetch(API_URL_BE +`api/users/${userId}`)
 
         if (response.ok) {
           const user = await response.json()
@@ -60,7 +60,7 @@ export default function Header({ title }: HeaderProps) {
         } else {
           setUserData({
             id: userId,
-            name: "User",
+            fullName: "User",
             email: "",
             role: role,
           })
@@ -71,7 +71,7 @@ export default function Header({ title }: HeaderProps) {
         const role = localStorage.getItem("role") || "Admin"
         setUserData({
           id: userId,
-          name: "User",
+          fullName: "User",
           email: "",
           role: role,
         })
@@ -84,12 +84,12 @@ export default function Header({ title }: HeaderProps) {
   }, [])
 
   const getAvatarInitials = (user: UserData) => {
-    if (user.name) {
-      const words = user.name.split(" ").filter((word) => word.length > 0)
+    if (user.fullName) {
+      const words = user.fullName.split(" ").filter((word) => word.length > 0)
       if (words.length >= 2) {
         return (words[0][0] + words[1][0]).toUpperCase()
       }
-      return user.name.substring(0, 2).toUpperCase()
+      return user.fullName.substring(0, 2).toUpperCase()
     }
     return "AD"
   }
@@ -147,107 +147,131 @@ export default function Header({ title }: HeaderProps) {
             </button>
 
             {/* Notifications */}
-            <div className="relative">
-              <button
-                onClick={() => setShowNotifications(!showNotifications)}
-                className="relative p-2 rounded-lg hover:bg-gray-100 text-gray-600 hover:text-gray-800 transition-colors duration-200"
-              >
-                <Bell size={18} />
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
-                  <span className="text-white text-xs font-medium">3</span>
-                </span>
-              </button>
+            {userData && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowNotifications(!showNotifications)}
+                  className="relative p-2 rounded-lg hover:bg-gray-100 text-gray-600 hover:text-gray-800 transition-colors duration-200"
+                >
+                  <Bell size={18} />
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs font-medium">3</span>
+                  </span>
+                </button>
 
-              {/* Notifications Dropdown */}
-              {showNotifications && (
-                <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                  <div className="px-4 py-3 border-b border-gray-100">
-                    <h3 className="font-medium text-gray-800">Notifications</h3>
-                  </div>
+                {/* Notifications Dropdown */}
+                {showNotifications && (
+                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                    <div className="px-4 py-3 border-b border-gray-100">
+                      <h3 className="font-medium text-gray-800">Notifications</h3>
+                    </div>
 
-                  <div className="max-h-64 overflow-y-auto">
-                    {notifications.map((notification) => (
-                      <div
-                        key={notification.id}
-                        className={`px-4 py-3 hover:bg-gray-50 border-l-4 ${
-                          notification.type === "violation"
-                            ? "border-red-500"
-                            : notification.type === "warning"
-                              ? "border-yellow-500"
-                              : "border-blue-500"
-                        }`}
-                      >
-                        <p className="text-sm font-medium text-gray-800">{notification.title}</p>
-                        <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
-                        <p className="text-xs text-gray-500 mt-2">{notification.time}</p>
-                      </div>
-                    ))}
-                  </div>
+                    <div className="max-h-64 overflow-y-auto">
+                      {notifications.map((notification) => (
+                        <div
+                          key={notification.id}
+                          className={`px-4 py-3 hover:bg-gray-50 border-l-4 ${
+                            notification.type === "violation"
+                              ? "border-red-500"
+                              : notification.type === "warning"
+                                ? "border-yellow-500"
+                                : "border-blue-500"
+                          }`}
+                        >
+                          <p className="text-sm font-medium text-gray-800">{notification.title}</p>
+                          <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
+                          <p className="text-xs text-gray-500 mt-2">{notification.time}</p>
+                        </div>
+                      ))}
+                    </div>
 
-                  <div className="px-4 py-3 border-t border-gray-100 text-center">
-                    <button className="text-sm text-blue-600 hover:text-blue-800 font-medium">
-                      View all notifications
-                    </button>
+                    <div className="px-4 py-3 border-t border-gray-100 text-center">
+                      <button className="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                        View all notifications
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
 
             {/* User Menu */}
             <div className="relative">
-              <button
-                onClick={() => setShowUserMenu(!showUserMenu)}
-                className="flex items-center space-x-2 rounded-lg hover:bg-gray-100 py-2 px-3 transition-colors duration-200"
-              >
-                {/* Avatar */}
-                <div className="relative">
-                  {userData?.avatar ? (
-                    <img
-                      src={userData.avatar || "/placeholder.svg"}
-                      alt="User Avatar"
-                      className="w-8 h-8 rounded-full object-cover"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement
-                        target.style.display = "none"
-                        target.nextElementSibling?.classList.remove("hidden")
-                      }}
-                    />
-                  ) : null}
-                  <div
-                    className={`bg-blue-100 text-blue-600 w-8 h-8 rounded-full flex items-center justify-center font-medium text-sm ${
-                      userData?.avatar ? "hidden" : ""
-                    }`}
-                  >
-                    {loading ? "..." : userData ? getAvatarInitials(userData) : "AD"}
+              {userData ? (
+                <button
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="flex items-center space-x-2 rounded-lg hover:bg-gray-100 py-2 px-3 transition-colors duration-200"
+                >
+                  {/* Avatar */}
+                  <div className="relative">
+                    {userData.avatar ? (
+                      <img
+                        src={userData.avatar || "/placeholder.svg"}
+                        alt="User Avatar"
+                        className="w-8 h-8 rounded-full object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement
+                          target.style.display = "none"
+                          target.nextElementSibling?.classList.remove("hidden")
+                        }}
+                      />
+                    ) : null}
+                    <div
+                      className={`bg-blue-100 text-blue-600 w-8 h-8 rounded-full flex items-center justify-center font-medium text-sm ${
+                        userData.avatar ? "hidden" : ""
+                      }`}
+                    >
+                      {loading ? "..." : userData ? getAvatarInitials(userData) : "AD"}
+                    </div>
+                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 rounded-full border-2 border-white" />
                   </div>
-                  <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 rounded-full border-2 border-white" />
-                </div>
 
-                {/* User Info */}
-                <div className="hidden sm:block text-left">
-                  <span className="text-sm font-medium text-gray-700 block max-w-24 truncate">
-                    {loading ? "Loading..." : userData?.name || userData?.role || "Admin"}
-                  </span>
-                </div>
+                  {/* User Info */}
+                  <div className="hidden sm:block text-left">
+                    <span className="text-sm font-medium text-gray-700 block max-w-24 truncate">
+                      {loading ? "Loading..." : userData?.fullName || userData?.role || "Admin"}
+                    </span>
+                  </div>
 
-                <ChevronDown size={16} className="text-gray-500" />
-              </button>
+                  <ChevronDown size={16} className="text-gray-500" />
+                </button>
+              ) : (
+                <button
+                  onClick={() => navigate('/login')}
+                  className="flex items-center space-x-2 rounded-lg hover:bg-gray-100 py-2 px-3 transition-colors duration-200"
+                >
+                  <div className="relative">
+                    <div className="bg-blue-100 text-blue-600 w-8 h-8 rounded-full flex items-center justify-center font-medium text-sm">
+                      {loading ? "..." : "LI"}
+                    </div>
+                  </div>
+                  <div className="hidden sm:block text-left">
+                    <span className="text-sm font-medium text-gray-700 block max-w-24 truncate">
+                      {loading ? "Loading..." : "Login"}
+                    </span>
+                  </div>
+                  <ChevronDown size={16} className="text-gray-500" />
+                </button>
+              )}
 
               {/* User Dropdown */}
-              {showUserMenu && (
+              {showUserMenu && userData && (
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
                   <div className="px-4 py-3 border-b border-gray-100">
-                    <p className="font-medium text-gray-800">{userData?.name || "Admin"}</p>
+                    <p className="font-medium text-gray-800">{userData?.fullName || "Admin"}</p>
                     <p className="text-sm text-gray-600">{userData?.email || ""}</p>
                   </div>
 
                   <div className="py-1">
-                    <a href="profile" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                    <a href="/profile" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                       <User size={16} className="mr-2" />
                       Your Profile
                     </a>
                     <div className="border-t border-gray-100 my-1"></div>
-                    <a href="#" className="flex items-center px-4 py-2 text-sm text-red-600 hover:bg-gray-100">
+                    <button
+                      onClick={() => navigate('/login')}
+                      className="flex items-center px-4 py-2 text-sm text-red-600 hover:bg-gray-100 w-full text-left"
+                    >
                       <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path
                           strokeLinecap="round"
@@ -257,7 +281,7 @@ export default function Header({ title }: HeaderProps) {
                         />
                       </svg>
                       Sign out
-                    </a>
+                    </button>
                   </div>
                 </div>
               )}

@@ -1,7 +1,7 @@
 // hooks/useAuth.ts
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useGoogleLogin, CredentialResponse } from '@react-oauth/google';
+import {  CredentialResponse } from '@react-oauth/google';
 import axios from 'axios';
 import {
   LoginFormData,
@@ -12,8 +12,9 @@ import {
   AuthState
 } from '../../types/Auth/auth';
 import { setCookie } from '../../utils/cookieUltil';
+import {API_URL_BE} from '../../components/Link/LinkAPI';
 
-const API_BASE_URL = 'http://localhost:8080/api/users';
+const API_BASE_URL = API_URL_BE +'api/users';
 
 export const useLogin = () => {
   const [state, setState] = useState<AuthState>({
@@ -49,11 +50,10 @@ export const useLogin = () => {
 
       localStorage.setItem('token', response.data.token);
       setCookie('userId', response.data.userId);
-
+      localStorage.setItem('role', response.data.role);
       setState({ isLoading: false, error: '' });
 
       if (response.data.role === 'customer') {
-
         navigate('/home');
       } else {
         navigate('/dashboard');
@@ -99,7 +99,7 @@ export const useRegister = () => {
     try {
       await axios.post(`${API_BASE_URL}/register`, {
         userName: formData.username,
-        name: formData.fullName,
+        fullName: formData.fullName,
         password: formData.password,
       });
 
@@ -118,7 +118,6 @@ export const useRegister = () => {
     register
   };
 };
-
 
 export const useForgotPassword = () => {
   const [state, setState] = useState<AuthState & { isSubmitted: boolean }>({
@@ -170,6 +169,7 @@ export const useGoogleAuth = () => {
   const navigate = useNavigate();
 
   const handleGoogleLoginSuccess = async (credentialResponse: CredentialResponse) => {
+    console.log('Google login success, credential response:', credentialResponse);
     setIsLoading(true);
     setError('');
 
@@ -178,6 +178,7 @@ export const useGoogleAuth = () => {
         throw new Error('No credential received from Google');
       }
 
+      console.log('Sending Google token to backend...');
       const response = await axios.post(`${API_BASE_URL}/signin`, {
         token: credentialResponse.credential
       }, {
@@ -186,24 +187,30 @@ export const useGoogleAuth = () => {
         }
       });
 
-      // Store auth data
+      console.log('Google login response:', response.data);
+
+      // Store auth data - consistent with regular login
       localStorage.setItem('token', response.data.token);
-      localStorage.setItem('userId', response.data.userId);
+      setCookie('userId', response.data.userId);
       localStorage.setItem('role', response.data.role);
 
       setIsLoading(false);
-      navigate('/home');
+      
+      // Navigate based on role like regular login
+  
+        navigate('/home');
+     
     } catch (err: any) {
+      console.error('Google login error:', err);
       const errorMessage = err.response?.data?.error || 'Google authentication failed';
       setError(errorMessage);
       setIsLoading(false);
-      console.error('Google login error:', err);
     }
   };
 
   const handleGoogleLoginError = () => {
-    setError('Google login failed. Please try again.');
     console.error('Google login failed');
+    setError('Google login failed. Please try again.');
   };
 
   return {

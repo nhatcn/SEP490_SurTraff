@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios, { AxiosError } from 'axios';
+import {API_URL_BE} from '../Link/LinkAPI';
 
 // Define ViolationsDTO interface
 interface ViolationsDTO {
@@ -64,7 +65,7 @@ const RequestButton: React.FC<RequestButtonProps> = ({ violationId, onStatusUpda
     const fetchViolationStatus = async () => {
       try {
         const response = await axios.get<ViolationsDTO>(
-          `http://localhost:8081/api/violations/${violationId}`,
+          API_URL_BE+ `api/violations/${violationId}`,
           {
             headers: {
               Accept: 'application/json',
@@ -74,6 +75,7 @@ const RequestButton: React.FC<RequestButtonProps> = ({ violationId, onStatusUpda
         setViolationStatus(response.data.status?.toUpperCase() || null);
       } catch (err) {
         console.error('Error fetching violation status:', err);
+        setError('Failed to fetch violation status.');
         setViolationStatus(null);
       }
     };
@@ -97,20 +99,17 @@ const RequestButton: React.FC<RequestButtonProps> = ({ violationId, onStatusUpda
     setError(null);
 
     try {
-      const response = await axios.patch<ViolationsDTO>(
-        `http://localhost:8081/api/violations/${violationId}/status`,
+      const response = await axios.post<ViolationsDTO>(
+        API_URL_BE+`api/violations/${violationId}/request`,
         null,
         {
-          params: {
-            status: 'REQUEST',
-          },
           headers: {
             Accept: 'application/json',
           },
         }
       );
       onStatusUpdate(response.data);
-      setViolationStatus(response.data.status?.toUpperCase() || 'REQUEST');
+      setViolationStatus(response.data.status?.toUpperCase() || 'REQUESTED');
       setSuccess(true);
     } catch (err) {
       const error = err as AxiosError;
@@ -120,17 +119,14 @@ const RequestButton: React.FC<RequestButtonProps> = ({ violationId, onStatusUpda
         headers: error.response?.headers,
         request: {
           url: error.config?.url,
-          params: error.config?.params,
+          method: error.config?.method,
           headers: error.config?.headers,
         },
       });
       if (error.response?.status === 404) {
         setError((error.response?.data as any)?.message || 'Violation not found.');
       } else if (error.response?.status === 400) {
-        setError(
-          (error.response?.data as any)?.message ||
-            'Invalid status. Valid statuses: PENDING, REQUEST, RESOLVED, DISMISSED.'
-        );
+        setError((error.response?.data as any)?.message || 'Invalid request. Violation must be in PENDING status.');
       } else {
         setError((error.response?.data as any)?.message || 'An error occurred. Please try again.');
       }
@@ -141,27 +137,33 @@ const RequestButton: React.FC<RequestButtonProps> = ({ violationId, onStatusUpda
   };
 
   // Determine button text and disabled state
-  const isRequested = violationStatus === 'REQUEST';
+  const isRequestAllowed = violationStatus === 'PENDING';
   const buttonText = isLoading
     ? 'Processing...'
     : success === true
     ? 'Success'
     : success === false
     ? 'Failed'
-    : isRequested
+    : violationStatus === 'APPROVED'
+    ? 'Approved'
+    : violationStatus === 'REJECTED'
+    ? 'Rejected'
+    : violationStatus === 'REQUESTED'
     ? 'Requested'
+    : violationStatus === 'PROCESSED'
+    ? 'Processed'
     : 'Send Request';
 
   return (
     <div className="flex flex-col items-center">
       <button
         onClick={handleRequest}
-        disabled={isLoading || isRequested}
+        disabled={isLoading || !isRequestAllowed}
         className={`
           relative px-6 py-3 rounded-lg font-semibold text-white 
           ${success === true ? 'bg-green-600 hover:bg-green-700' : 
             success === false ? 'bg-red-600 hover:bg-red-700' : 
-            isRequested ? 'bg-gray-600 hover:bg-gray-700' : 
+            !isRequestAllowed ? 'bg-gray-600 hover:bg-gray-700' : 
             'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'}
           transition-all duration-300 ease-in-out
           transform hover:scale-105 hover:shadow-xl

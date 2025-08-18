@@ -59,8 +59,8 @@ def stream_violation_video_service(youtube_url: str, camera_id: int):
 
     red_light_history = []
     vehicle_states = {}  # track_id: {prev_y, violated, video_saved}
-    frame_buffer = deque(maxlen=30)  # 1 giây (30fps)
-    recording_tasks = {}  # track_id: {writer, frames_remaining, file_path}
+   
+    recording_tasks = {}  # track_id: {writer, frames frame_buffer = deque(maxlen=30)  # 1 giây (30fps)_remaining, file_path}
     db = SessionLocal()
 
     try:

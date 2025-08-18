@@ -20,6 +20,11 @@ export const getStatusBadge = (status: string) => {
       icon: <X className="w-4 h-4 mr-1 animate-pulse" />,
       text: "Rejected",
     },
+    processed: {
+      className: "bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 border border-green-200 shadow-lg",
+      icon: <Check className="w-4 h-4 mr-1 animate-bounce" />,
+      text: "Processed",
+    },
   }
 
   const config = statusConfig[normalizedStatus as keyof typeof statusConfig] || {

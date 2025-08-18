@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { X, Maximize2, Minimize2, Settings, Camera, MapPin, Clock, Circle } from 'lucide-react';
+import { X, Maximize2, Minimize2, Settings,  MapPin, Clock, Circle } from 'lucide-react';
+import { API_URL_FAST } from '../Link/LinkAPI';
 
 interface CameraProps {
   id: string | number;
@@ -49,11 +50,7 @@ export default function FullscreenCameraView({ camera, onClose }: FullscreenCame
     }
   };
 
-  const toggleRecording = () => {
-    setIsRecording(!isRecording);
-  };
-
-  const processedVideoUrl = `http://localhost:8000/api/video/${camera.id}`;
+  const processedVideoUrl = API_URL_FAST+`api/video/${camera.id}`;
 
   return (
     <div 

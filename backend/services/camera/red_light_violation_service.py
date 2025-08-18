@@ -15,19 +15,66 @@ from schemas.violation_schema import ViolationCreate
 from utils.yt_stream import get_stream_url
 from crud import violation_crud  
 import traceback
+import tempfile
+import ffmpeg
+import threading
+from concurrent.futures import ThreadPoolExecutor
+import atexit
 
 # Load models
 model_vehicle = YOLO("yolov8m.pt")
-model_light = YOLO("final.pt")  # Đèn đỏ
+model_light = YOLO("final.pt")  # Red light model
 
 # Constants
 stop_line_y = 550
 iou_threshold = 200
-red_light_buffer_size = 5  # Buffer cho đèn đỏ
+red_light_buffer_size = 5
+VIOLATION_API_URL = "http://localhost:8081/api/violations"
 
 # Create violations directory
 VIOLATIONS_DIR = "violations"
 os.makedirs(VIOLATIONS_DIR, exist_ok=True)
+
+# Thread pool for async violation sending
+violation_executor = ThreadPoolExecutor(max_workers=5)
+
+def send_violation_async(violation_data, image_path, video_path, track_id):
+    """Send violation to API asynchronously"""
+    def send_violation():
+        try:
+            with open(image_path, 'rb') as img_file, open(video_path, 'rb') as vid_file:
+                files = {
+                    'imageFile': ('violation.jpg', img_file, 'image/jpeg'),
+                    'videoFile': ('violation.mp4', vid_file, 'video/mp4'),
+                    'Violation': (None, json.dumps(violation_data), 'application/json')
+                }
+                response = requests.post(VIOLATION_API_URL, files=files, timeout=10)
+                response.raise_for_status()
+                print(f"✅ Violation sent successfully for track {track_id}: {response.status_code}")
+        except Exception as e:
+            print(f"❌ Failed to send violation to API for track {track_id}: {e}")
+        finally:
+            # Clean up temporary files
+            try:
+                if os.path.exists(image_path):
+                    os.remove(image_path)
+                if os.path.exists(video_path):
+                    os.remove(video_path)
+                print(f"🗑️ Cleaned up temp files for track {track_id}")
+            except Exception as e:
+                print(f"⚠️ Error deleting temp files for track {track_id}: {e}")
+    
+    # Submit to thread pool for async execution
+    violation_executor.submit(send_violation)
+
+def cleanup_output_video(video_path):
+    """Clean up output video file"""
+    try:
+        if os.path.exists(video_path):
+            os.remove(video_path)
+            print(f"🗑️ Deleted output video: {video_path}")
+    except Exception as e:
+        print(f"⚠️ Error deleting output video {video_path}: {e}")
 
 def stream_violation_video_service1(youtube_url: str, camera_id: int):
     # Load zones from Spring Boot API
@@ -52,9 +99,6 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
     light_lane_links = camera_config.get("zoneLightLaneLinks", [])
 
     def convert_percentage_to_frame(percentage_coords, frame_width, frame_height):
-        """
-        Chuyển đổi tọa độ phần trăm (0-100%) sang tọa độ pixel thực tế của frame
-        """
         converted_coords = []
         for x_percent, y_percent in percentage_coords:
             x_pixel = int(round((x_percent / 100.0) * frame_width))
@@ -65,9 +109,6 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
         return np.array(converted_coords, dtype=np.int32)
 
     def point_below_line(point, line_start, line_end):
-        """
-        Kiểm tra điểm có ở phía dưới đường thẳng không
-        """
         x, y = point
         x1, y1 = line_start
         x2, y2 = line_end
@@ -75,15 +116,18 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
         return cross_product > 0
 
     def detect_line_crossing(prev_point, curr_point, line_start, line_end):
-        """
-        Kiểm tra xe có vượt qua line từ dưới lên trên không
-        """
         if prev_point is None or curr_point is None:
             return False
         was_below = point_below_line(prev_point, line_start, line_end)
         is_above = not point_below_line(curr_point, line_start, line_end)
         print(f"Detect line crossing: prev={prev_point}, curr={curr_point}, was_below={was_below}, is_above={is_above}")
         return was_below and is_above
+
+    def save_temp_violation_video(frames, fps, output_path, width, height):
+        out = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))
+        for frame in frames:
+            out.write(frame)
+        out.release()
 
     # Parse zones
     lane_zones_percentage = {}
@@ -125,20 +169,23 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
     if not cap.isOpened():
         raise ValueError("Cannot open stream")
 
-    # Biến để lưu zones đã chuyển đổi
+    # Initialize zones with actual frame size
     lane_zones = {}
     light_zones = {}
     zone_lines = []
     frame_size_initialized = False
 
     red_light_history = {zone_id: deque(maxlen=red_light_buffer_size) for zone_id in light_zones_percentage}
-    track_zone_history = {}  # track_id: current_zone_id
-    track_position_history = {}  # track_id: previous_position
+    track_zone_history = {}
+    track_position_history = {}
     vehicle_violations = {}
-    vehicle_violation_types = {}  # track_id: violation_type
+    vehicle_violation_types = {}
+    frame_buffer = deque(maxlen=30)  # Buffer for 1 second of frames at 30 FPS
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30
 
-    # Lưu video output để debug
+    # Video output for debug
     out = None
+    output_video_path = None
 
     try:
         while True:
@@ -151,8 +198,9 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
 
             frame_annotated = frame.copy()
             h, w, _ = frame.shape
+            frame_buffer.append(frame_annotated.copy())
 
-            # Khởi tạo zones với kích thước frame thực tế
+            # Initialize zones with frame size
             if not frame_size_initialized:
                 print(f"Frame size: {w}x{h}")
                 print(f"Converting percentage coordinates to frame coordinates...")
@@ -175,11 +223,11 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
                 frame_size_initialized = True
                 print(f"Initialized {len(lane_zones)} lane zones, {len(light_zones)} light zones, {len(zone_lines)} lines")
 
-                # Khởi tạo video output
-                out = cv2.VideoWriter(os.path.join(VIOLATIONS_DIR, f"output_{camera_id}.mp4"), 
-                                      cv2.VideoWriter_fourcc(*'mp4v'), 20.0, (w, h))
+                # Create output video path
+                output_video_path = os.path.join(VIOLATIONS_DIR, f"output_{camera_id}.mp4")
+                out = cv2.VideoWriter(output_video_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
 
-            # Step 1: Vẽ zones lên frame
+            # Draw zones
             for zone_id, zone in lane_zones.items():
                 cv2.polylines(frame_annotated, [zone["polygon"]], isClosed=True, color=(255, 255, 0), thickness=2)
                 if len(zone["polygon"]) > 0:
@@ -187,7 +235,7 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
                     cv2.putText(frame_annotated, f"Lane: {zone['name']}", (cx, cy), 
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
 
-            # Step 2: Vẽ light zones và hiển thị trạng thái đèn
+            # Draw light zones and status
             for light_zone_id, light_zone in light_zones.items():
                 cv2.polylines(frame_annotated, [light_zone["polygon"]], isClosed=True, color=(0, 0, 255), thickness=2)
                 if len(light_zone["polygon"]) > 0:
@@ -198,7 +246,7 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
                     cv2.putText(frame_annotated, f"Light of Zone: {lane_zone_name}", 
                                 (cx, top_y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
 
-                    # Detect đèn trong light zone
+                    # Detect traffic light
                     mask = np.zeros((h, w), dtype=np.uint8)
                     cv2.fillPoly(mask, [light_zone["polygon"]], 255)
                     light_frame = cv2.bitwise_and(frame, frame, mask=mask)
@@ -211,12 +259,11 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
                     red_light_history[light_zone_id].append(zone_red_detected)
                     is_red = red_light_history[light_zone_id].count(True) > 1
 
-                    # Debug trạng thái đèn
                     print(f"Light zone {light_zone_id}: {red_light_history[light_zone_id]}, is_red: {is_red}")
 
                     bottom_y = int(np.max(light_zone["polygon"][:, 1]))
-                    status_text = "Red" if is_red else "Green"
-                    status_color = (0, 0, 255) if is_red else (0, 255, 0)
+                    status_text = "Red" if is_red else "Red"
+                    status_color = ( 0, 0, 255) if is_red else (0, 0, 255)
                     cv2.putText(frame_annotated, status_text, (cx, bottom_y + 20), 
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, status_color, 2)
 
@@ -227,7 +274,7 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
                     cv2.putText(frame_annotated, f"Line: {line['name']}", tuple(mid_point), 
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
 
-            # Step 3: Detect và track phương tiện
+            # Detect and track vehicles
             results = model_vehicle.track(source=frame, persist=True, conf=0.4, iou=0.4, tracker="bytetrack.yaml")[0]
 
             if results.boxes is not None and results.boxes.id is not None:
@@ -241,28 +288,26 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
                     cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
                     track_id = int(results.boxes.id[i])
 
-                    # Debug vị trí xe
                     print(f"Vehicle {track_id}: cx={cx}, cy={cy}")
 
-                    # Lưu vị trí trước đó
+                    # Save previous position
                     prev_position = track_position_history.get(track_id)
                     track_position_history[track_id] = (cx, cy)
 
-                    # Xác định zone hiện tại của vehicle
+                    # Determine current zone
                     current_zone_id = None
                     for z_id, z in lane_zones.items():
                         if cv2.pointPolygonTest(z["polygon"], (cx, cy), False) >= 0:
                             current_zone_id = z_id
                             break
 
-                    # Debug zone
                     print(f"Vehicle {track_id}: current_zone_id={current_zone_id}")
 
-                    # Kiểm tra chuyển động
+                    # Check movement
                     prev_zone_id = track_zone_history.get(track_id)
                     track_zone_history[track_id] = current_zone_id
 
-                    # Kiểm tra vi phạm vượt đèn đỏ
+                    # Check red light violation
                     if prev_position and len(zone_lines) > 0:
                         for line_data in zone_lines:
                             line_coords = line_data["coordinates"]
@@ -271,63 +316,85 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
                                 line_end = tuple(line_coords[1])
                                 
                                 if detect_line_crossing(prev_position, (cx, cy), line_start, line_end):
-                                    # Debug line crossing
                                     print(f"Vehicle {track_id} crossed line: prev={prev_position}, curr={(cx, cy)}, line={line_start}->{line_end}")
                                     
-                                    # Kiểm tra trạng thái đèn đỏ cho bất kỳ light_zone_id nào
                                     for light_zone_id in red_light_history:
                                         if red_light_history[light_zone_id].count(True) > 1:
                                             vehicle_violations[track_id] = True
                                             vehicle_violation_types[track_id] = "RED_LIGHT"
-                                            print(f"RED LIGHT VIOLATION: Vehicle {track_id} crossed line during red light (light_zone_id={light_zone_id})")
+                                            print(f"🚨 RED LIGHT VIOLATION: Vehicle {track_id} crossed line during red light (light_zone_id={light_zone_id})")
 
-                                            # Lưu vi phạm vào database
-                                            # db = SessionLocal()
-                                            # try:
-                                            #     violation_data = ViolationCreate(
-                                            #         camera_id=camera_id,
-                                            #         vehicle_type=class_name,
-                                            #         violation_type="RED_LIGHT",
-                                            #         timestamp=datetime.now(),
-                                            #         track_id=track_id,
-                                            #         zone_id=current_zone_id or 0,
-                                            #         image_path=os.path.join(VIOLATIONS_DIR, f"violation_{track_id}_{int(time.time())}.jpg")
-                                            #     )
-                                            #     cv2.imwrite(violation_data.image_path, frame_annotated)
-                                            #     violation_crud.create_violation(db, violation_data)
-                                            # finally:
-                                            #     db.close()
-                                            # break  # Thoát vòng lặp light_zone_id sau khi ghi nhận vi phạm
+                                            # Create temporary files for violation
+                                            with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_image, \
+                                                 tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as temp_video:
+                                                image_path = temp_image.name
+                                                video_path = temp_video.name
+
+                                                # Save image
+                                                cv2.imwrite(image_path, frame_annotated)
+
+                                                # Save video (1s before and after)
+                                                violation_frames = list(frame_buffer)[-15:] + [frame_annotated] + list(frame_buffer)[:15]
+                                                save_temp_violation_video(violation_frames, fps, video_path, w, h)
+
+                                                # Prepare violation data for API
+                                                violation_data = {
+                                                    "camera": {"id": camera_id},
+                                                    "status": "PENDING",
+                                                    "createdAt": datetime.now().isoformat(),
+                                                    "violationDetails": [{
+                                                        "violationTypeId": 1,  # RED_LIGHT
+                                                        "violationTime": datetime.now().isoformat(),
+                                                        "licensePlate": f"TRACK_{track_id}"  # Replace with OCR later
+                                                    }]
+                                                }
+
+                                                # Send violation asynchronously (non-blocking)
+                                                print(f"📤 Sending RED_LIGHT violation for track {track_id} asynchronously...")
+                                                send_violation_async(violation_data, image_path, video_path, track_id)
+                                            break
                                     else:
                                         print(f"No red light violation: No red light detected in any light zone")
 
-                    # Kiểm tra vi phạm đi sai làn
+                    # Check wrong lane violation
                     if (current_zone_id and prev_zone_id and prev_zone_id != current_zone_id and 
                         (prev_zone_id, current_zone_id) not in lane_transitions):
                         light_zone_id = light_control_map.get(current_zone_id)
                         if light_zone_id and not red_light_history.get(light_zone_id, deque([False])).count(True) > 1:
                             vehicle_violations[track_id] = True
-                            vehicle_violation_types[track_id] = "WRONG_WAY"
-                            print(f"WRONG WAY VIOLATION: Vehicle {track_id} moved from zone {prev_zone_id} to {current_zone_id} (not allowed movement)")
+                            vehicle_violation_types[track_id] = "WRONG_LANE"
+                            print(f"🚨 WRONG LANE VIOLATION: Vehicle {track_id} moved from zone {prev_zone_id} to {current_zone_id}")
 
-                            # Lưu vi phạm vào database
-                            db = SessionLocal()
-                            try:
-                                violation_data = ViolationCreate(
-                                    camera_id=camera_id,
-                                    vehicle_type=class_name,
-                                    violation_type="WRONG_WAY",
-                                    timestamp=datetime.now(),
-                                    track_id=track_id,
-                                    zone_id=current_zone_id or 0,
-                                    image_path=os.path.join(VIOLATIONS_DIR, f"violation_{track_id}_{int(time.time())}.jpg")
-                                )
-                                cv2.imwrite(violation_data.image_path, frame_annotated)
-                                violation_crud.create_violation(db, violation_data)
-                            finally:
-                                db.close()
+                            # Create temporary files for violation
+                            with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_image, \
+                                 tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as temp_video:
+                                image_path = temp_image.name
+                                video_path = temp_video.name
 
-                    # Vẽ bounding box và label
+                                # Save image
+                                cv2.imwrite(image_path, frame_annotated)
+
+                                # Save video (1s before and after)
+                                violation_frames = list(frame_buffer)[-15:] + [frame_annotated] + list(frame_buffer)[:15]
+                                save_temp_violation_video(violation_frames, fps, video_path, w, h)
+
+                                # Prepare violation data for API
+                                violation_data = {
+                                    "camera": {"id": camera_id},
+                                    "status": "PENDING",
+                                    "createdAt": datetime.now().isoformat(),
+                                    "violationDetails": [{
+                                        "violationTypeId": 4,  # WRONG_LANE
+                                        "violationTime": datetime.now().isoformat(),
+                                        "licensePlate": f"TRACK_{track_id}"  # Replace with OCR later
+                                    }]
+                                }
+
+                                # Send violation asynchronously (non-blocking)
+                                print(f"📤 Sending WRONG_LANE violation for track {track_id} asynchronously...")
+                                send_violation_async(violation_data, image_path, video_path, track_id)
+
+                    # Draw bounding box and label
                     violation_type = vehicle_violation_types.get(track_id, "")
                     color = (0, 0, 255) if vehicle_violations.get(track_id, False) else (0, 255, 0)
                     violation_text = violation_type if vehicle_violations.get(track_id, False) else "OK"
@@ -342,10 +409,9 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
                         cv2.putText(frame_annotated, zone_text, (x1, y2 + 20), 
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
 
-                    # Debug trạng thái vi phạm
                     print(f"Vehicle {track_id}: vehicle_violations={vehicle_violations.get(track_id, False)}, violation_type={violation_type}")
 
-            # Lưu frame vào video output
+            # Save frame to video output
             if out:
                 out.write(frame_annotated)
 
@@ -357,17 +423,21 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
             )
 
     except Exception as e:
-        print(f"Error in stream_violation_video_service1: {e}")
+        print(f"❌ Error in stream_violation_video_service1: {e}")
         traceback.print_exc()
     finally:
+        # Clean up resources
         cap.release()
         if out:
             out.release()
+        
+        # Clean up output video file
+        if output_video_path:
+            cleanup_output_video(output_video_path)
+        
+        print("🧹 Stream cleanup completed")
 
 def extract_thumbnail_from_stream_url(youtube_url: str) -> bytes:
-    """
-    Trích xuất thumbnail (ảnh JPEG đầu tiên) từ stream YouTube.
-    """
     stream_url = get_stream_url(youtube_url)
     cap = cv2.VideoCapture(stream_url)
 
@@ -391,3 +461,14 @@ def extract_thumbnail_from_stream_url(youtube_url: str) -> bytes:
         raise ValueError("Lỗi khi encode frame thành JPEG.")
 
     return buffer.tobytes()
+
+# Cleanup function for graceful shutdown
+def cleanup_on_exit():
+    """Clean up thread pool on exit"""
+    print("🛑 Shutting down violation executor...")
+    violation_executor.shutdown(wait=True)
+    print("✅ Violation executor shutdown complete")
+
+# Register cleanup function
+atexit.register(cleanup_on_exit)
+

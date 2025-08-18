@@ -9,6 +9,7 @@ import CardLineChartViolations3 from "../../components/Cards/CardLineChartViolat
 import CardDonutChart from "../../components/Cards/CardDonutChartViolations";
 import CardDonutChartMonth from "../../components/Cards/CardDonutChartViolations2";
 import CardDonutChartYear from "../../components/Cards/CardDonutChartViolations3";
+import {API_URL_BE} from "../../components/Link/LinkAPI";
 
 interface Violation {
   id: number;
@@ -38,7 +39,7 @@ const ViolationStatistics: React.FC = () => {
   useEffect(() => {
     const fetchViolations = async () => {
       try {
-        const response = await fetch("http://localhost:8081/api/violations");
+        const response = await fetch(API_URL_BE +"api/violations");
         const data = await response.json();
         setViolations(data);
       } catch (error) {
@@ -53,7 +54,7 @@ const ViolationStatistics: React.FC = () => {
   useEffect(() => {
     const fetchViolationDetails = async () => {
       try {
-        const response = await fetch("http://localhost:8081/api/violationdetail/all");
+        const response = await fetch(API_URL_BE +"api/violationdetail/all");
         const data = await response.json();
         setViolationDetails(data);
       } catch (error) {
@@ -69,7 +70,7 @@ const ViolationStatistics: React.FC = () => {
 
   return (
     <div className="flex h-screen">
-      <Sidebar />
+      <Sidebar defaultActiveItem="statistics"/>
       <div className="flex flex-col flex-1">
         <Header title="Violation Statistics Dashboard" />
         <div className="flex-1 overflow-y-auto">

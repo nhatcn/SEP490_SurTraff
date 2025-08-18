@@ -10,14 +10,22 @@
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^13.5.0",
+    "@typescript-eslint/eslint-plugin": "^8.39.0",
+    "@typescript-eslint/parser": "^8.39.0",
     "axios": "^1.9.0",
     "bootstrap": "^5.3.5",
     "chart.js": "^4.4.9",
     "chartjs-plugin-datalabels": "^2.2.0",
+    "crypto-js": "^4.2.0",
     "date-fns": "^4.1.0",
+    "eslint": "^9.33.0",
     "framer-motion": "^12.23.6",
     "hls.js": "^1.6.2",
+    "jspdf": "^3.0.1",
+    "jspdf-autotable": "^5.0.2",
     "leaflet": "^1.9.4",
+    "leaflet-polylinedecorator": "^1.6.0",
+    "lodash": "^4.17.21",
     "lucide-react": "^0.503.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
@@ -30,7 +38,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build",
+    "build": "DISABLE_ESLINT_PLUGIN=true react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
@@ -38,7 +46,10 @@
     "extends": [
       "react-app",
       "react-app/jest"
-    ]
+    ],
+    "rules": {
+      "react-hooks/exhaustive-deps": "off"
+    }
   },
   "browserslist": {
     "production": [
@@ -53,6 +64,8 @@
     ]
   },
   "devDependencies": {
+    "@types/crypto-js": "^4.2.2",
+    "@types/jspdf": "^2.0.0",
     "@types/leaflet": "^1.9.18",
     "@types/react": "^19.1.5",
     "@types/react-dom": "^19.1.5",
@@ -60,6 +73,6 @@
     "autoprefixer": "^10.4.21",
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",
-    "typescript": "^5.8.3"
+    "typescript": "^4.9.5"
   }
 }

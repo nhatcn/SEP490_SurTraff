@@ -5,14 +5,14 @@ import {
   Marker,
   Popup,
   LayersControl,
-  ZoomControl,
-  CircleMarker
+  ZoomControl
 } from "react-leaflet";
 import L, { Icon } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import Sidebar from "../../components/Layout/Sidebar";
 import Header from "../../components/Layout/Header";
 import CameraDetail from "../../components/Camera/CameraDetail";
+import { API_URL_FAST } from "../../components/Link/LinkAPI";
 
 // Camera type
 interface CameraType {
@@ -55,7 +55,7 @@ export default function MapDashboard() {
   const mapRef = useRef<L.Map | null>(null);
 
   useEffect(() => {
-    fetch("http://localhost:8000/api/cameras")
+    fetch(API_URL_FAST+"api/cameras")
       .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch camera data");
         return res.json();
