@@ -45,8 +45,7 @@ export default function VehicleDashboard() {
           {/* <div className="mb-4">
             <AddVehicle onVehicleAdded={handleVehicleAdded} />
           </div> */}
-          <TableVehicle key={refreshKey} />
-        </div>
+<TableVehicle key={refreshKey} vehicles={vehicles} setVehicles={setVehicles} />        </div>
       </div>
     </div>
   );

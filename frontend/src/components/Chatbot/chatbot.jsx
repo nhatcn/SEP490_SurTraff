@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Bot, Info, Trash2, Edit, Mic, Send, X, BookOpen } from "lucide-react"
-
+import { API_URL_FAST } from "../Link/LinkAPI"
 const Chatbot = () => {
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState([])
@@ -156,7 +156,7 @@ const Chatbot = () => {
     setIsFeedbackLoading(true)
     try {
       const question = messages[feedbackMessageId].text
-      const response = await fetch(API_URL_FAST+"api/feedback/", {
+      const response = await fetch(API_URL_FAST+"api/feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
