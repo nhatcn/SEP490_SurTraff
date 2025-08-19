@@ -1,105 +1,125 @@
-import { useState, useEffect, useRef } from "react";
-import {
-  MapContainer,
-  TileLayer,
-  Marker,
-  Popup,
-  LayersControl,
-  ZoomControl
-} from "react-leaflet";
-import L, { Icon } from "leaflet";
-import "leaflet/dist/leaflet.css";
-import Sidebar from "../../components/Layout/Sidebar";
-import Header from "../../components/Layout/Header";
-import CameraDetail from "../../components/Camera/CameraDetail";
-import { API_URL_FAST } from "../../components/Link/LinkAPI";
+"use client"
+
+import { useState, useEffect, useRef } from "react"
+import { MapContainer, TileLayer, Marker, Popup, LayersControl, ZoomControl } from "react-leaflet"
+import L, { type Icon } from "leaflet"
+import "leaflet/dist/leaflet.css"
+import Sidebar from "../../components/Layout/Sidebar"
+import Header from "../../components/Layout/Header"
+import CameraDetail from "../../components/Camera/CameraDetail"
+import { API_URL_FAST } from "../../components/Link/LinkAPI"
 
 // Camera type
 interface CameraType {
-  id: number;
-  name: string;
-  location: string;
-  status: string;
-  latitude: number;
-  ip_address: string;
-  stream_url: string;
-  longitude: number;
-  thumbnail?: string;
-  description?: string;
+  id: number
+  name: string
+  location: string
+  status: string
+  latitude: number
+  ip_address: string
+  stream_url: string
+  longitude: number
+  thumbnail?: string
+  description?: string
 }
 
 // Camera icon
 const cameraIcon: Icon = new L.Icon({
-
   iconUrl: "https://tse3.mm.bing.net/th/id/OIP.rDwv7jSrMyrexUsSSdYd8wHaHa?rs=1&pid=ImgDetMain",
   iconSize: [32, 32],
   iconAnchor: [16, 32],
   popupAnchor: [0, -32],
-});
+})
 
 // Status color
 const statusColors: Record<string, string> = {
   online: "#4CAF50",
   offline: "#F44336",
-  warning: "#FF9800"
-};
+  warning: "#FF9800",
+}
 
 export default function MapDashboard() {
-  const [cameras, setCameras] = useState<CameraType[]>([]);
-  const [selectedCamera, setSelectedCamera] = useState<CameraType | null>(null);
-  const [mapCenter, setMapCenter] = useState<[number, number]>([10.75, 106.67]);
-  const [mapZoom, setMapZoom] = useState<number>(6);
-  const [filterStatus, setFilterStatus] = useState<string>("all");
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const mapRef = useRef<L.Map | null>(null);
+  const [cameras, setCameras] = useState<CameraType[]>([])
+  const [selectedCamera, setSelectedCamera] = useState<CameraType | null>(null)
+  const [mapCenter, setMapCenter] = useState<[number, number]>([10.75, 106.67])
+  const [mapZoom, setMapZoom] = useState<number>(6)
+  const [filterStatus, setFilterStatus] = useState<string>("all")
+  const [loading, setLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
+  const [userLocation, setUserLocation] = useState<[number, number] | null>(null) // Added state for user location
+  const mapRef = useRef<L.Map | null>(null)
+
+  const getCurrentLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords
+          const userPos: [number, number] = [latitude, longitude]
+          setUserLocation(userPos)
+          setMapCenter(userPos)
+          setMapZoom(12)
+        },
+        (error) => {
+          console.warn("Geolocation error:", error)
+          // Fallback to default location if geolocation fails
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000, // 5 minutes
+        },
+      )
+    }
+  }
 
   useEffect(() => {
-    fetch(API_URL_FAST+"api/cameras")
+    getCurrentLocation()
+
+    fetch(API_URL_FAST + "api/cameras")
       .then((res) => {
-        if (!res.ok) throw new Error("Failed to fetch camera data");
-        return res.json();
+        if (!res.ok) throw new Error("Failed to fetch camera data")
+        return res.json()
       })
       .then((data: CameraType[]) => {
-        setCameras(data);
-        setLoading(false);
+        setCameras(data)
+        setLoading(false)
 
         if (data.length > 0) {
-          setSelectedCamera(data[0]);
-          const validCoords = data.filter(c => c.latitude && c.longitude);
-          if (validCoords.length > 0) {
-            const latSum = validCoords.reduce((sum, cam) => sum + cam.latitude, 0);
-            const lngSum = validCoords.reduce((sum, cam) => sum + cam.longitude, 0);
-            setMapCenter([latSum / validCoords.length, lngSum / validCoords.length]);
-            setMapZoom(7);
+          setSelectedCamera(data[0])
+          if (!userLocation) {
+            const validCoords = data.filter((c) => c.latitude && c.longitude)
+            if (validCoords.length > 0) {
+              const latSum = validCoords.reduce((sum, cam) => sum + cam.latitude, 0)
+              const lngSum = validCoords.reduce((sum, cam) => sum + cam.longitude, 0)
+              setMapCenter([latSum / validCoords.length, lngSum / validCoords.length])
+              setMapZoom(7)
+            }
           }
         }
       })
       .catch((err) => {
-        console.error("Error loading cameras:", err);
-        setError("Failed to load cameras. Please try again later.");
-        setLoading(false);
-      });
-  }, []);
+        console.error("Error loading cameras:", err)
+        setError("Failed to load cameras. Please try again later.")
+        setLoading(false)
+      })
+  }, [userLocation]) // Added userLocation as dependency
 
-  const filteredCameras = filterStatus === "all"
-    ? cameras
-    : cameras.filter(camera => camera.status === filterStatus);
+  const filteredCameras = filterStatus === "all" ? cameras : cameras.filter((camera) => camera.status === filterStatus)
 
   const handleCameraSelect = (camera: CameraType) => {
-    setSelectedCamera(camera);
+    setSelectedCamera(camera)
     if (mapRef.current) {
-      mapRef.current.flyTo([camera.latitude, camera.longitude], 12, { duration: 1.5 });
+      mapRef.current.flyTo([camera.latitude, camera.longitude], 12, { duration: 1.5 })
     }
-  };
+  }
 
   const getStatusColor = (status: string): string => {
-    return statusColors[status] || "#999999";
-  };
+    return statusColors[status] || "#999999"
+  }
 
   return (
     <div className="flex h-screen">
-      <Sidebar defaultActiveItem="map"/>
+      <Sidebar defaultActiveItem="map" />
       <div className="flex flex-col flex-grow overflow-hidden">
         <Header title="Camera Location Map" />
         <div className="flex p-4 gap-6 flex-grow overflow-hidden">
@@ -110,20 +130,22 @@ export default function MapDashboard() {
                 <div className="flex items-center gap-2">
                   <span className="text-gray-600 font-medium">Filter by status:</span>
                   <div className="flex gap-1">
-                    {["all", "online", "offline", "warning"].map(status => (
+                    {["all", "online", "offline", "warning"].map((status) => (
                       <button
                         key={status}
-                        className={`px-3 py-1 rounded-md text-sm transition ${filterStatus === status
-                          ? `text-white ${status === "online"
-                            ? "bg-green-500"
-                            : status === "offline"
-                              ? "bg-red-500"
-                              : status === "warning"
-                                ? "bg-yellow-500"
-                                : "bg-blue-500"
-                          }`
-                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                          }`}
+                        className={`px-3 py-1 rounded-md text-sm transition ${
+                          filterStatus === status
+                            ? `text-white ${
+                                status === "online"
+                                  ? "bg-green-500"
+                                  : status === "offline"
+                                    ? "bg-red-500"
+                                    : status === "warning"
+                                      ? "bg-yellow-500"
+                                      : "bg-blue-500"
+                              }`
+                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        }`}
                         onClick={() => setFilterStatus(status)}
                       >
                         {status.charAt(0).toUpperCase() + status.slice(1)}
@@ -131,14 +153,25 @@ export default function MapDashboard() {
                     ))}
                   </div>
                 </div>
-                <div className="text-gray-600">
-                  <span className="font-semibold">{filteredCameras.length}</span> cameras displayed
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={getCurrentLocation}
+                    className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-md transition flex items-center gap-1"
+                    title="Center on my location"
+                  >
+                    📍 My Location
+                  </button>
+                  <div className="text-gray-600">
+                    <span className="font-semibold">{filteredCameras.length}</span> cameras displayed
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Map container */}
-            <div className="flex-grow relative rounded-lg overflow-hidden shadow-md">
+            <div className="flex-grow relative rounded-lg overflow-hidden shadow-md z-0">
+              {" "}
+              {/* Added z-0 to ensure map stays below fullscreen modal */}
               {loading ? (
                 <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
                   <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
@@ -154,7 +187,7 @@ export default function MapDashboard() {
                   zoomControl={false}
                   className="h-full w-full"
                   ref={(mapInstance) => {
-                    if (mapInstance) mapRef.current = mapInstance;
+                    if (mapInstance) mapRef.current = mapInstance
                   }}
                 >
                   <ZoomControl position="bottomright" />
@@ -167,10 +200,7 @@ export default function MapDashboard() {
                       />
                     </LayersControl.BaseLayer>
                     <LayersControl.BaseLayer name="Satellite">
-                      <TileLayer
-                        url="http://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
-                        attribution="© Google"
-                      />
+                      <TileLayer url="http://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}" attribution="© Google" />
                     </LayersControl.BaseLayer>
                     <LayersControl.BaseLayer name="Dark Mode">
                       <TileLayer
@@ -189,12 +219,10 @@ export default function MapDashboard() {
                   {filteredCameras.map((camera) => (
                     <div key={camera.id} className="circle-camera">
                       <Marker
-
                         position={[camera.latitude, camera.longitude]}
                         icon={cameraIcon}
                         eventHandlers={{ click: () => handleCameraSelect(camera) }}
                       >
-
                         <Popup>
                           <div className="p-2">
                             <div className="flex items-center gap-2 mb-1">
@@ -214,8 +242,6 @@ export default function MapDashboard() {
                           </div>
                         </Popup>
                       </Marker>
-
-
                     </div>
                   ))}
                 </MapContainer>
@@ -228,9 +254,8 @@ export default function MapDashboard() {
               <CameraDetail camera={selectedCamera} />
             </div>
           )}
-
         </div>
       </div>
     </div>
-  );
+  )
 }

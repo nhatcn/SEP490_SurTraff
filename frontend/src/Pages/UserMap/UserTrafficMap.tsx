@@ -1,64 +1,59 @@
-import { useState, useEffect } from "react";
-import { Header, MobileDropdownMenu } from "../../components/Layout/Menu";
-import {
-  MapContainer,
-  TileLayer,
-  CircleMarker,
-  Tooltip,
-  Marker,
-  ZoomControl,
-} from "react-leaflet";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+"use client"
 
-import Footer from "../../components/Layout/Footer";
-import {API_URL_BE} from "../../components/Link/LinkAPI";
+import { useState, useEffect } from "react"
+import { Header, MobileDropdownMenu } from "../../components/Layout/Menu"
+import { MapContainer, TileLayer, CircleMarker, Tooltip, Marker, ZoomControl } from "react-leaflet"
+import L from "leaflet"
+import "leaflet/dist/leaflet.css"
+
+import Footer from "../../components/Layout/Footer"
+import { API_URL_BE } from "../../components/Link/LinkAPI"
 
 interface TrafficDensity {
-  id: number;
-  camera_id: number;
-  location: string;
-  vehicleCount: number;
-  createdAt: string;
-  latitude: number;
-  longitude: number;
+  id: number
+  camera_id: number
+  location: string
+  vehicleCount: number
+  createdAt: string
+  latitude: number
+  longitude: number
 }
 
 interface Accident {
-  id: number;
-  cameraId: number;
-  latitude: number;
-  longitude: number;
-  vehicleId: number;
-  userId: number;
-  userEmail?: string | null;
-  userFullName: string;
-  licensePlate: string;
-  name: string;
-  description: string;
-  imageUrl: string;
-  videoUrl?: string;
-  location?: string | null;
-  status: string;
-  accidentTime: string;
-  createdAt: string;
+  id: number
+  cameraId: number
+  latitude: number
+  longitude: number
+  vehicleId: number
+  userId: number
+  userEmail?: string | null
+  userFullName: string
+  licensePlate: string
+  name: string
+  description: string
+  imageUrl: string
+  videoUrl?: string
+  location?: string | null
+  status: string
+  accidentTime: string
+  createdAt: string
 }
 
 const getColorByDensity = (count: number) => {
-  if (count >= 25) return "#dc2626";
-  if (count >= 20) return "#ea580c";
-  if (count >= 15) return "#f59e0b";
-  if (count >= 10) return "#84cc16";
-  return "#16a34a";
-};
+  if (count >= 25) return "#dc2626"
+  if (count >= 20) return "#ea580c"
+  if (count >= 15) return "#f59e0b"
+  if (count >= 10) return "#84cc16"
+  return "#16a34a"
+}
 
 const getTrafficLevel = (count: number) => {
-  if (count >= 25) return { level: "Very Heavy", color: "text-red-600" };
-  if (count >= 20) return { level: "Heavy", color: "text-orange-600" };
-  if (count >= 15) return { level: "Moderate", color: "text-yellow-600" };
-  if (count >= 10) return { level: "Light", color: "text-lime-600" };
-  return { level: "Very Light", color: "text-green-600" };
-};
+  if (count >= 25) return { level: "Very Heavy", color: "text-red-600" }
+  if (count >= 20) return { level: "Heavy", color: "text-orange-600" }
+  if (count >= 15) return { level: "Moderate", color: "text-yellow-600" }
+  if (count >= 10) return { level: "Light", color: "text-lime-600" }
+  return { level: "Very Light", color: "text-green-600" }
+}
 
 const accidentIcon = L.divIcon({
   className: "accident-icon",
@@ -70,9 +65,9 @@ const accidentIcon = L.divIcon({
         viewBox="0 0 24 24"
         fill="none"
         stroke="#d32f2f"
-        stroke-width="2.5"
-        stroke-linecap="round"
-        stroke-linejoin="round"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
         style="filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.9));"
       >
         <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
@@ -98,53 +93,73 @@ const accidentIcon = L.divIcon({
   iconSize: [36, 36],
   iconAnchor: [18, 36],
   popupAnchor: [0, -36],
-});
+})
 
 export default function UserTrafficMap() {
-  const [showMobileMenu, setShowMobileMenu] = useState(false);
-  const [trafficData, setTrafficData] = useState<TrafficDensity[]>([]);
-  const [accidentData, setAccidentData] = useState<Accident[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [showMobileMenu, setShowMobileMenu] = useState(false)
+  const [trafficData, setTrafficData] = useState<TrafficDensity[]>([])
+  const [accidentData, setAccidentData] = useState<Accident[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
+  const [mapCenter, setMapCenter] = useState<[number, number]>([10.7769, 106.6957])
+
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords
+          setMapCenter([latitude, longitude])
+        },
+        (error) => {
+          console.warn("Geolocation failed:", error)
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000,
+        },
+      )
+    }
+  }, [])
 
   useEffect(() => {
     const fetchData = async () => {
-      setLoading(true);
-      setError(null);
+      setLoading(true)
+      setError(null)
       try {
         const [trafficRes, accidentRes] = await Promise.all([
-          fetch(API_URL_BE +"api/trafficdensity"),
-          fetch(API_URL_BE +"api/accident"),
-        ]);
+          fetch(API_URL_BE + "api/trafficdensity"),
+          fetch(API_URL_BE + "api/accident"),
+        ])
 
-        if (!trafficRes.ok) throw new Error(`Traffic API error: ${trafficRes.status}`);
-        if (!accidentRes.ok) throw new Error(`Accident API error: ${accidentRes.status}`);
+        if (!trafficRes.ok) throw new Error(`Traffic API error: ${trafficRes.status}`)
+        if (!accidentRes.ok) throw new Error(`Accident API error: ${accidentRes.status}`)
 
-        const trafficJson: TrafficDensity[] = await trafficRes.json();
-        const accidentJson: Accident[] = await accidentRes.json();
+        const trafficJson: TrafficDensity[] = await trafficRes.json()
+        const accidentJson: Accident[] = await accidentRes.json()
 
-        setTrafficData(trafficJson);
-        setAccidentData(accidentJson);
-        setLastUpdate(new Date());
+        setTrafficData(trafficJson)
+        setAccidentData(accidentJson)
+        setLastUpdate(new Date())
       } catch (err: any) {
-        console.error(err);
-        setError("Unable to fetch data from API. Please check server or network.");
-        setTrafficData([]);
-        setAccidentData([]);
+        console.error(err)
+        setError("Unable to fetch data from API. Please check server or network.")
+        setTrafficData([])
+        setAccidentData([])
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
-    };
+    }
 
-    fetchData();
-    const interval = setInterval(fetchData, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    fetchData()
+    const interval = setInterval(fetchData, 30000)
+    return () => clearInterval(interval)
+  }, [])
 
-  const defaultCenter: [number, number] = [10.7769, 106.6957];
-  const totalVehicles = trafficData.reduce((sum, item) => sum + item.vehicleCount, 0);
-  const highTrafficPoints = trafficData.filter((item) => item.vehicleCount >= 20).length;
+  const defaultCenter: [number, number] = [10.7769, 106.6957]
+  const totalVehicles = trafficData.reduce((sum, item) => sum + item.vehicleCount, 0)
+  const highTrafficPoints = trafficData.filter((item) => item.vehicleCount >= 20).length
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -192,7 +207,7 @@ export default function UserTrafficMap() {
           <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
             <div className="h-[700px] relative">
               <MapContainer
-                center={defaultCenter}
+                center={mapCenter}
                 zoom={13}
                 zoomControl={false}
                 className="h-full w-full"
@@ -205,7 +220,7 @@ export default function UserTrafficMap() {
                 />
 
                 {trafficData.map((entry) => {
-                  const trafficLevel = getTrafficLevel(entry.vehicleCount);
+                  const trafficLevel = getTrafficLevel(entry.vehicleCount)
                   return (
                     <CircleMarker
                       key={`traffic-${entry.id}`}
@@ -222,7 +237,9 @@ export default function UserTrafficMap() {
                         <div className="p-3 min-w-[250px]">
                           <div className="flex items-center justify-between mb-2">
                             <h4 className="font-bold text-gray-800 text-sm">{entry.location}</h4>
-                            <span className={`text-xs font-semibold px-2 py-1 rounded-full ${trafficLevel.color} bg-gray-100`}>
+                            <span
+                              className={`text-xs font-semibold px-2 py-1 rounded-full ${trafficLevel.color} bg-gray-100`}
+                            >
                               {trafficLevel.level}
                             </span>
                           </div>
@@ -243,7 +260,7 @@ export default function UserTrafficMap() {
                         </div>
                       </Tooltip>
                     </CircleMarker>
-                  );
+                  )
                 })}
 
                 {accidentData
@@ -254,15 +271,23 @@ export default function UserTrafficMap() {
                         <div className="p-3 min-w-[280px]">
                           <div className="font-bold text-red-700 mb-2 text-center text-lg">Accident</div>
                           <img
-                            src={acc.imageUrl}
+                            src={acc.imageUrl || "/placeholder.svg"}
                             alt={`Accident at camera #${acc.cameraId}`}
                             className="w-full rounded-md mb-2"
                             loading="lazy"
                           />
-                          <p><strong>Description:</strong> {acc.description}</p>
-                          <p><strong>Vehicle:</strong> {acc.name} ({acc.licensePlate})</p>
-                          <p><strong>Reported by:</strong> {acc.userFullName || "Unknown"}</p>
-                          <p><strong>Time:</strong> {new Date(acc.accidentTime).toLocaleString("en-US")}</p>
+                          <p>
+                            <strong>Description:</strong> {acc.description}
+                          </p>
+                          <p>
+                            <strong>Vehicle:</strong> {acc.name} ({acc.licensePlate})
+                          </p>
+                          <p>
+                            <strong>Reported by:</strong> {acc.userFullName || "Unknown"}
+                          </p>
+                          <p>
+                            <strong>Time:</strong> {new Date(acc.accidentTime).toLocaleString("en-US")}
+                          </p>
                         </div>
                       </Tooltip>
                     </Marker>
@@ -298,7 +323,7 @@ export default function UserTrafficMap() {
         }
       `}</style>
     </div>
-  );
+  )
 }
 
 // Helper Components
@@ -317,7 +342,7 @@ function StatCard({ title, value, color }: { title: string; value: number; color
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 function Legend() {
@@ -327,7 +352,7 @@ function Legend() {
     { range: "15-19 vehicles", color: "#f59e0b", level: "Moderate" },
     { range: "10-14 vehicles", color: "#84cc16", level: "Light" },
     { range: "< 10 vehicles", color: "#16a34a", level: "Very Light" },
-  ];
+  ]
   return (
     <div className="bg-white rounded-xl shadow-lg p-6 mb-8 border border-gray-100">
       <h3 className="text-lg font-semibold text-gray-800 mb-4">Traffic Density Legend</h3>
@@ -344,5 +369,5 @@ function Legend() {
         ))}
       </div>
     </div>
-  );
+  )
 }

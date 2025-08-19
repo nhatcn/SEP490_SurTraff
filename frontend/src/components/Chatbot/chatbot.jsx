@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Bot, Info, Trash2, Edit, Mic, Send, X, BookOpen } from "lucide-react"
+import { API_URL_FAST } from "../Link/LinkAPI";
 
 const Chatbot = () => {
   const [isOpen, setIsOpen] = useState(false)
