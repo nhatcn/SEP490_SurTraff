@@ -156,7 +156,7 @@ const Chatbot = () => {
     setIsFeedbackLoading(true)
     try {
       const question = messages[feedbackMessageId].text
-      const response = await fetch(API_URL_FAST+"api/feedback", {
+      const response = await fetch(API_URL_FAST+"api/feedback/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
