@@ -19,19 +19,41 @@ interface CardBarChartProps {
 function getMonthlyStats(
   accidents: Accident[],
   year: number,
-  fromDate: Date | null,
-  toDate: Date | null
+  fromMonth: number | null,
+  fromYear: number | null,
+  toMonth: number | null,
+  toYear: number | null
 ): number[] {
   const months = Array(12).fill(0);
   accidents.forEach((acc) => {
     const date = new Date(acc.accidentTime);
-    if (
-      !isNaN(date.getTime()) &&
-      date.getFullYear() === year &&
-      (!fromDate || date >= fromDate) &&
-      (!toDate || date <= toDate)
-    ) {
-      months[date.getMonth()]++;
+    if (!isNaN(date.getTime()) && date.getFullYear() === year) {
+      const accMonth = date.getMonth() + 1; // 1-12
+      const accYear = date.getFullYear();
+
+      let isInRange = true;
+
+      if (fromMonth !== null && fromYear !== null) {
+        if (
+          accYear < fromYear ||
+          (accYear === fromYear && accMonth < fromMonth)
+        ) {
+          isInRange = false;
+        }
+      }
+
+      if (toMonth !== null && toYear !== null) {
+        if (
+          accYear > toYear ||
+          (accYear === toYear && accMonth > toMonth)
+        ) {
+          isInRange = false;
+        }
+      }
+
+      if (isInRange) {
+        months[date.getMonth()]++;
+      }
     }
   });
   return months;
@@ -41,12 +63,11 @@ export default function CardBarChart({ accidents }: CardBarChartProps) {
   const chartRef = useRef<HTMLCanvasElement | null>(null);
   const chartInstanceRef = useRef<ChartJS<"bar", number[], string> | null>(null);
 
-  const [from, setFrom] = useState<string>("");
-  const [to, setTo] = useState<string>("");
+  const [fromMonthYear, setFromMonthYear] = useState<string>("");
+  const [toMonthYear, setToMonthYear] = useState<string>("");
 
   useEffect(() => {
     if (!chartRef.current) return;
-
     if (chartInstanceRef.current) {
       chartInstanceRef.current.destroy();
     }
@@ -55,27 +76,53 @@ export default function CardBarChart({ accidents }: CardBarChartProps) {
     const currentYear = now.getFullYear();
     const lastYear = currentYear - 1;
 
-    const fromDate = from ? new Date(from + "T00:00:00") : null;
-    const toDate = to ? new Date(to + "T23:59:59") : null;
+    // Parse from / to month-year
+    let fromMonth: number | null = null;
+    let fromYear: number | null = null;
+    let toMonth: number | null = null;
+    let toYear: number | null = null;
 
-    const dataCurrent = getMonthlyStats(accidents, currentYear, fromDate, toDate);
-    const dataLast = getMonthlyStats(accidents, lastYear, fromDate, toDate);
+    if (fromMonthYear) {
+      const [year, month] = fromMonthYear.split("-");
+      fromYear = parseInt(year);
+      fromMonth = parseInt(month);
+    }
+    if (toMonthYear) {
+      const [year, month] = toMonthYear.split("-");
+      toYear = parseInt(year);
+      toMonth = parseInt(month);
+    }
+
+    const dataCurrent = getMonthlyStats(
+      accidents,
+      currentYear,
+      fromMonth,
+      fromYear,
+      toMonth,
+      toYear
+    );
+    const dataLast = getMonthlyStats(
+      accidents,
+      lastYear,
+      fromMonth,
+      fromYear,
+      toMonth,
+      toYear
+    );
 
     const months = [
       "January", "February", "March", "April", "May", "June",
       "July", "August", "September", "October", "November", "December"
     ];
 
-    // Kiểm tra có dữ liệu cho từng năm không
     const hasCurrent = dataCurrent.some((v) => v > 0);
     const hasLast = dataLast.some((v) => v > 0);
 
-    // Tạo datasets động
-    const datasets = [];
+    const datasets: any[] = [];
     if (hasCurrent) {
       datasets.push({
         label: `${currentYear}`,
-        backgroundColor: "#4c51bf",
+        backgroundColor: "#4c51bf", // năm hiện tại
         borderColor: "#4c51bf",
         data: dataCurrent,
         barThickness: 8,
@@ -84,8 +131,8 @@ export default function CardBarChart({ accidents }: CardBarChartProps) {
     if (hasLast) {
       datasets.push({
         label: `${lastYear}`,
-        backgroundColor: "#4c51bf",
-        borderColor: "#4c51bf",
+        backgroundColor: "#ed64a6", // năm trước
+        borderColor: "#ed64a6",
         data: dataLast,
         barThickness: 8,
       });
@@ -96,10 +143,7 @@ export default function CardBarChart({ accidents }: CardBarChartProps) {
 
     const config: ChartConfiguration<"bar", number[], string> = {
       type: "bar",
-      data: {
-        labels: months,
-        datasets: datasets,
-      },
+      data: { labels: months, datasets },
       options: {
         responsive: true,
         maintainAspectRatio: false,
@@ -134,7 +178,7 @@ export default function CardBarChart({ accidents }: CardBarChartProps) {
     return () => {
       chartInstanceRef.current?.destroy();
     };
-  }, [accidents, from, to]);
+  }, [accidents, fromMonthYear, toMonthYear]);
 
   return (
     <div className="relative flex flex-col min-w-0 break-words bg-white w-full mb-6 shadow-lg rounded h-[340px] md:h-[380px]">
@@ -151,16 +195,16 @@ export default function CardBarChart({ accidents }: CardBarChartProps) {
           <div className="flex gap-2 items-center">
             <label className="text-xs">From</label>
             <input
-              type="date"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
+              type="month"
+              value={fromMonthYear}
+              onChange={(e) => setFromMonthYear(e.target.value)}
               className="border rounded px-2 py-1 text-xs"
             />
             <label className="text-xs">To</label>
             <input
-              type="date"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
+              type="month"
+              value={toMonthYear}
+              onChange={(e) => setToMonthYear(e.target.value)}
               className="border rounded px-2 py-1 text-xs"
             />
           </div>

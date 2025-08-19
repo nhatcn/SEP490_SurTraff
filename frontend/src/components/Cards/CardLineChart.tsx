@@ -108,7 +108,7 @@ export default function CardLineChart({ accidents }: Props) {
             },
             title: {
               display: true,
-              text: "Accident Count",
+              text: "Accidents Count",
             },
             grid: {
               display: false,

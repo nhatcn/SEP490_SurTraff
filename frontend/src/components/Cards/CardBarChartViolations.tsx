@@ -19,21 +19,40 @@ interface Props {
 function getMonthlyStats(
   violations: Violation[],
   year: number,
-  fromDate: Date | null,
-  toDate: Date | null
+  fromMonth: number | null,
+  fromYear: number | null,
+  toMonth: number | null,
+  toYear: number | null
 ): number[] {
   const months = Array(12).fill(0);
   violations.forEach((vio: Violation) => {
     const createdAt = vio?.createdAt;
     if (!createdAt) return;
     const date = new Date(createdAt);
-    if (
-      !isNaN(date.getTime()) &&
-      date.getFullYear() === year &&
-      (!fromDate || date >= fromDate) &&
-      (!toDate || date <= toDate)
-    ) {
-      months[date.getMonth()]++;
+    if (!isNaN(date.getTime()) && date.getFullYear() === year) {
+      const violationMonth = date.getMonth() + 1; // getMonth() returns 0-11, we need 1-12
+      const violationYear = date.getFullYear();
+      
+      // Check if violation date is within the filter range
+      let isInRange = true;
+      
+      if (fromMonth !== null && fromYear !== null) {
+        if (violationYear < fromYear || 
+            (violationYear === fromYear && violationMonth < fromMonth)) {
+          isInRange = false;
+        }
+      }
+      
+      if (toMonth !== null && toYear !== null) {
+        if (violationYear > toYear || 
+            (violationYear === toYear && violationMonth > toMonth)) {
+          isInRange = false;
+        }
+      }
+      
+      if (isInRange) {
+        months[date.getMonth()]++;
+      }
     }
   });
   return months;
@@ -43,8 +62,8 @@ export default function CardBarChartViolationsMonth({ violations }: Props) {
   const chartRef = useRef<HTMLCanvasElement | null>(null);
   const chartInstanceRef = useRef<ChartJS<"bar", number[], string> | null>(null);
 
-  const [from, setFrom] = useState<string>("");
-  const [to, setTo] = useState<string>("");
+  const [fromMonthYear, setFromMonthYear] = useState<string>("");
+  const [toMonthYear, setToMonthYear] = useState<string>("");
 
   useEffect(() => {
     if (!chartRef.current) return;
@@ -57,11 +76,26 @@ export default function CardBarChartViolationsMonth({ violations }: Props) {
     const currentYear = now.getFullYear();
     const lastYear = currentYear - 1;
 
-    const fromDate = from ? new Date(from + "T00:00:00") : null;
-    const toDate = to ? new Date(to + "T23:59:59") : null;
+    // Parse from and to month/year
+    let fromMonth: number | null = null;
+    let fromYear: number | null = null;
+    let toMonth: number | null = null;
+    let toYear: number | null = null;
 
-    const dataCurrent = getMonthlyStats(violations, currentYear, fromDate, toDate);
-    const dataLast = getMonthlyStats(violations, lastYear, fromDate, toDate);
+    if (fromMonthYear) {
+      const [year, month] = fromMonthYear.split("-");
+      fromYear = parseInt(year);
+      fromMonth = parseInt(month);
+    }
+
+    if (toMonthYear) {
+      const [year, month] = toMonthYear.split("-");
+      toYear = parseInt(year);
+      toMonth = parseInt(month);
+    }
+
+    const dataCurrent = getMonthlyStats(violations, currentYear, fromMonth, fromYear, toMonth, toYear);
+    const dataLast = getMonthlyStats(violations, lastYear, fromMonth, fromYear, toMonth, toYear);
 
     const months = [
       "January", "February", "March", "April", "May", "June",
@@ -86,8 +120,8 @@ export default function CardBarChartViolationsMonth({ violations }: Props) {
     if (hasLast) {
       datasets.push({
         label: `${lastYear}`,
-        backgroundColor: "#a0aec0", // Xám nhạt cho năm trước (hoặc đổi màu khác nếu muốn)
-        borderColor: "#a0aec0",
+        backgroundColor: "#ed64a6", // Xám nhạt cho năm trước
+        borderColor: "#ed64a6",
         data: dataLast,
         barThickness: 8,
       });
@@ -142,7 +176,7 @@ export default function CardBarChartViolationsMonth({ violations }: Props) {
     return () => {
       chartInstanceRef.current?.destroy();
     };
-  }, [violations, from, to]);
+  }, [violations, fromMonthYear, toMonthYear]);
 
   return (
     <div className="relative flex flex-col min-w-0 break-words bg-white w-full mb-6 shadow-lg rounded h-[340px] md:h-[380px]">
@@ -159,17 +193,19 @@ export default function CardBarChartViolationsMonth({ violations }: Props) {
           <div className="flex gap-2 items-center">
             <label className="text-xs">From</label>
             <input
-              type="date"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
+              type="month"
+              value={fromMonthYear}
+              onChange={(e) => setFromMonthYear(e.target.value)}
               className="border rounded px-2 py-1 text-xs"
+              placeholder="mm/yy"
             />
             <label className="text-xs">To</label>
             <input
-              type="date"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
+              type="month"
+              value={toMonthYear}
+              onChange={(e) => setToMonthYear(e.target.value)}
               className="border rounded px-2 py-1 text-xs"
+              placeholder="mm/yy"
             />
           </div>
         </div>

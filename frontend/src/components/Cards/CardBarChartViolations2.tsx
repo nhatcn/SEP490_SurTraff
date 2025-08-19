@@ -9,7 +9,10 @@ import {
 Chart.register(...registerables);
 
 interface Violation {
-  vehicleId: string | number | null;
+  id: number;
+  vehicle?: {
+    id: number;
+  };
   createdAt: string;
 }
 
@@ -20,12 +23,13 @@ interface Props {
 function getTopVehicleViolations(violations: Violation[], limit: number) {
   const stats: Record<string, number> = {};
   violations.forEach((vio) => {
-    if (vio.vehicleId == null) return;
-    const id = String(vio.vehicleId);
+    if (!vio.vehicle?.id) return;
+    const id = String(vio.vehicle.id);
     stats[id] = (stats[id] || 0) + 1;
   });
   return Object.entries(stats)
-    .sort((a, b) => b[1] - a[1])
+    .map(([id, count]) => ({ id, count }))
+    .sort((a, b) => b.count - a.count)
     .slice(0, limit);
 }
 
@@ -41,8 +45,8 @@ export default function CardBarChartViolations2({ violations }: Props) {
     }
 
     const stats = getTopVehicleViolations(violations, 5); // Top 5
-    const labels = stats.map(([vehicleId]) => `Vehicle ${vehicleId}`);
-    const data = stats.map(([, count]) => count);
+    const labels = stats.map((s) => `Vehicle ${s.id}`);
+    const data = stats.map((s) => s.count);
 
     const ctx = chartRef.current.getContext("2d");
     if (!ctx) return;
@@ -54,8 +58,8 @@ export default function CardBarChartViolations2({ violations }: Props) {
         datasets: [
           {
             label: "Top 5 Vehicles by Violations",
-            backgroundColor: "#ed64a6",
-            borderColor: "#ed64a6",
+            backgroundColor: "#fb6340",
+            borderColor: "#fb6340",
             data,
             barThickness: 24,
           },
@@ -95,7 +99,7 @@ export default function CardBarChartViolations2({ violations }: Props) {
             beginAtZero: true,
             title: {
               display: true,
-              text: "Violation Count",
+              text: "Violations Count",
             },
             ticks: {
               precision: 0,
