@@ -17,7 +17,6 @@ frontend/.env.*
 # Python (FastAPI Backend)
 # --------------------
 **/__pycache__/
-backend/__pycache__/
 
 backend/*.py[cod]
 backend/*.so
