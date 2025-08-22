@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Camera, Clock, Calendar, AlertTriangle, Car, ArrowLeft } from "lucide-react";
+import { Search, Camera, Clock, Calendar, AlertTriangle, Car, Truck, Bike, Circle, ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
 import axios, { AxiosError } from "axios";
 import { Header, MobileDropdownMenu } from "../../components/Layout/Menu";
@@ -41,7 +41,7 @@ interface ViolationsDTO {
     id: number;
     violationId?: number;
     violationTypeId?: number;
-    violationType: {
+    violationType?: {
       id: number;
       typeName: string;
       description?: string;
@@ -86,8 +86,14 @@ interface RequestButtonProps {
   onStatusUpdate: (updatedViolation: ViolationsDTO) => void;
 }
 
-
 const ITEMS_PER_PAGE = 10;
+
+// Define vehicle types mapping
+const vehicleTypes = [
+  { id: 1, typeName: "car" },
+  { id: 2, typeName: "truck" },
+  { id: 3, typeName: "motobike" },
+];
 
 // RequestButton Component
 const RequestButton: React.FC<RequestButtonProps> = ({ violationId, onStatusUpdate }) => {
@@ -96,7 +102,6 @@ const RequestButton: React.FC<RequestButtonProps> = ({ violationId, onStatusUpda
   const [success, setSuccess] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [violationStatus, setViolationStatus] = useState<string | null>(null);
-
 
   useEffect(() => {
     const fetchViolationStatus = async () => {
@@ -130,54 +135,52 @@ const RequestButton: React.FC<RequestButtonProps> = ({ violationId, onStatusUpda
   }, [success, error]);
 
   const handleRequest = async () => {
-  setIsLoading(true);
-  setSuccess(null);
-  setError(null);
+    setIsLoading(true);
+    setSuccess(null);
+    setError(null);
 
-  try {
-    const response = await axios.post<ViolationsDTO>(
-      `${API_URL_BE}api/violations/${violationId}/request`,
-      null,
-      {
-        headers: {
-          Accept: "application/json",
-        },
+    try {
+      const response = await axios.post<ViolationsDTO>(
+        `${API_URL_BE}api/violations/${violationId}/request`,
+        null,
+        {
+          headers: {
+            Accept: "application/json",
+          },
+        }
+      );
+
+      if (!response.data || !response.data.id) {
+        throw new Error("Empty or invalid response.");
       }
-    );
 
-    // Nếu violation trả về không có id, xem như là lỗi do backend trả về DTO rỗng
-    if (!response.data || !response.data.id) {
-      throw new Error("Empty or invalid response.");
+      onStatusUpdate(response.data);
+      setViolationStatus(response.data.status?.toUpperCase() || "REQUEST");
+      setSuccess(true);
+    } catch (err) {
+      const error = err as AxiosError;
+      const status = error.response?.status;
+
+      if (status === 404) {
+        setError("Violation not found.");
+      } else if (status === 400) {
+        setError("Invalid request. Violation must be in APPROVED status.");
+      } else {
+        setError("An unexpected error occurred. Please try again.");
+      }
+
+      console.error("Request failed:", {
+        status,
+        data: error.response?.data,
+        headers: error.response?.headers,
+        url: error.config?.url,
+      });
+
+      setSuccess(false);
+    } finally {
+      setIsLoading(false);
     }
-
-    onStatusUpdate(response.data);
-    setViolationStatus(response.data.status?.toUpperCase() || "REQUEST");
-    setSuccess(true);
-  } catch (err) {
-    const error = err as AxiosError;
-
-    const status = error.response?.status;
-
-    if (status === 404) {
-      setError("Violation not found.");
-    } else if (status === 400) {
-      setError("Invalid request. Violation must be in APPROVED status.");
-    } else {
-      setError("An unexpected error occurred. Please try again.");
-    }
-
-    console.error("Request failed:", {
-      status,
-      data: error.response?.data,
-      headers: error.response?.headers,
-      url: error.config?.url,
-    });
-
-    setSuccess(false);
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   const handleViewDetails = () => {
     navigate(`/violationsuser/${violationId}`);
@@ -520,7 +523,7 @@ const SearchAndFilter: React.FC<{
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
     >
-      <div style={{ flex: 1, width: "100%" }}>
+      {/* <div style={{ flex: 1, width: "100%" }}>
         <label
           style={{
             display: "block",
@@ -573,7 +576,7 @@ const SearchAndFilter: React.FC<{
             }}
           />
         </div>
-      </div>
+      </div> */}
       <div style={{ width: "100%", maxWidth: "12rem" }}>
         <label
           style={{
@@ -673,7 +676,23 @@ const ViolationRow: React.FC<{
   violation: ViolationsDTO;
   onStatusUpdate: (violationId: number, newStatus: "Pending" | "Request" | "Approved" | "Reject" | "Processed") => void;
 }> = React.memo(({ violation, onStatusUpdate }) => {
+  // Lấy phần tử đầu tiên của violationDetails hoặc null nếu không có
   const detail = violation.violationDetails?.[0] || null;
+
+  // Function to get the appropriate icon based on vehicleTypeId
+  const getVehicleIcon = (vehicleTypeId: number | undefined) => {
+    const vehicleType = vehicleTypes.find((type) => type.id === vehicleTypeId);
+    switch (vehicleType?.typeName) {
+      case "car":
+        return <Car size={14} style={{ color: "#059669" }} />;
+      case "truck":
+        return <Truck size={14} style={{ color: "#059669" }} />;
+      case "motobike":
+        return <Bike size={14} style={{ color: "#059669" }} />;
+      default:
+        return <Circle size={14} style={{ color: "#059669" }} />;
+    }
+  };
 
   const getStatusColor = (status: string | null | undefined) => {
     const statusMap: { [key: string]: { bg: string; text: string; icon: React.ReactNode } } = {
@@ -722,10 +741,12 @@ const ViolationRow: React.FC<{
     );
   };
 
-  const formatDate = useCallback((dateString: string | null | undefined) => {
-    if (!dateString) return <span style={{ color: "#9CA3AF", fontStyle: "italic" }}>N/A</span>;
+  const formatDate = useCallback((dateString: string | null | undefined, fallback: string | null | undefined) => {
+    const validDateString = dateString || fallback;
+    if (!validDateString) return <span style={{ color: "#9CA3AF", fontStyle: "italic" }}>N/A</span>;
     try {
-      const date = new Date(dateString);
+      const date = new Date(validDateString);
+      if (isNaN(date.getTime())) throw new Error("Invalid date");
       const isToday = date.toDateString() === new Date().toDateString();
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
@@ -742,7 +763,7 @@ const ViolationRow: React.FC<{
                 borderRadius: "0.5rem",
               }}
             >
-              {format(new Date(dateString), "HH:mm:ss")}
+              {format(date, "HH:mm:ss")}
             </span>
           </div>
           <div
@@ -756,7 +777,7 @@ const ViolationRow: React.FC<{
             }}
           >
             <Calendar style={{ width: "0.75rem", height: "0.75rem" }} />
-            <span>{format(new Date(dateString), "dd/MM/yyyy")}</span>
+            <span>{format(date, "dd/MM/yyyy")}</span>
             {isToday && (
               <span
                 style={{
@@ -810,7 +831,7 @@ const ViolationRow: React.FC<{
               className="group"
             >
               <img
-                src={detail.imageUrl || "/placeholder.svg"}
+                src={detail.imageUrl}
                 alt="Violation"
                 style={{
                   height: "4rem",
@@ -821,6 +842,7 @@ const ViolationRow: React.FC<{
                 className="group-hover:scale-110"
                 loading="lazy"
                 onError={(e) => {
+                  console.warn(`Failed to load image: ${detail.imageUrl}`);
                   const target = e.target as HTMLImageElement;
                   target.style.display = "none";
                   target.nextElementSibling?.classList.remove("hidden");
@@ -937,7 +959,7 @@ const ViolationRow: React.FC<{
         <div className="group">
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
             <div style={{ padding: "0.25rem", backgroundColor: "#D1FAE5", borderRadius: "0.5rem" }}>
-              <Car style={{ width: "0.875rem", height: "0.875rem", color: "#059669" }} />
+              {getVehicleIcon(violation.vehicle?.vehicleTypeId)}
             </div>
             <span
               style={{
@@ -981,7 +1003,7 @@ const ViolationRow: React.FC<{
         </div>
       </td>
       <td style={{ padding: "0.75rem", fontSize: "0.875rem", color: "#6B7280" }}>
-        {formatDate(detail?.violationTime)}
+        {formatDate(detail?.violationTime, violation.createdAt)}
       </td>
       <td style={{ padding: "0.75rem" }}>
         <div
@@ -1103,7 +1125,7 @@ export default function ViolationHistory() {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`${API_URL_BE}api/violations/history/${selectedLicensePlate}`);
+      const response = await fetch(`${API_URL_BE}api/violations/license-plate/${selectedLicensePlate}`);
       if (!response.ok) {
         if (response.status === 404) {
           setViolations([]);
@@ -1149,218 +1171,268 @@ export default function ViolationHistory() {
     setRefreshKey((prev) => prev + 1);
   }, []);
 
+  // Function to get the appropriate icon for loading/error states
+  const getVehicleIcon = (vehicleTypeId: number | undefined) => {
+    const vehicleType = vehicleTypes.find((type) => type.id === vehicleTypeId);
+    switch (vehicleType?.typeName) {
+      case "car":
+        return <Car size={20} style={{ color: "#3B82F6" }} />;
+      case "truck":
+        return <Truck size={20} style={{ color: "#3B82F6" }} />;
+      case "motobike":
+        return <Bike size={20} style={{ color: "#3B82F6" }} />;
+      default:
+        return <Circle size={20} style={{ color: "#3B82F6" }} />;
+    }
+  };
+
   return (
     <div>
-            <Header showMobileMenu={showMobileMenu} setShowMobileMenu={setShowMobileMenu} />
+      <Header showMobileMenu={showMobileMenu} setShowMobileMenu={setShowMobileMenu} />
       <MobileDropdownMenu showMobileMenu={showMobileMenu} setShowMobileMenu={setShowMobileMenu} />
-    <div
-      style={{
-        display: "flex",
-        height: "100vh",
-        background: "linear-gradient(to bottom right, #F1F5F9, #DBEAFE, #E0E7FF)",
-        fontFamily: "'Inter', sans-serif",
-        overflow: "hidden",
-      }}
-    >
-      <div style={{ flexGrow: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <motion.div
-          style={{
-            padding: "1rem 1.5rem",
-            background: "linear-gradient(to right, #3B82F6, #8B5CF6)",
-            color: "white",
-            boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-            display: "flex",
-            alignItems: "center",
-            gap: "1rem",
-          }}
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <button
-            onClick={() => navigate("/vehiclelistuser")}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.5rem",
-              padding: "0.5rem 1rem",
-              backgroundColor: "rgba(255,255,255,0.2)",
-              borderRadius: "0.75rem",
-              color: "white",
-              fontWeight: 500,
-              transition: "background-color 0.3s ease",
-              cursor: "pointer",
-              border: "none",
-            }}
-            className="hover:bg-white/30"
-          >
-            <ArrowLeft size={18} />
-            <span>Back</span>
-          </button>
-          <h1 style={{ fontSize: "1.25rem", fontWeight: 600 }}>
-            Violation History - {selectedLicensePlate || "Select a Vehicle"}
-          </h1>
-        </motion.div>
-        <div style={{ flexGrow: 1, padding: "1.5rem", overflowY: "auto" }}>
+      <div
+        style={{
+          display: "flex",
+          height: "100vh",
+          background: "linear-gradient(to bottom right, #F1F5F9, #DBEAFE, #E0E7FF)",
+          fontFamily: "'Inter', sans-serif",
+          overflow: "hidden",
+        }}
+      >
+        <div style={{ flexGrow: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
           <motion.div
             style={{
-              maxWidth: "100%",
-              background: "rgba(255, 255, 255, 0.8)",
-              backdropFilter: "blur(8px)",
-              borderRadius: "1.5rem",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-              border: "1px solid rgba(255,255,255,0.2)",
-              padding: "2rem",
-              transition: "box-shadow 0.3s ease",
+              padding: "1rem 1.5rem",
+              background: "linear-gradient(to right, #3B82F6, #8B5CF6)",
+              color: "white",
+              boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+              display: "flex",
+              alignItems: "center",
+              gap: "1rem",
             }}
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="hover:shadow-xl"
           >
-            <div
+            <button
+              onClick={() => navigate("/vehiclelistuser")}
               style={{
-                marginBottom: "1.5rem",
                 display: "flex",
-                flexDirection: "column",
-                alignItems: "flex-start",
-                gap: "1rem",
+                alignItems: "center",
+                gap: "0.5rem",
+                padding: "0.5rem 1rem",
+                backgroundColor: "rgba(255,255,255,0.2)",
+                borderRadius: "0.75rem",
+                color: "white",
+                fontWeight: 500,
+                transition: "background-color 0.3s ease",
+                cursor: "pointer",
+                border: "none",
               }}
+              className="hover:bg-white/30"
             >
-              <div style={{ fontSize: "0.875rem", color: "#6B7280" }}>
-                Total: <span style={{ fontWeight: 600 }}>{filteredViolations.length}</span> violations
+              <ArrowLeft size={18} />
+              <span>Back</span>
+            </button>
+            <h1 style={{ fontSize: "1.25rem", fontWeight: 600 }}>
+              Violation History - {selectedLicensePlate || "Select a Vehicle"}
+            </h1>
+          </motion.div>
+          <div style={{ flexGrow: 1, padding: "1.5rem", overflowY: "auto" }}>
+            <motion.div
+              style={{
+                maxWidth: "100%",
+                background: "rgba(255, 255, 255, 0.8)",
+                backdropFilter: "blur(8px)",
+                borderRadius: "1.5rem",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                border: "1px solid rgba(255,255,255,0.2)",
+                padding: "2rem",
+                transition: "box-shadow 0.3s ease",
+              }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="hover:shadow-xl"
+            >
+              <div
+                style={{
+                  marginBottom: "1.5rem",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                  gap: "1rem",
+                }}
+              >
+                <div style={{ fontSize: "0.875rem", color: "#6B7280" }}>
+                  Total: <span style={{ fontWeight: 600 }}>{filteredViolations.length}</span> violations
+                </div>
               </div>
-            </div>
-            <SearchAndFilter
-              searchTerm={searchTerm}
-              onSearchChange={setSearchTerm}
-              filterType={filterType}
-              onFilterChange={setFilterType}
-              violationTypes={violationTypes}
-              selectedLicensePlate={selectedLicensePlate}
-              onVehicleSelect={setSelectedLicensePlate}
-              vehicles={allVehicles}
-            />
-            <AnimatePresence>
-              {loading ? (
-                <LoadingSpinner />
-              ) : error ? (
-                <ErrorMessage message={error} onRetry={handleRetry} />
-              ) : filteredViolations.length === 0 ? (
-                <EmptyState />
-              ) : (
-                <div
-                  style={{
-                    background: "rgba(255,255,255,0.8)",
-                    borderRadius: "1rem",
-                    boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-                    border: "1px solid rgba(229,231,235,0.7)",
-                    overflow: "hidden",
-                  }}
-                >
-                  <div style={{ overflowX: "auto" }}>
-                    <table style={{ minWidth: "100%", borderCollapse: "collapse" }}>
-                      <thead
+              <SearchAndFilter
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
+                filterType={filterType}
+                onFilterChange={setFilterType}
+                violationTypes={violationTypes}
+                selectedLicensePlate={selectedLicensePlate}
+                onVehicleSelect={setSelectedLicensePlate}
+                vehicles={allVehicles}
+              />
+              <AnimatePresence>
+                {loading ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      height: "100%",
+                      padding: "2rem",
+                    }}
+                  >
+                    <div style={{ position: "relative" }}>
+                      <div style={{ width: "4rem", height: "4rem", border: "4px solid #E5E7EB", borderRadius: "50%" }}></div>
+                      <div
                         style={{
-                          background: "linear-gradient(to right, #3B82F6, #8B5CF6)",
-                          color: "white",
+                          width: "4rem",
+                          height: "4rem",
+                          border: "4px solid #3B82F6",
+                          borderTopColor: "transparent",
+                          borderRadius: "50%",
+                          position: "absolute",
+                          top: 0,
+                          left: 0,
+                          animation: "spin 1s linear infinite",
+                        }}
+                      ></div>
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "50%",
+                          left: "50%",
+                          transform: "translate(-50%, -50%)",
                         }}
                       >
-                        <tr>
-                          <th
-                            style={{
-                              padding: "1rem 0.75rem",
-                              textAlign: "left",
-                              fontSize: "0.75rem",
-                              fontWeight: 500,
-                              textTransform: "uppercase",
-                              letterSpacing: "0.05em",
-                            }}
-                          >
-                            Image
-                          </th>
-                          <th
-                            style={{
-                              padding: "1rem 0.75rem",
-                              textAlign: "left",
-                              fontSize: "0.75rem",
-                              fontWeight: 500,
-                              textTransform: "uppercase",
-                              letterSpacing: "0.05em",
-                            }}
-                          >
-                            Violation Type
-                          </th>
-                          <th
-                            style={{
-                              padding: "1rem 0.75rem",
-                              textAlign: "left",
-                              fontSize: "0.75rem",
-                              fontWeight: 500,
-                              textTransform: "uppercase",
-                              letterSpacing: "0.05em",
-                            }}
-                          >
-                            License Plate
-                          </th>
-                          <th
-                            style={{
-                              padding: "1rem 0.75rem",
-                              textAlign: "left",
-                              fontSize: "0.75rem",
-                              fontWeight: 500,
-                              textTransform: "uppercase",
-                              letterSpacing: "0.05em",
-                            }}
-                          >
-                            Time
-                          </th>
-                          <th
-                            style={{
-                              padding: "1rem 0.75rem",
-                              textAlign: "left",
-                              fontSize: "0.75rem",
-                              fontWeight: 500,
-                              textTransform: "uppercase",
-                              letterSpacing: "0.05em",
-                            }}
-                          >
-                            Status
-                          </th>
-                          <th
-                            style={{
-                              padding: "1rem 0.75rem",
-                              textAlign: "left",
-                              fontSize: "0.75rem",
-                              fontWeight: 500,
-                              textTransform: "uppercase",
-                              letterSpacing: "0.05em",
-                            }}
-                          >
-                            Action
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody style={{ background: "rgba(255,255,255,0.8)" }}>
-                        {paginatedViolations.map((violation) => (
-                          <ViolationRow key={violation.id} violation={violation} onStatusUpdate={handleStatusUpdate} />
-                        ))}
-                      </tbody>
-                    </table>
+                        {getVehicleIcon(1)}
+                      </div>
+                    </div>
                   </div>
-                  <Pagination
-                    currentPage={paginationInfo.currentPage}
-                    totalPages={paginationInfo.totalPages}
-                    onPageChange={setCurrentPage}
-                  />
-                </div>
-              )}
-            </AnimatePresence>
-          </motion.div>
+                ) : error ? (
+                  <ErrorMessage message={error} onRetry={handleRetry} />
+                ) : filteredViolations.length === 0 ? (
+                  <EmptyState />
+                ) : (
+                  <div
+                    style={{
+                      background: "rgba(255,255,255,0.8)",
+                      borderRadius: "1rem",
+                      boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+                      border: "1px solid rgba(229,231,235,0.7)",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <div style={{ overflowX: "auto" }}>
+                      <table style={{ minWidth: "100%", borderCollapse: "collapse" }}>
+                        <thead
+                          style={{
+                            background: "linear-gradient(to right, #3B82F6, #8B5CF6)",
+                            color: "white",
+                          }}
+                        >
+                          <tr>
+                            <th
+                              style={{
+                                padding: "1rem 0.75rem",
+                                textAlign: "left",
+                                fontSize: "0.75rem",
+                                fontWeight: 500,
+                                textTransform: "uppercase",
+                                letterSpacing: "0.05em",
+                              }}
+                            >
+                              Image
+                            </th>
+                            <th
+                              style={{
+                                padding: "1rem 0.75rem",
+                                textAlign: "left",
+                                fontSize: "0.75rem",
+                                fontWeight: 500,
+                                textTransform: "uppercase",
+                                letterSpacing: "0.05em",
+                              }}
+                            >
+                              Violation Type
+                            </th>
+                            <th
+                              style={{
+                                padding: "1rem 0.75rem",
+                                textAlign: "left",
+                                fontSize: "0.75rem",
+                                fontWeight: 500,
+                                textTransform: "uppercase",
+                                letterSpacing: "0.05em",
+                              }}
+                            >
+                              License Plate
+                            </th>
+                            <th
+                              style={{
+                                padding: "1rem 0.75rem",
+                                textAlign: "left",
+                                fontSize: "0.75rem",
+                                fontWeight: 500,
+                                textTransform: "uppercase",
+                                letterSpacing: "0.05em",
+                              }}
+                            >
+                              Time
+                            </th>
+                            <th
+                              style={{
+                                padding: "1rem 0.75rem",
+                                textAlign: "left",
+                                fontSize: "0.75rem",
+                                fontWeight: 500,
+                                textTransform: "uppercase",
+                                letterSpacing: "0.05em",
+                              }}
+                            >
+                              Status
+                            </th>
+                            <th
+                              style={{
+                                padding: "1rem 0.75rem",
+                                textAlign: "left",
+                                fontSize: "0.75rem",
+                                fontWeight: 500,
+                                textTransform: "uppercase",
+                                letterSpacing: "0.05em",
+                              }}
+                            >
+                              Action
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody style={{ background: "rgba(255,255,255,0.8)" }}>
+                          {paginatedViolations.map((violation) => (
+                            <ViolationRow key={violation.id} violation={violation} onStatusUpdate={handleStatusUpdate} />
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <Pagination
+                      currentPage={paginationInfo.currentPage}
+                      totalPages={paginationInfo.totalPages}
+                      onPageChange={setCurrentPage}
+                    />
+                  </div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          </div>
         </div>
       </div>
-    </div>
-    <Footer/>
+      <Footer />
     </div>
   );
 }

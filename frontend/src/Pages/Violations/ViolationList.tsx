@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import Sidebar from "../../components/Layout/Sidebar";
 import Header from "../../components/Layout/Header";
@@ -10,7 +9,7 @@ import { toast } from "react-toastify";
 import ExportViolationsPDF from "./ExportViolationsPDF";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  Eye, Trash2, Camera, MapPin, Clock, Car, AlertTriangle, RefreshCw, TrendingUp, 
+  Eye, Trash2, Camera, MapPin, Clock, Car, Truck, Bike, Circle, AlertTriangle, RefreshCw, TrendingUp, 
   Filter, BarChart3, Calendar, Search, X, ChevronDown, Sparkles,
   Target, Zap, Activity, Globe, CheckCircle2, XCircle, ChevronLeft,
   ChevronRight
@@ -63,9 +62,15 @@ interface Violation {
   createdAt: string | null;
   violationDetails: ViolationDetail[] | null;
   status: string | null;
-  isDelete: boolean; // Added to match backend
+  isDelete: boolean;
 }
 
+// Define vehicle types mapping
+const vehicleTypes = [
+  { id: 1, typeName: "car" },
+  { id: 2, typeName: "truck" },
+  { id: 3, typeName: "motobike" },
+];
 
 const ITEMS_PER_PAGE_OPTIONS = [5, 10, 15, 20, 25, 50];
 
@@ -203,6 +208,21 @@ export default function ViolationList() {
       : { bg: "bg-green-100", text: "text-green-700", icon: <CheckCircle2 className="text-green-500" size={14} /> };
   };
 
+  // Function to get the appropriate icon based on vehicleTypeId
+  const getVehicleIcon = (vehicleTypeId: number | undefined) => {
+    const vehicleType = vehicleTypes.find((type) => type.id === vehicleTypeId);
+    switch (vehicleType?.typeName) {
+      case "car":
+        return <Car size={14} className="text-green-600" />;
+      case "truck":
+        return <Truck size={14} className="text-green-600" />;
+      case "motobike":
+        return <Bike size={14} className="text-green-600" />;
+      default:
+        return <Circle size={14} className="text-green-600" />;
+    }
+  };
+
   // Load violations with retry capability
   const loadViolations = useCallback(async () => {
     try {
@@ -212,7 +232,7 @@ export default function ViolationList() {
       const processedData = response.data.map((item: any) => ({
         ...item,
         violationDetails: item.violationDetails || [],
-        isDelete: item.isDelete ?? false, // Ensure isDelete is always boolean
+        isDelete: item.isDelete ?? false,
       }));
       setViolations(processedData);
     } catch (err) {
@@ -220,7 +240,7 @@ export default function ViolationList() {
       console.error("Failed to load violations:", err);
       setError(errorMsg);
     } finally {
-      setLoading(false); // Fixed bug: was setLoading(true)
+      setLoading(false);
     }
   }, []);
 
@@ -778,7 +798,7 @@ export default function ViolationList() {
                           <div className="group">
                             <div className="flex items-center space-x-2 mb-2">
                               <div className="p-1 bg-green-100 rounded-lg">
-                                <Car size={14} className="text-green-600" />
+                                {getVehicleIcon(violation.vehicleType?.id)}
                               </div>
                               <span className="font-mono text-lg font-bold text-gray-900 group-hover:text-green-600 transition-colors duration-200 tracking-wider bg-gradient-to-r from-green-50 to-emerald-50 px-3 py-1 rounded-lg border">
                                 {violation.vehicle?.licensePlate || "N/A"}

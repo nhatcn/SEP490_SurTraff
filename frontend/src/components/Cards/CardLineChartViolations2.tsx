@@ -88,14 +88,27 @@ export default function CardLineChartViolations2({ violations }: Props) {
       "July", "August", "September", "October", "November", "December",
     ];
 
-    const datasets = years.map((year, idx) => ({
-      label: `${year}`,
-      data: getMonthlyStats(violations, year, fromDate, toDate),
-      backgroundColor: COLORS[idx % COLORS.length],
-      borderColor: COLORS[idx % COLORS.length],
-      fill: false,
-      tension: 0.3,
-    }));
+    const currentYear = new Date().getFullYear();
+
+    const datasets = years.map((year, idx) => {
+      let color;
+      if (year === currentYear) {
+        color = "#4c51bf"; // Màu xanh tím cho năm hiện tại
+      } else if (year === currentYear - 1) {
+        color = "#ed64a6"; // Màu hồng cho năm trước
+      } else {
+        color = COLORS[idx % COLORS.length]; // Màu mặc định cho các năm khác
+      }
+
+      return {
+        label: `${year}`,
+        data: getMonthlyStats(violations, year, fromDate, toDate),
+        backgroundColor: color,
+        borderColor: color,
+        fill: false,
+        tension: 0.3,
+      };
+    });
 
     const config: ChartConfiguration<"line"> = {
       type: "line",
