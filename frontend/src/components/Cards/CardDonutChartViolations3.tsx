@@ -120,7 +120,7 @@ const CardDonutChartYear: React.FC<Props> = ({ violationDetails }) => {
           Statistics
         </h6>
         <h2 className="text-blueGray-700 text-xl font-semibold">
-          Violation Type by Year
+          Violations Type by Year
         </h2>
       </div>
 

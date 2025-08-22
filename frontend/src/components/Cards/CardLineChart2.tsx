@@ -83,14 +83,19 @@ export default function CardLineChartAccidents2({ accidents }: Props) {
       "July", "August", "September", "October", "November", "December",
     ];
 
-    const datasets = years.map((year, idx) => ({
-      label: `${year}`,
-      data: getMonthlyStats(accidents, year, fromDate, toDate),
-      backgroundColor: COLORS[idx % COLORS.length],
-      borderColor: COLORS[idx % COLORS.length],
-      fill: false,
-      tension: 0.3,
-    }));
+    const currentYear = new Date().getFullYear();
+
+const datasets = years.map((year) => {
+  const color = year === currentYear ? "#4c51bf" : "#ed64a6";
+  return {
+    label: `${year}`,
+    data: getMonthlyStats(accidents, year, fromDate, toDate),
+    backgroundColor: color,
+    borderColor: color,
+    fill: false,
+    tension: 0.3,
+  };
+});
 
     const config: ChartConfiguration<"line"> = {
       type: "line",
