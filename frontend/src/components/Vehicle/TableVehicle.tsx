@@ -1,10 +1,16 @@
-
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Car, Search, Filter, ChevronDown, X, AlertTriangle, ChevronLeft, ChevronRight, Eye, Trash2 } from "lucide-react";
+import { Car, Truck, Bike, Circle, Search, Filter, ChevronDown, X, AlertTriangle, ChevronLeft, ChevronRight, Eye, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import AlertDialog from "./AlertDialog";
 import { API_URL_BE } from "../Link/LinkAPI";
+
+interface UserType {
+  userId: number;
+  userName: string;
+  fullName: string;
+  email: string;
+}
 
 interface VehicleType {
   id: number;
@@ -23,6 +29,13 @@ interface TableVehicleProps {
 
 const ITEMS_PER_PAGE_OPTIONS = [5, 10, 15, 20, 25, 50];
 
+// Define vehicle types mapping
+const vehicleTypes = [
+  { id: 1, typeName: "car" },
+  { id: 2, typeName: "truck" },
+  { id: 3, typeName: "motobike" },
+];
+
 export default function TableVehicle({ vehicles = [], setVehicles }: TableVehicleProps) {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
@@ -32,6 +45,38 @@ export default function TableVehicle({ vehicles = [], setVehicles }: TableVehicl
   const [showFilters, setShowFilters] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [userData, setUserData] = useState<{ [key: number]: UserType }>({});
+
+  // Fetch user data
+  useEffect(() => {
+    const fetchUserData = async () => {
+      const uniqueUserIds = Array.from(new Set(vehicles.map((v) => v.userId)));
+      const fetchPromises = uniqueUserIds.map(async (userId) => {
+        try {
+          const response = await fetch(`${API_URL_BE}api/users/${userId}`, {
+            headers: { "Content-Type": "application/json" },
+          });
+          if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+          const data: UserType = await response.json();
+          return { userId, data };
+        } catch (err) {
+          console.error(`Failed to fetch user ${userId}:`, err);
+          return { userId, data: { userId, userName: "N/A", fullName: "N/A", email: "N/A" } };
+        }
+      });
+
+      const results = await Promise.all(fetchPromises);
+      const newUserData = results.reduce((acc, { userId, data }) => {
+        acc[userId] = data;
+        return acc;
+      }, {} as { [key: number]: UserType });
+      setUserData(newUserData);
+    };
+
+    if (vehicles.length > 0) {
+      fetchUserData();
+    }
+  }, [vehicles]);
 
   // Extract unique brands
   const brands = useMemo(() => {
@@ -115,6 +160,21 @@ export default function TableVehicle({ vehicles = [], setVehicles }: TableVehicl
     }
   }, [setVehicles, filteredVehicles, currentPage, pageSize, paginatedVehicles]);
 
+  // Function to get the appropriate icon based on vehicleTypeId
+  const getVehicleIcon = (vehicleTypeId: number) => {
+    const vehicleType = vehicleTypes.find((type) => type.id === vehicleTypeId);
+    switch (vehicleType?.typeName) {
+      case "car":
+        return <Car size={14} style={{ color: "#059669" }} />;
+      case "truck":
+        return <Truck size={14} style={{ color: "#059669" }} />;
+      case "motobike":
+        return <Bike size={14} style={{ color: "#059669" }} />;
+      default:
+        return <Circle size={14} style={{ color: "#059669" }} />;
+    }
+  };
+
   return (
     <motion.div
       style={{
@@ -134,11 +194,18 @@ export default function TableVehicle({ vehicles = [], setVehicles }: TableVehicl
         background: "linear-gradient(to right, rgba(249,250,251,0.95), rgba(219,234,254,0.95))",
         padding: "16px 24px",
         borderBottom: "1px solid rgba(203,213,225,0.5)",
+        border: "1px solid #d1d5db",
       }}>
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <div style={{ padding: "8px", background: "linear-gradient(to right, #3b82f6, #7e22ce)", borderRadius: "8px", boxShadow: "0 4px 6px rgba(0,0,0,0.1)" }}>
+              <div style={{ 
+                padding: "8px", 
+                background: "linear-gradient(to right, #3b82f6, #7e22ce)", 
+                borderRadius: "8px", 
+                boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
+                border: "1px solid #d1d5db"
+              }}>
                 <Car style={{ color: "#fff" }} size={20} />
               </div>
               <div>
@@ -147,7 +214,15 @@ export default function TableVehicle({ vehicles = [], setVehicles }: TableVehicl
               </div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-              <div style={{ background: "rgba(220,252,231,0.8)", color: "#047857", padding: "4px 12px", borderRadius: "9999px", fontSize: "14px", fontWeight: 500 }}>
+              <div style={{ 
+                background: "rgba(220,252,231,0.8)", 
+                color: "#047857", 
+                padding: "4px 12px", 
+                borderRadius: "9999px", 
+                fontSize: "14px", 
+                fontWeight: 500,
+                border: "1px solid #d1d5db"
+              }}>
                 {(filteredVehicles || []).length} records
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", color: "#4b5563" }}>
@@ -156,8 +231,12 @@ export default function TableVehicle({ vehicles = [], setVehicles }: TableVehicl
                   value={pageSize}
                   onChange={(e) => handlePageSizeChange(Number(e.target.value))}
                   style={{
-                    padding: "4px 8px", border: "1px solid #d1d5db", borderRadius: "8px",
-                    boxShadow: "0 2px 4px rgba(0,0,0,0.05)", transition: "all 0.2s", outline: "none",
+                    padding: "4px 8px", 
+                    border: "1px solid #d1d5db", 
+                    borderRadius: "8px",
+                    boxShadow: "0 2px 4px rgba(0,0,0,0.05)", 
+                    transition: "all 0.2s", 
+                    outline: "none",
                   }}
                   onFocus={(e) => e.currentTarget.style.boxShadow = "0 0 0 2px #3b82f6"}
                   onBlur={(e) => e.currentTarget.style.boxShadow = "0 2px 4px rgba(0,0,0,0.05)"}
@@ -177,9 +256,17 @@ export default function TableVehicle({ vehicles = [], setVehicles }: TableVehicl
               whileTap={{ scale: 0.95 }}
               onClick={() => setShowFilters(!showFilters)}
               style={{
-                display: "flex", alignItems: "center", gap: "8px", padding: "8px 16px",
-                background: "#fff", color: "#374151", borderRadius: "12px", border: "1px solid #d1d5db",
-                cursor: "pointer", transition: "all 0.2s", boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+                display: "flex", 
+                alignItems: "center", 
+                gap: "8px", 
+                padding: "8px 16px",
+                background: "#fff", 
+                color: "#374151", 
+                borderRadius: "12px", 
+                border: "1px solid #d1d5db",
+                cursor: "pointer", 
+                transition: "all 0.2s", 
+                boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
               }}
               onMouseOver={(e) => e.currentTarget.style.background = "#f9fafb"}
               onMouseOut={(e) => e.currentTarget.style.background = "#fff"}
@@ -197,9 +284,16 @@ export default function TableVehicle({ vehicles = [], setVehicles }: TableVehicl
                   whileTap={{ scale: 0.95 }}
                   onClick={handleResetFilters}
                   style={{
-                    display: "flex", alignItems: "center", gap: "4px", padding: "4px 12px",
-                    background: "#fee2e2", color: "#dc2626", borderRadius: "8px", border: "none",
-                    cursor: "pointer", transition: "background-color 0.2s",
+                    display: "flex", 
+                    alignItems: "center", 
+                    gap: "4px", 
+                    padding: "4px 12px",
+                    background: "#fee2e2", 
+                    color: "#dc2626", 
+                    borderRadius: "8px", 
+                    border: "1px solid #d1d5db",
+                    cursor: "pointer", 
+                    transition: "background-color 0.2s",
                   }}
                   onMouseOver={(e) => e.currentTarget.style.background = "#fecaca"}
                   onMouseOut={(e) => e.currentTarget.style.background = "#fee2e2"}
@@ -233,9 +327,13 @@ export default function TableVehicle({ vehicles = [], setVehicles }: TableVehicl
                         value={searchTerm}
                         onChange={(e) => handleFilterChange("licensePlate", e.target.value)}
                         style={{
-                          width: "100%", padding: "8px 16px 8px 40px", border: "1px solid #d1d5db",
-                          borderRadius: "12px", boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
-                          transition: "all 0.2s", outline: "none",
+                          width: "100%", 
+                          padding: "8px 16px 8px 40px", 
+                          border: "1px solid #d1d5db",
+                          borderRadius: "12px", 
+                          boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+                          transition: "all 0.2s", 
+                          outline: "none",
                         }}
                         onFocus={(e) => e.currentTarget.style.boxShadow = "0 0 0 2px #3b82f6"}
                         onBlur={(e) => e.currentTarget.style.boxShadow = "0 2px 4px rgba(0,0,0,0.05)"}
@@ -251,9 +349,13 @@ export default function TableVehicle({ vehicles = [], setVehicles }: TableVehicl
                       value={filterBrand}
                       onChange={(e) => handleFilterChange("brand", e.target.value)}
                       style={{
-                        width: "100%", padding: "8px 16px", border: "1px solid #d1d5db",
-                        borderRadius: "12px", boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
-                        transition: "all 0.2s", outline: "none",
+                        width: "100%", 
+                        padding: "8px 16px", 
+                        border: "1px solid #d1d5db",
+                        borderRadius: "12px", 
+                        boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+                        transition: "all 0.2s", 
+                        outline: "none",
                       }}
                       onFocus={(e) => e.currentTarget.style.boxShadow = "0 0 0 2px #3b82f6"}
                       onBlur={(e) => e.currentTarget.style.boxShadow = "0 2px 4px rgba(0,0,0,0.05)"}
@@ -276,21 +378,37 @@ export default function TableVehicle({ vehicles = [], setVehicles }: TableVehicl
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse" }} role="grid" aria-describedby="vehicle-table-desc">
           <caption id="vehicle-table-desc" style={{ position: "absolute", width: "1px", height: "1px", overflow: "hidden", clip: "rect(0,0,0,0)" }}>
-            List of registered vehicles with details including license plate, type, brand, color, user ID, and actions.
+            List of registered vehicles with details including license plate, type, brand, color, user information, and actions.
           </caption>
-          <thead style={{ background: "rgba(249,250,251,0.8)", position: "sticky", top: 0, zIndex: 10 }}>
+          <thead style={{ 
+            background: "rgba(249,250,251,0.8)", 
+            position: "sticky", 
+            top: 0, 
+            zIndex: 10,
+            border: "1px solid #d1d5db"
+          }}>
             <tr>
-              {["License Plate", "Type", "Brand", "Color", "User ID", "Actions"].map((header) => (
+              {["License Plate", "Type", "Brand", "Color", "User Info", "Actions"].map((header) => (
                 <th key={header} style={{
-                  padding: "12px 16px", textAlign: "left", fontSize: "12px", fontWeight: 500,
-                  color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", minWidth: header === "Actions" ? "80px" : "120px",
+                  padding: "12px 16px", 
+                  textAlign: "left", 
+                  fontSize: "12px", 
+                  fontWeight: 500,
+                  color: "#6b7280", 
+                  textTransform: "uppercase", 
+                  letterSpacing: "0.05em", 
+                  minWidth: header === "Actions" ? "80px" : header === "User Info" ? "200px" : "120px",
                 }}>
                   {header}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody style={{ background: "#fff", borderTop: "1px solid #e5e7eb" }}>
+          <tbody style={{ 
+            background: "#fff", 
+            borderTop: "1px solid #e5e7eb",
+            border: "1px solid #d1d5db"
+          }}>
             {(paginatedVehicles || []).length === 0 ? (
               <tr>
                 <td colSpan={6} style={{ padding: "48px 24px", textAlign: "center" }}>
@@ -316,13 +434,24 @@ export default function TableVehicle({ vehicles = [], setVehicles }: TableVehicl
                 >
                   <td style={{ padding: "16px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <div style={{ padding: "4px", background: "#dcfce7", borderRadius: "8px" }}>
-                        <Car size={14} style={{ color: "#059669" }} />
+                      <div style={{ 
+                        padding: "4px", 
+                        background: "#dcfce7", 
+                        borderRadius: "8px",
+                        border: "1px solid #d1d5db"
+                      }}>
+                        {getVehicleIcon(vehicle.vehicleTypeId)}
                       </div>
                       <span style={{
-                        fontFamily: "monospace", fontSize: "18px", fontWeight: 700, color: "#111827",
-                        background: "linear-gradient(to right, #f0fdf4, #d1fae5)", padding: "4px 12px",
-                        borderRadius: "8px", border: "1px solid #e5e7eb", transition: "color 0.2s",
+                        fontFamily: "monospace", 
+                        fontSize: "18px", 
+                        fontWeight: 700, 
+                        color: "#111827",
+                        background: "linear-gradient(to right, #f0fdf4, #d1fae5)", 
+                        padding: "4px 12px",
+                        borderRadius: "8px", 
+                        border: "1px solid #e5e7eb", 
+                        transition: "color 0.2s",
                       }}
                       onMouseOver={(e) => e.currentTarget.style.color = "#059669"}
                       onMouseOut={(e) => e.currentTarget.style.color = "#111827"}
@@ -339,12 +468,22 @@ export default function TableVehicle({ vehicles = [], setVehicles }: TableVehicl
                   </td>
                   <td style={{ padding: "16px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <div style={{ width: "16px", height: "16px", borderRadius: "50%", background: vehicle.color || "#000000" }}></div>
+                      <div style={{ 
+                        width: "16px", 
+                        height: "16px", 
+                        borderRadius: "50%", 
+                        background: vehicle.color || "#000000",
+                        border: "1px solid #d1d5db"
+                      }}></div>
                       <span style={{ textTransform: "capitalize" }}>{vehicle.color || "N/A"}</span>
                     </div>
                   </td>
                   <td style={{ padding: "16px" }}>
-                    <span style={{ color: "#111827" }}>{vehicle.userId || "N/A"}</span>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                      <span style={{ color: "#111827", fontWeight: 500 }}>{userData[vehicle.userId]?.userName || "N/A"}</span>
+                      <span style={{ color: "#4b5563", fontSize: "14px" }}>{userData[vehicle.userId]?.fullName || "N/A"}</span>
+                      <span style={{ color: "#6b7280", fontSize: "12px" }}>{userData[vehicle.userId]?.email || "N/A"}</span>
+                    </div>
                   </td>
                   <td style={{ padding: "16px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }} onClick={(e) => e.stopPropagation()}>
@@ -353,8 +492,12 @@ export default function TableVehicle({ vehicles = [], setVehicles }: TableVehicl
                         whileTap={{ scale: 0.9 }}
                         onClick={() => navigate(`/vehicles/${vehicle.id}`)}
                         style={{
-                          color: "#2563eb", padding: "8px", borderRadius: "8px", border: "none",
-                          transition: "all 0.2s", cursor: "pointer",
+                          color: "#2563eb", 
+                          padding: "8px", 
+                          borderRadius: "8px", 
+                          border: "1px solid #d1d5db",
+                          transition: "all 0.2s", 
+                          cursor: "pointer",
                         }}
                         onMouseOver={(e) => e.currentTarget.style.background = "rgba(219,234,254,0.5)"}
                         onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
@@ -371,8 +514,12 @@ export default function TableVehicle({ vehicles = [], setVehicles }: TableVehicl
                           setOpenDialog(true);
                         }}
                         style={{
-                          color: "#dc2626", padding: "8px", borderRadius: "8px", border: "none",
-                          transition: "all 0.2s", cursor: "pointer",
+                          color: "#dc2626", 
+                          padding: "8px", 
+                          borderRadius: "8px", 
+                          border: "1px solid #d1d5db",
+                          transition: "all 0.2s", 
+                          cursor: "pointer",
                         }}
                         onMouseOver={(e) => e.currentTarget.style.background = "rgba(254,226,226,0.5)"}
                         onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
@@ -392,7 +539,15 @@ export default function TableVehicle({ vehicles = [], setVehicles }: TableVehicl
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: "1px solid #e5e7eb" }}>
+        <div style={{ 
+          display: "flex", 
+          flexDirection: "column", 
+          alignItems: "center", 
+          justifyContent: "space-between", 
+          padding: "12px 16px", 
+          borderTop: "1px solid #e5e7eb",
+          border: "1px solid #d1d5db"
+        }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
             <span style={{ fontSize: "14px", color: "#374151" }}>
               Page {currentPage} of {totalPages}
@@ -405,9 +560,15 @@ export default function TableVehicle({ vehicles = [], setVehicles }: TableVehicl
               onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage === 1}
               style={{
-                display: "flex", alignItems: "center", padding: "8px 12px", fontSize: "14px",
-                borderRadius: "8px", border: "1px solid #d1d5db", background: "#fff",
-                cursor: currentPage === 1 ? "not-allowed" : "pointer", opacity: currentPage === 1 ? 0.5 : 1,
+                display: "flex", 
+                alignItems: "center", 
+                padding: "8px 12px", 
+                fontSize: "14px",
+                borderRadius: "8px", 
+                border: "1px solid #d1d5db", 
+                background: "#fff",
+                cursor: currentPage === 1 ? "not-allowed" : "pointer", 
+                opacity: currentPage === 1 ? 0.5 : 1,
                 transition: "all 0.2s",
               }}
               onMouseOver={(e) => currentPage !== 1 && (e.currentTarget.style.background = "#f9fafb")}
@@ -436,9 +597,14 @@ export default function TableVehicle({ vehicles = [], setVehicles }: TableVehicl
                   whileTap={{ scale: 0.95 }}
                   onClick={() => handlePageChange(pageNumber)}
                   style={{
-                    padding: "8px 12px", fontSize: "14px", borderRadius: "8px", border: "1px solid #d1d5db",
-                    background: currentPage === pageNumber ? "#3b82f6" : "#fff", color: currentPage === pageNumber ? "#fff" : "#374151",
-                    cursor: "pointer", transition: "all 0.2s",
+                    padding: "8px 12px", 
+                    fontSize: "14px", 
+                    borderRadius: "8px", 
+                    border: "1px solid #d1d5db",
+                    background: currentPage === pageNumber ? "#3b82f6" : "#fff", 
+                    color: currentPage === pageNumber ? "#fff" : "#374151",
+                    cursor: "pointer", 
+                    transition: "all 0.2s",
                   }}
                   onMouseOver={(e) => currentPage !== pageNumber && (e.currentTarget.style.background = "#f9fafb")}
                   onMouseOut={(e) => currentPage !== pageNumber && (e.currentTarget.style.background = "#fff")}
@@ -454,9 +620,15 @@ export default function TableVehicle({ vehicles = [], setVehicles }: TableVehicl
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
               style={{
-                display: "flex", alignItems: "center", padding: "8px 12px", fontSize: "14px",
-                borderRadius: "8px", border: "1px solid #d1d5db", background: "#fff",
-                cursor: currentPage === totalPages ? "not-allowed" : "pointer", opacity: currentPage === totalPages ? 0.5 : 1,
+                display: "flex", 
+                alignItems: "center", 
+                padding: "8px 12px", 
+                fontSize: "14px",
+                borderRadius: "8px", 
+                border: "1px solid #d1d5db", 
+                background: "#fff",
+                cursor: currentPage === totalPages ? "not-allowed" : "pointer", 
+                opacity: currentPage === totalPages ? 0.5 : 1,
                 transition: "all 0.2s",
               }}
               onMouseOver={(e) => currentPage !== totalPages && (e.currentTarget.style.background = "#f9fafb")}
