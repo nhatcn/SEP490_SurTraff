@@ -5,6 +5,9 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Car,
+  Truck,
+  Bike,
+  Circle,
   Search,
   X,
   ArrowLeft,
@@ -89,6 +92,13 @@ interface VehicleCustomerListProps {
   onBack?: () => void
 }
 
+// Define vehicle types mapping
+const vehicleTypes = [
+  { id: 1, typeName: "car" },
+  { id: 2, typeName: "truck" },
+  { id: 3, typeName: "motobike" },
+];
+
 const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({
   onBack
 }) => {
@@ -112,7 +122,20 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({
   const [userId, setUserId] = useState<string | null>(null)
   const [showMobileMenu, setShowMobileMenu] = useState(false)
 
-
+  // Function to get the appropriate icon based on vehicleTypeId
+  const getVehicleIcon = (vehicleTypeId: number | undefined) => {
+    const vehicleType = vehicleTypes.find((type) => type.id === vehicleTypeId);
+    switch (vehicleType?.typeName) {
+      case "car":
+        return <Car size={20} className="text-blue-600" />;
+      case "truck":
+        return <Truck size={20} className="text-blue-600" />;
+      case "motobike":
+        return <Bike size={20} className="text-blue-600" />;
+      default:
+        return <Circle size={20} className="text-blue-600" />;
+    }
+  };
 
   // Fetch userId from cookie or localStorage
   useEffect(() => {
@@ -183,7 +206,7 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({
     } finally {
       setIsLoading(false)
     }
-  }, [userId,])
+  }, [userId])
 
   // Check violations for a specific license plate
   const checkViolations = useCallback(
@@ -270,7 +293,7 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({
           setTimeout(() => {
             setShowRobotMessage(false)
           }, 5000)
-        }, 1000)
+        }, 2000)
       }
     },
     [checkViolations, firstViolatedPlate]
@@ -318,7 +341,6 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({
     },
     []
   )
-
 
   // Filter vehicles
   const filteredVehicles = useMemo(() => {
@@ -376,7 +398,7 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({
           <div className='w-16 h-16 border-4 border-gray-200 rounded-full'></div>
           <div className='w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full absolute top-0 left-0 animate-spin'></div>
           <div className='absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2'>
-            <Car className='text-blue-500' size={20} />
+            {getVehicleIcon(1)}
           </div>
         </div>
       </div>
@@ -388,7 +410,7 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({
       <div className='flex justify-center items-center h-screen bg-gray-50'>
         <div className='bg-white rounded-lg shadow-lg border p-8 text-center max-w-md'>
           <div className='w-16 h-16 bg-red-500 rounded-full flex items-center justify-center mx-auto mb-4'>
-            <Car className='text-white' size={24} />
+            {getVehicleIcon(1)}
           </div>
           <p className='text-red-600 text-lg font-medium'>{error}</p>
           {onBack && (
@@ -430,7 +452,7 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({
           <div className='flex flex-col md:flex-row items-center justify-between gap-6'>
             <div className='flex items-center space-x-4'>
               <div className='w-16 h-16 bg-blue-500 rounded-lg flex items-center justify-center'>
-                <Car className='text-white' size={28} />
+                {getVehicleIcon(1)}
               </div>
               <div>
                 <h1 className='text-2xl font-bold text-gray-900 mb-1'>
@@ -549,7 +571,7 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({
                       <td className='px-6 py-4 whitespace-nowrap'>
                         <div className='flex items-center'>
                           <div className='w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-3'>
-                            <Car className='text-blue-600' size={20} />
+                            {getVehicleIcon(vehicle.vehicleTypeId)}
                           </div>
                           <div>
                             <div className='text-sm font-medium text-gray-900'>
@@ -632,7 +654,7 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({
                           ) : (
                             <button
                               onClick={() => navigate(`/editv/${vehicle.id}`)}
-                              className='inline-flex items-center w-20 justify-center px-3 py-1 border border-blue-300 rounded-md text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors'
+                              className='inline-flex items-center w-20 justify-center px-3 py-1 border border-blue-300 rounded-md text-sm text-blue-700 bg-blue-100 hover:bg-blue-200 transition-colors'
                               title='Edit Vehicle'
                             >
                               <Edit size={16} />
