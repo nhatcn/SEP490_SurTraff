@@ -1,5 +1,5 @@
 import { useState,  ReactNode } from 'react';
-import { ChevronRight, ChevronLeft, Filter, AlertCircle, X } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Filter, AlertCircle, X, ChevronsLeft, ChevronsRight, MoreHorizontal } from 'lucide-react';
 
 // Generic interfaces
 export interface TableColumn<T> {
@@ -89,6 +89,8 @@ export default function GenericTable<T extends Record<string, any>>({
   emptyMessage = 'No data found'
 }: GenericTableProps<T>) {
   const [showFilters, setShowFilters] = useState(false);
+  const [showPageInput, setShowPageInput] = useState(false);
+  const [pageInputValue, setPageInputValue] = useState('');
 
   // Check if filters are active
   const hasActiveFilters = Object.values(filterValues).some(value => 
@@ -109,6 +111,27 @@ export default function GenericTable<T extends Record<string, any>>({
   // Page size options
   const pageSizeOptions = [10, 25, 50, 100];
 
+  // Handle page input
+  const handlePageInputSubmit = () => {
+    if (!pagination) return;
+    
+    const pageNum = parseInt(pageInputValue);
+    if (pageNum >= 1 && pageNum <= pagination.totalPages) {
+      pagination.onPageChange(pageNum);
+    }
+    setShowPageInput(false);
+    setPageInputValue('');
+  };
+
+  const handlePageInputKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handlePageInputSubmit();
+    } else if (e.key === 'Escape') {
+      setShowPageInput(false);
+      setPageInputValue('');
+    }
+  };
+
   // Generate page numbers for pagination
   const getPageNumbers = () => {
     if (!pagination) return [];
@@ -117,21 +140,49 @@ export default function GenericTable<T extends Record<string, any>>({
     const pages = [];
     const maxVisiblePages = 5;
     
-    if (totalPages <= maxVisiblePages) {
+    if (totalPages <= maxVisiblePages + 2) {
+      // Show all pages if total is small
       for (let i = 1; i <= totalPages; i++) {
         pages.push(i);
       }
     } else {
-      const half = Math.floor(maxVisiblePages / 2);
-      let start = Math.max(currentPage - half, 1);
-      let end = Math.min(start + maxVisiblePages - 1, totalPages);
+      // Always show first page
+      pages.push(1);
       
-      if (end - start + 1 < maxVisiblePages) {
-        start = Math.max(end - maxVisiblePages + 1, 1);
+      const half = Math.floor((maxVisiblePages - 2) / 2);
+      let start = Math.max(currentPage - half, 2);
+      let end = Math.min(start + maxVisiblePages - 3, totalPages - 1);
+      
+      // Adjust if we're near the beginning
+      if (start <= 3) {
+        start = 2;
+        end = Math.min(maxVisiblePages - 1, totalPages - 1);
       }
       
+      // Adjust if we're near the end
+      if (end >= totalPages - 2) {
+        end = totalPages - 1;
+        start = Math.max(totalPages - maxVisiblePages + 2, 2);
+      }
+      
+      // Add ellipsis before if needed
+      if (start > 2) {
+        pages.push('...');
+      }
+      
+      // Add middle pages
       for (let i = start; i <= end; i++) {
         pages.push(i);
+      }
+      
+      // Add ellipsis after if needed
+      if (end < totalPages - 1) {
+        pages.push('...');
+      }
+      
+      // Always show last page (if more than 1 page)
+      if (totalPages > 1) {
+        pages.push(totalPages);
       }
     }
     
@@ -336,7 +387,7 @@ export default function GenericTable<T extends Record<string, any>>({
         )}
       </div>
 
-      {/* Pagination */}
+      {/* Enhanced Pagination */}
       {pagination?.enabled && pagination.totalPages > 1 && (
         <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
           <div className="flex items-center space-x-2">
@@ -346,6 +397,17 @@ export default function GenericTable<T extends Record<string, any>>({
           </div>
 
           <div className="flex items-center space-x-1">
+            {/* First Page Button */}
+            <button
+              className="flex items-center px-2 py-2 text-sm rounded border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+              onClick={() => pagination.onPageChange(1)}
+              disabled={pagination.currentPage === 1}
+              title="First page"
+            >
+              <ChevronsLeft size={16} />
+            </button>
+
+            {/* Previous Button */}
             <button
               className="flex items-center px-3 py-2 text-sm rounded border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
               onClick={() => pagination.onPageChange(pagination.currentPage - 1)}
@@ -355,21 +417,80 @@ export default function GenericTable<T extends Record<string, any>>({
               Previous
             </button>
 
-            {/* Page numbers */}
-            {getPageNumbers().map((page) => (
-              <button
-                key={page}
-                className={`px-3 py-2 text-sm rounded border transition-colors ${
-                  pagination.currentPage === page
-                    ? 'bg-blue-500 text-white border-blue-500'
-                    : 'border-gray-300 hover:bg-gray-50'
-                }`}
-                onClick={() => pagination.onPageChange(page)}
-              >
-                {page}
-              </button>
-            ))}
+            {/* Page Input Modal */}
+            {showPageInput && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg p-6 shadow-lg">
+                  <h3 className="text-lg font-medium mb-4">Go to Page</h3>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="number"
+                      min="1"
+                      max={pagination.totalPages}
+                      value={pageInputValue}
+                      onChange={(e) => setPageInputValue(e.target.value)}
+                      onKeyPress={handlePageInputKeyPress}
+                      className="border border-gray-300 rounded px-3 py-2 w-20 text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Page"
+                      autoFocus
+                    />
+                    <span className="text-sm text-gray-500">of {pagination.totalPages}</span>
+                  </div>
+                  <div className="flex justify-end space-x-2 mt-4">
+                    <button
+                      onClick={() => {
+                        setShowPageInput(false);
+                        setPageInputValue('');
+                      }}
+                      className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handlePageInputSubmit}
+                      className="px-4 py-2 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                    >
+                      Go
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
+            {/* Page Numbers */}
+            {getPageNumbers().map((page, index) => {
+              if (page === '...') {
+                return (
+                  <button
+                    key={`ellipsis-${index}`}
+                    className="px-3 py-2 text-sm rounded border border-gray-300 hover:bg-gray-50 transition-colors"
+                    onClick={() => {
+                      setShowPageInput(true);
+                      setPageInputValue(String(pagination.currentPage));
+                    }}
+                    title="Go to page..."
+                  >
+                    <MoreHorizontal size={16} />
+                  </button>
+                );
+              }
+              
+              return (
+                <button
+                  key={page}
+                  className={`px-3 py-2 text-sm rounded border transition-colors ${
+                    pagination.currentPage === page
+                      ? 'bg-blue-500 text-white border-blue-500'
+                      : 'border-gray-300 hover:bg-gray-50'
+                  }`}
+                  onClick={() => pagination.onPageChange(Number(page))}
+                >
+                  {page}
+                </button>
+              );
+            })}
+
+            {/* Next Button */}
             <button
               className="flex items-center px-3 py-2 text-sm rounded border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
               onClick={() => pagination.onPageChange(pagination.currentPage + 1)}
@@ -377,6 +498,16 @@ export default function GenericTable<T extends Record<string, any>>({
             >
               Next
               <ChevronRight size={16} className="ml-1" />
+            </button>
+
+            {/* Last Page Button */}
+            <button
+              className="flex items-center px-2 py-2 text-sm rounded border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+              onClick={() => pagination.onPageChange(pagination.totalPages)}
+              disabled={pagination.currentPage === pagination.totalPages}
+              title="Last page"
+            >
+              <ChevronsRight size={16} />
             </button>
           </div>
         </div>

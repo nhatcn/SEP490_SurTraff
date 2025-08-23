@@ -1,4 +1,4 @@
-import { Camera, MapPin, Wifi, WifiOff, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Camera, MapPin, Wifi, WifiOff, AlertTriangle, CheckCircle, Power } from 'lucide-react';
 import { useState, useEffect } from "react";
 
 interface CameraProps {
@@ -13,12 +13,14 @@ interface CameraCardProps {
   camera: CameraProps;
   isSelected: boolean;
   onClick: (camera: CameraProps) => void;
+  onStatusToggle?: (cameraId: string | number, newStatus: string) => void;
 }
 
-export default function CameraCard({ camera, isSelected, onClick }: CameraCardProps) {
+export default function CameraCard({ camera, isSelected, onClick, onStatusToggle }: CameraCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [isToggling, setIsToggling] = useState(false);
   
   useEffect(() => {
     const timer = setInterval(() => {
@@ -50,7 +52,8 @@ export default function CameraCard({ camera, isSelected, onClick }: CameraCardPr
           icon: AlertTriangle,
           label: "Violation Detected",
           pulseColor: "bg-red-400",
-          dotColor: "bg-red-500"
+          dotColor: "bg-red-500",
+          isActive: true
         };
       case "active":
       case "normal":
@@ -61,7 +64,8 @@ export default function CameraCard({ camera, isSelected, onClick }: CameraCardPr
           icon: CheckCircle,
           label: "Active",
           pulseColor: "bg-green-400",
-          dotColor: "bg-green-500"
+          dotColor: "bg-green-500",
+          isActive: true
         };
       case "inactive":
         return {
@@ -71,7 +75,8 @@ export default function CameraCard({ camera, isSelected, onClick }: CameraCardPr
           icon: WifiOff,
           label: "Inactive",
           pulseColor: "bg-gray-400",
-          dotColor: "bg-gray-400"
+          dotColor: "bg-gray-400",
+          isActive: false
         };
       default:
         return {
@@ -81,8 +86,26 @@ export default function CameraCard({ camera, isSelected, onClick }: CameraCardPr
           icon: Wifi,
           label: "Online",
           pulseColor: "bg-blue-400",
-          dotColor: "bg-blue-500"
+          dotColor: "bg-blue-500",
+          isActive: true
         };
+    }
+  };
+
+  const handleStatusToggle = async (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card selection when clicking switch
+    
+    if (!onStatusToggle || isToggling) return;
+    
+    setIsToggling(true);
+    
+    try {
+      const newStatus = statusConfig.isActive ? 'inactive' : 'active';
+      await onStatusToggle(camera.id, newStatus);
+    } catch (error) {
+      console.error('Failed to toggle camera status:', error);
+    } finally {
+      setIsToggling(false);
     }
   };
 
@@ -116,15 +139,19 @@ export default function CameraCard({ camera, isSelected, onClick }: CameraCardPr
         </div>
       </div>
 
-      {/* Image Section - Reduced height */}
+
+
+      {/* Image Section */}
       <div className="relative bg-gradient-to-br from-gray-100 to-gray-200 h-36 flex items-center justify-center overflow-hidden">
-        {imageError || !camera.thumbnail ? (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col items-center justify-center text-gray-400">
+        {imageError || !camera.thumbnail || !statusConfig.isActive ? (
+          <div className={`w-full h-full bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col items-center justify-center text-gray-400 ${!statusConfig.isActive ? 'opacity-60' : ''}`}>
             <div className="relative">
               <Camera size={32} className="mb-2 opacity-60" />
-              <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+              <div className={`absolute -top-1 -right-1 w-2 h-2 ${statusConfig.isActive ? 'bg-red-500' : 'bg-gray-400'} rounded-full ${statusConfig.isActive ? 'animate-pulse' : ''}`}></div>
             </div>
-            <span className="text-xs text-center px-4 font-medium">Camera Offline</span>
+            <span className="text-xs text-center px-4 font-medium">
+              {!statusConfig.isActive ? 'Camera Offline' : 'No Signal'}
+            </span>
           </div>
         ) : (
           <>
@@ -137,10 +164,12 @@ export default function CameraCard({ camera, isSelected, onClick }: CameraCardPr
               onError={() => setImageError(true)}
             />
             {/* Live Indicator */}
-            <div className="absolute bottom-2 left-2 bg-red-600 text-white px-2 py-0.5 rounded text-xs font-semibold flex items-center space-x-1 shadow-lg">
-              <span className="inline-block w-1 h-1 bg-white rounded-full animate-pulse"></span>
-              <span>LIVE</span>
-            </div>
+            {statusConfig.isActive && (
+              <div className="absolute bottom-2 left-2 bg-red-600 text-white px-2 py-0.5 rounded text-xs font-semibold flex items-center space-x-1 shadow-lg">
+                <span className="inline-block w-1 h-1 bg-white rounded-full animate-pulse"></span>
+                <span>LIVE</span>
+              </div>
+            )}
           </>
         )}
 
@@ -156,7 +185,7 @@ export default function CameraCard({ camera, isSelected, onClick }: CameraCardPr
         </div>
       </div>
 
-      {/* Content Section - Reduced padding */}
+      {/* Content Section */}
       <div className="p-3 flex-grow flex flex-col bg-gradient-to-b from-white to-gray-50/30">
         {/* Header */}
         <div className="flex items-start justify-between mb-2">
@@ -172,15 +201,52 @@ export default function CameraCard({ camera, isSelected, onClick }: CameraCardPr
           <span className="text-sm font-medium truncate">{camera.location}</span>
         </div>
 
-        {/* Status Bar */}
+        {/* Status Display with Power Switch */}
+        <div className="flex items-center justify-between mb-2 p-2 bg-gray-50 rounded-lg">
+          <div className="flex items-center space-x-2">
+            <div className={`w-2 h-2 rounded-full bg-gradient-to-r ${statusConfig.color} shadow-sm`}></div>
+            <span className="text-sm font-medium text-gray-700">Status:</span>
+            <span className={`text-sm font-semibold ${statusConfig.textColor}`}>
+              {statusConfig.label}
+            </span>
+          </div>
+          
+          {/* Power Switch */}
+          <button
+            onClick={handleStatusToggle}
+            disabled={isToggling}
+            className={`
+              relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-50
+              ${statusConfig.isActive 
+                ? 'bg-green-500 focus:ring-green-500' 
+                : 'bg-gray-300 focus:ring-gray-500'
+              }
+              ${isToggling ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}
+              shadow-sm
+            `}
+            title={statusConfig.isActive ? 'Turn off camera' : 'Turn on camera'}
+          >
+            <span
+              className={`
+                inline-block h-3 w-3 transform rounded-full bg-white shadow-sm transition-transform duration-200
+                ${statusConfig.isActive ? 'translate-x-5' : 'translate-x-1'}
+              `}
+            />
+            
+            {isToggling && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-2 h-2 border border-white border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            )}
+          </button>
+        </div>
+
+        {/* Timestamp Bar */}
         <div className="mt-auto pt-2 border-t border-gray-100">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <div className={`w-2 h-2 rounded-full bg-gradient-to-r ${statusConfig.color} shadow-sm`}></div>
-              <span className="text-xs font-mono text-gray-500">
-                {formatDateTime(currentTime)}
-              </span>
-            </div>
+            <span className="text-xs font-mono text-gray-500">
+              {formatDateTime(currentTime)}
+            </span>
             
             <div className="flex items-center space-x-1 text-gray-400">
               <div className="w-1 h-1 bg-gray-300 rounded-full"></div>
