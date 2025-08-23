@@ -15,7 +15,7 @@ import threading
 from queue import Queue, Empty
 
 # Cấu hình
-FPS = 25
+FPS = 30
 VIDEO_CLIP_DURATION_SECONDS = 3
 EVENT_ACTIVE_DURATION_SECONDS = 4
 

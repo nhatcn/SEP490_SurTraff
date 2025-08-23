@@ -20,6 +20,7 @@ import ffmpeg
 import threading
 from concurrent.futures import ThreadPoolExecutor
 import atexit
+import shutil
 
 # Load models
 model_vehicle = YOLO("yolov8m.pt")
@@ -33,34 +34,124 @@ VIOLATION_API_URL = "http://localhost:8081/api/violations"
 
 # Create violations directory
 VIOLATIONS_DIR = "violations"
+DEBUG_VIDEOS_DIR = os.path.join(VIOLATIONS_DIR, "debug_videos")
 os.makedirs(VIOLATIONS_DIR, exist_ok=True)
+os.makedirs(DEBUG_VIDEOS_DIR, exist_ok=True)
 
 # Thread pool for async violation sending
 violation_executor = ThreadPoolExecutor(max_workers=5)
 
+def save_temp_violation_video(frames, fps, output_path, width, height):
+    """Save violation video with proper codec and settings"""
+    try:
+        # Use H.264 codec for better compatibility
+        fourcc = cv2.VideoWriter_fourcc(*'H264')  # Changed from 'mp4v' to 'H264'
+        out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+        
+        if not out.isOpened():
+            print(f"❌ Failed to open VideoWriter for {output_path}")
+            # Fallback to mp4v codec
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+        
+        frames_written = 0
+        for frame in frames:
+            if frame is not None and frame.shape[:2] == (height, width):
+                out.write(frame)
+                frames_written += 1
+            else:
+                print(f"⚠️ Skipping invalid frame: shape={frame.shape if frame is not None else None}")
+        
+        out.release()
+        
+        # Check if video file was created successfully
+        if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+            print(f"✅ Video saved successfully: {output_path} ({frames_written} frames, {os.path.getsize(output_path)} bytes)")
+            return True
+        else:
+            print(f"❌ Video file not created or empty: {output_path}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Error saving video {output_path}: {e}")
+        traceback.print_exc()
+        return False
+
 def send_violation_async(violation_data, image_path, video_path, track_id):
     """Send violation to API asynchronously"""
     def send_violation():
+        debug_video_path = None
         try:
+            # Create debug copy of video with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            debug_video_filename = f"violation_track_{track_id}_{timestamp}.mp4"
+            debug_video_path = os.path.join(DEBUG_VIDEOS_DIR, debug_video_filename)
+            
+            # Copy video for debugging
+            if os.path.exists(video_path):
+                shutil.copy2(video_path, debug_video_path)
+                print(f"📋 Debug video saved: {debug_video_path} (Size: {os.path.getsize(debug_video_path)} bytes)")
+                
+                # Verify video properties
+                cap = cv2.VideoCapture(debug_video_path)
+                if cap.isOpened():
+                    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                    fps = cap.get(cv2.CAP_PROP_FPS)
+                    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                    duration = frame_count / fps if fps > 0 else 0
+                    
+                    print(f"🎥 Video properties - Frames: {frame_count}, FPS: {fps:.2f}, "
+                          f"Size: {width}x{height}, Duration: {duration:.2f}s")
+                    
+                    # Try to read first frame
+                    ret, first_frame = cap.read()
+                    if ret and first_frame is not None:
+                        print(f"✅ First frame readable: {first_frame.shape}")
+                    else:
+                        print(f"❌ Cannot read first frame")
+                    
+                    cap.release()
+                else:
+                    print(f"❌ Cannot open debug video for verification")
+            else:
+                print(f"❌ Original video doesn't exist: {video_path}")
+
+            # Send to API
             with open(image_path, 'rb') as img_file, open(video_path, 'rb') as vid_file:
                 files = {
                     'imageFile': ('violation.jpg', img_file, 'image/jpeg'),
                     'videoFile': ('violation.mp4', vid_file, 'video/mp4'),
                     'Violation': (None, json.dumps(violation_data), 'application/json')
                 }
-                response = requests.post(VIOLATION_API_URL, files=files, timeout=10)
+                
+                print(f"📤 Sending violation to API...")
+                print(f"   Image size: {os.path.getsize(image_path)} bytes")
+                print(f"   Video size: {os.path.getsize(video_path)} bytes")
+                
+                response = requests.post(VIOLATION_API_URL, files=files, timeout=30)  # Increased timeout
                 response.raise_for_status()
                 print(f"✅ Violation sent successfully for track {track_id}: {response.status_code}")
+                
+                # Print response details
+                try:
+                    response_data = response.json()
+                    print(f"📥 API Response: {json.dumps(response_data, indent=2)}")
+                except:
+                    print(f"📥 API Response (text): {response.text}")
+                    
         except Exception as e:
             print(f"❌ Failed to send violation to API for track {track_id}: {e}")
+            traceback.print_exc()
         finally:
-            # Clean up temporary files
+            # Clean up temporary files (but keep debug copy)
             try:
                 if os.path.exists(image_path):
                     os.remove(image_path)
                 if os.path.exists(video_path):
                     os.remove(video_path)
                 print(f"🗑️ Cleaned up temp files for track {track_id}")
+                print(f"🔍 Debug video kept at: {debug_video_path}")
             except Exception as e:
                 print(f"⚠️ Error deleting temp files for track {track_id}: {e}")
     
@@ -123,12 +214,6 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
         print(f"Detect line crossing: prev={prev_point}, curr={curr_point}, was_below={was_below}, is_above={is_above}")
         return was_below and is_above
 
-    def save_temp_violation_video(frames, fps, output_path, width, height):
-        out = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))
-        for frame in frames:
-            out.write(frame)
-        out.release()
-
     # Parse zones
     lane_zones_percentage = {}
     light_zones_percentage = {}
@@ -180,8 +265,9 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
     track_position_history = {}
     vehicle_violations = {}
     vehicle_violation_types = {}
-    frame_buffer = deque(maxlen=30)  # Buffer for 1 second of frames at 30 FPS
+    frame_buffer = deque(maxlen=90)  # Increased buffer for 2 seconds at 30 FPS
     fps = cap.get(cv2.CAP_PROP_FPS) or 30
+    print(f"📹 Stream FPS: {fps}")
 
     # Video output for debug
     out = None
@@ -223,9 +309,15 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
                 frame_size_initialized = True
                 print(f"Initialized {len(lane_zones)} lane zones, {len(light_zones)} light zones, {len(zone_lines)} lines")
 
-                # Create output video path
+                # Create output video path with H.264 codec
                 output_video_path = os.path.join(VIOLATIONS_DIR, f"output_{camera_id}.mp4")
-                out = cv2.VideoWriter(output_video_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
+                fourcc = cv2.VideoWriter_fourcc(*'H264')  # Changed from 'mp4v'
+                out = cv2.VideoWriter(output_video_path, fourcc, fps, (w, h))
+                
+                if not out.isOpened():
+                    print("❌ Failed to open H264 codec, falling back to mp4v")
+                    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                    out = cv2.VideoWriter(output_video_path, fourcc, fps, (w, h))
 
             # Draw zones
             for zone_id, zone in lane_zones.items():
@@ -333,25 +425,28 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
                                                 # Save image
                                                 cv2.imwrite(image_path, frame_annotated)
 
-                                                # Save video (1s before and after)
-                                                violation_frames = list(frame_buffer)[-15:] + [frame_annotated] + list(frame_buffer)[:15]
-                                                save_temp_violation_video(violation_frames, fps, video_path, w, h)
+                                                # Save video (2s before and after) - improved frame collection
+                                                violation_frames = list(frame_buffer)
+                                                print(f"📹 Creating violation video with {len(violation_frames)} frames")
+                                                
+                                                if save_temp_violation_video(violation_frames, fps, video_path, w, h):
+                                                    # Prepare violation data for API
+                                                    violation_data = {
+                                                        "camera": {"id": camera_id},
+                                                        "status": "PENDING",
+                                                        "createdAt": datetime.now().isoformat(),
+                                                        "violationDetails": [{
+                                                            "violationTypeId": 1,  # RED_LIGHT
+                                                            "violationTime": datetime.now().isoformat(),
+                                                            "licensePlate": f"TRACK_{track_id}"  # Replace with OCR later
+                                                        }]
+                                                    }
 
-                                                # Prepare violation data for API
-                                                violation_data = {
-                                                    "camera": {"id": camera_id},
-                                                    "status": "PENDING",
-                                                    "createdAt": datetime.now().isoformat(),
-                                                    "violationDetails": [{
-                                                        "violationTypeId": 1,  # RED_LIGHT
-                                                        "violationTime": datetime.now().isoformat(),
-                                                        "licensePlate": f"TRACK_{track_id}"  # Replace with OCR later
-                                                    }]
-                                                }
-
-                                                # Send violation asynchronously (non-blocking)
-                                                print(f"📤 Sending RED_LIGHT violation for track {track_id} asynchronously...")
-                                                send_violation_async(violation_data, image_path, video_path, track_id)
+                                                    # Send violation asynchronously (non-blocking)
+                                                    print(f"📤 Sending RED_LIGHT violation for track {track_id} asynchronously...")
+                                                    send_violation_async(violation_data, image_path, video_path, track_id)
+                                                else:
+                                                    print(f"❌ Failed to create violation video for track {track_id}")
                                             break
                                     else:
                                         print(f"No red light violation: No red light detected in any light zone")
@@ -374,25 +469,28 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
                                 # Save image
                                 cv2.imwrite(image_path, frame_annotated)
 
-                                # Save video (1s before and after)
-                                violation_frames = list(frame_buffer)[-15:] + [frame_annotated] + list(frame_buffer)[:15]
-                                save_temp_violation_video(violation_frames, fps, video_path, w, h)
+                                # Save video (2s before and after) - improved frame collection
+                                violation_frames = list(frame_buffer)
+                                print(f"📹 Creating violation video with {len(violation_frames)} frames")
+                                
+                                if save_temp_violation_video(violation_frames, fps, video_path, w, h):
+                                    # Prepare violation data for API
+                                    violation_data = {
+                                        "camera": {"id": camera_id},
+                                        "status": "PENDING",
+                                        "createdAt": datetime.now().isoformat(),
+                                        "violationDetails": [{
+                                            "violationTypeId": 4,  # WRONG_LANE
+                                            "violationTime": datetime.now().isoformat(),
+                                            "licensePlate": f"TRACK_{track_id}"  # Replace with OCR later
+                                        }]
+                                    }
 
-                                # Prepare violation data for API
-                                violation_data = {
-                                    "camera": {"id": camera_id},
-                                    "status": "PENDING",
-                                    "createdAt": datetime.now().isoformat(),
-                                    "violationDetails": [{
-                                        "violationTypeId": 4,  # WRONG_LANE
-                                        "violationTime": datetime.now().isoformat(),
-                                        "licensePlate": f"TRACK_{track_id}"  # Replace with OCR later
-                                    }]
-                                }
-
-                                # Send violation asynchronously (non-blocking)
-                                print(f"📤 Sending WRONG_LANE violation for track {track_id} asynchronously...")
-                                send_violation_async(violation_data, image_path, video_path, track_id)
+                                    # Send violation asynchronously (non-blocking)
+                                    print(f"📤 Sending WRONG_LANE violation for track {track_id} asynchronously...")
+                                    send_violation_async(violation_data, image_path, video_path, track_id)
+                                else:
+                                    print(f"❌ Failed to create violation video for track {track_id}")
 
                     # Draw bounding box and label
                     violation_type = vehicle_violation_types.get(track_id, "")
@@ -471,4 +569,3 @@ def cleanup_on_exit():
 
 # Register cleanup function
 atexit.register(cleanup_on_exit)
-
