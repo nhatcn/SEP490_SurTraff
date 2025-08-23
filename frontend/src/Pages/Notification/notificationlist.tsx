@@ -16,6 +16,7 @@ import { getCookie } from "../../utils/cookieUltil"
 import { Header, MobileDropdownMenu } from "../../components/Layout/Menu"
 import Footer from "../../components/Layout/Footer"
 import {API_URL_BE} from "../../components/Link/LinkAPI"
+import { useNavigate } from "react-router-dom"
 
 interface Notification {
   id: number
@@ -46,6 +47,14 @@ function timeAgo(dateString: string) {
   if (weeks < 4) return `${weeks} weeks ago`
   const months = Math.floor(days / 30)
   return `${months} months ago`
+}
+
+// Function to extract license plate from message
+function extractLicensePlate(message: string): string | null {
+  // Regex pattern to match Vietnamese license plates (e.g., 51A-12345, 29B-123.45, etc.)
+  const licensePlatePattern = /\b\d{2}[A-Z]-?\d{3}\.?\d{2}\b|\b\d{2}[A-Z]-\d{4,5}\b/g;
+  const matches = message.match(licensePlatePattern);
+  return matches ? matches[0] : null;
 }
 
 const getNotificationIcon = (type: string, size = 20) => {
@@ -93,6 +102,7 @@ export default function NotificationsPage() {
   const [filterType, setFilterType] = useState("all")
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 5
+  const navigate = useNavigate()
 
   const fetchNotifications = async () => {
     setLoading(true)
@@ -118,6 +128,25 @@ export default function NotificationsPage() {
   useEffect(() => {
     fetchNotifications()
   }, [])
+
+  const handleNotificationClick = async (notification: Notification) => {
+    // Mark as read first if not already read
+    if (!notification.read) {
+      await markAsRead(notification.id);
+    }
+    
+    // Extract license plate from message
+    const licensePlate = extractLicensePlate(notification.message);
+    
+    if (licensePlate) {
+      // Navigate to violations history page for all notification types
+      navigate(`/violations/history/${licensePlate}`);
+    } else {
+      console.warn("Could not extract license plate from notification message");
+      // If no license plate found, still navigate to general violations page
+      navigate('/violations');
+    }
+  };
 
   const markAsRead = async (notificationId: number) => {
     try {
@@ -237,7 +266,7 @@ export default function NotificationsPage() {
                 <div
                   key={notification.id}
                   className={`relative p-6 rounded-2xl shadow-sm ${getNotificationStyle(notification.notificationType, notification.read)} cursor-pointer group`}
-                  onClick={() => !notification.read && markAsRead(notification.id)}
+                  onClick={() => handleNotificationClick(notification)}
                 >
                   <div className="flex items-start space-x-4">
                     <div className="flex-shrink-0 p-3 bg-white rounded-xl shadow-sm">

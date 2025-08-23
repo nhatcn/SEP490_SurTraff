@@ -6,9 +6,8 @@ import axios from "axios";
 import { useLocation } from "react-router-dom";
 import NewNotificationAlert from "./new-notification-alert";
 import { getCookie } from "../../utils/cookieUltil";
-import { useNavigate } from "react-router-dom" // Thêm dòng này
-import {API_URL_BE} from "../Link/LinkAPI";
-
+import { useNavigate } from "react-router-dom"; // Thêm dòng này
+import { API_URL_BE } from "../Link/LinkAPI";
 
 interface Notification {
   id: number;
@@ -36,6 +35,15 @@ function timeAgo(dateString: string) {
   return `${days} days ago`;
 }
 
+// Function to extract license plate from message
+function extractLicensePlate(message: string): string | null {
+  // Regex pattern to match Vietnamese license plates (e.g., 51A-12345, 29B-123.45, etc.)
+  const licensePlatePattern =
+    /\b\d{2}[A-Z]-?\d{3}\.?\d{2}\b|\b\d{2}[A-Z]-\d{4,5}\b/g;
+  const matches = message.match(licensePlatePattern);
+  return matches ? matches[0] : null;
+}
+
 const NotificationDropdown = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -49,6 +57,7 @@ const NotificationDropdown = () => {
   const titleMarqueeBaseText = useRef("🔔 You have new Violation/Accident");
   const currentMarqueeTitle = useRef("");
   const location = useLocation();
+  const navigate = useNavigate();
 
   const stopTitleMarquee = () => {
     if (titleMarqueeIntervalId) {
@@ -79,7 +88,7 @@ const NotificationDropdown = () => {
         throw new Error("User ID not found in cookie");
       }
       const res = await axios.get<Notification[]>(
-        API_URL_BE +`api/notifications/${userId}`
+        API_URL_BE + `api/notifications/${userId}`
       );
       const currentUnread = res.data.filter((n) => !n.read);
 
@@ -98,12 +107,11 @@ const NotificationDropdown = () => {
           startTitleMarquee();
         } else {
           stopTitleMarquee();
-          if (
-            newestNotification &&
-            location.pathname === "/home"
-          ) {
-            // Only show toast if on the /home page
-            setNewToast(newestNotification);
+          if (newestNotification) {
+            // Show toast on any page, but only if it's a new notification
+            if (location.pathname === "/home") {
+              setNewToast(newestNotification);
+            }
             setShownToastIds((prev) =>
               new Set(prev).add(newestNotification.id)
             );
@@ -112,6 +120,7 @@ const NotificationDropdown = () => {
       } else {
         stopTitleMarquee();
       }
+      // Show all unread notifications in dropdown
       setNotifications(currentUnread);
     } catch (error) {
       console.error("Failed to fetch notifications", error);
@@ -139,13 +148,13 @@ const NotificationDropdown = () => {
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () =>
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, [notifications,startTitleMarquee]);
+  }, [notifications, startTitleMarquee]);
 
   useEffect(() => {
     return () => {
       stopTitleMarquee();
     };
-  }, [ ]);
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -160,25 +169,51 @@ const NotificationDropdown = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [stopTitleMarquee]);
 
+  const handleNotificationClick = async (notification: Notification) => {
+    // Đánh dấu đã đọc trước
+    await markAsRead(notification.id);
+
+    // Extract license plate
+    const licensePlate = extractLicensePlate(notification.message);
+
+    // Close dropdown
+    setShowNotifications(false);
+
+    // Điều hướng trang
+    if (licensePlate) {
+      const targetPath = `/violations/history/${licensePlate}`;
+
+      if (
+        location.pathname.startsWith("/violations/history/") &&
+        location.pathname !== targetPath
+      ) {
+        window.location.href = targetPath;
+      } else if (location.pathname === targetPath) {
+        window.location.reload();
+      } else {
+        navigate(targetPath);
+      }
+    } else {
+      console.warn("Could not extract license plate from notification message");
+      navigate("/violations");
+    }
+  };
+
   const markAsRead = async (notificationId: number) => {
     try {
-      await axios.put(
-       API_URL_BE +`api/notifications/read/${notificationId}`
-      );
+      await axios.put(API_URL_BE + `api/notifications/read/${notificationId}`);
       setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
     } catch (error) {
       console.error("Failed to mark notification as read", error);
     }
   };
 
-  const navigate = useNavigate()
-
   const markAllAsRead = async () => {
     try {
       const notificationIds = notifications.map((n) => n.id);
       await Promise.all(
         notificationIds.map((id) =>
-          axios.put(API_URL_BE +`api/notifications/read/${id}`)
+          axios.put(API_URL_BE + `api/notifications/read/${id}`)
         )
       );
       setNotifications([]);
@@ -305,7 +340,7 @@ const NotificationDropdown = () => {
                   className={`px-4 py-3 cursor-pointer transition-colors duration-200 ${getNotificationBgColor(
                     notification.notificationType
                   )}`}
-                  onClick={() => markAsRead(notification.id)}
+                  onClick={() => handleNotificationClick(notification)}
                 >
                   <div className="flex items-start space-x-3">
                     {getNotificationIcon(notification.notificationType)}

@@ -256,7 +256,7 @@ export default function AccidentDetailsTable() {
   if (error || !accident) {
     return (
       <ErrorScreen
-        error={error || "Accident Not Found"}
+        error={error || ""}
         onBackClick={() => navigate("/accidentdashboard")}
       />
     );
