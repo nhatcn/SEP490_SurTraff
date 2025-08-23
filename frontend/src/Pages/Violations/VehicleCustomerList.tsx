@@ -315,8 +315,8 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({
         const response = await fetch(
           `${API_URL_BE}api/vehicle/${vehicleId}/activate`,
           {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' }
+            method: 'POST',
+            
           }
         )
         if (!response.ok) {
