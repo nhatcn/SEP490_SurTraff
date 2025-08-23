@@ -50,12 +50,43 @@ function getMonthlyStats(
   return monthlyCounts;
 }
 
+// Lấy ngày hiện tại theo định dạng YYYY-MM-DD
+function getTodayString(): string {
+  const today = new Date();
+  return today.toISOString().split('T')[0];
+}
+
 export default function CardLineChartViolations2({ violations }: Props) {
   const chartRef = useRef<HTMLCanvasElement | null>(null);
   const chartInstanceRef = useRef<ChartJS<"line"> | null>(null);
 
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+
+  const todayString = getTodayString();
+
+  // Xử lý thay đổi ngày From
+  const handleFromChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedDate = e.target.value;
+    if (selectedDate <= todayString) {
+      setFrom(selectedDate);
+      // Nếu ngày From lớn hơn ngày To, reset ngày To
+      if (to && selectedDate > to) {
+        setTo("");
+      }
+    }
+  };
+
+  // Xử lý thay đổi ngày To
+  const handleToChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedDate = e.target.value;
+    if (selectedDate <= todayString) {
+      // Kiểm tra nếu có ngày From, ngày To phải >= ngày From
+      if (!from || selectedDate >= from) {
+        setTo(selectedDate);
+      }
+    }
+  };
 
   useEffect(() => {
     if (!chartRef.current) return;
@@ -193,14 +224,17 @@ export default function CardLineChartViolations2({ violations }: Props) {
             <input
               type="date"
               value={from}
-              onChange={(e) => setFrom(e.target.value)}
+              max={todayString}
+              onChange={handleFromChange}
               className="border rounded px-2 py-1 text-xs bg-white"
             />
             <label className="text-xs text-white">To</label>
             <input
               type="date"
               value={to}
-              onChange={(e) => setTo(e.target.value)}
+              min={from || undefined}
+              max={todayString}
+              onChange={handleToChange}
               className="border rounded px-2 py-1 text-xs bg-white"
             />
           </div>
