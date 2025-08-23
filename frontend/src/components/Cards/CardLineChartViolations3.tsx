@@ -37,6 +37,12 @@ function toISODateString(dateStr: string): string {
   return dateStr.includes("T") ? dateStr : dateStr.replace(" ", "T");
 }
 
+// Lấy ngày hiện tại theo định dạng YYYY-MM-DD
+function getTodayString(): string {
+  const today = new Date();
+  return today.toISOString().split('T')[0];
+}
+
 // Tạo nhãn và thống kê theo đơn vị (ngày/tháng/năm)
 function getGroupedStats(
   violations: Violation[],
@@ -107,17 +113,48 @@ const CardLineChartViolations3: React.FC<Props> = ({ violationDetails }) => {
   const [to, setTo] = useState(maxDate.toISOString().slice(0, 10));
   const [type, setType] = useState("All");
 
+  const todayString = getTodayString();
+
+  // Xử lý thay đổi ngày From
+  const handleFromChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedDate = e.target.value;
+    if (selectedDate <= todayString) {
+      setFrom(selectedDate);
+      // Nếu ngày From lớn hơn ngày To, reset ngày To
+      if (to && selectedDate > to) {
+        setTo("");
+      }
+    }
+  };
+
+  // Xử lý thay đổi ngày To
+  const handleToChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedDate = e.target.value;
+    if (selectedDate <= todayString) {
+      // Kiểm tra nếu có ngày From, ngày To phải >= ngày From
+      if (!from || selectedDate >= from) {
+        setTo(selectedDate);
+      }
+    }
+  };
+
   // Nếu violationDetails thay đổi, reset filter về 1 tuần gần nhất
   useEffect(() => {
     if (allDates.length) {
       const newMax = new Date(Math.max(...allDates.map((d) => d.getTime())));
       const newMin = new Date(new Date(newMax).setDate(newMax.getDate() - 6));
-      setFrom(newMin.toISOString().slice(0, 10));
-      setTo(newMax.toISOString().slice(0, 10));
+      
+      // Đảm bảo không vượt quá ngày hiện tại
+      const today = new Date(todayString);
+      const finalMax = newMax <= today ? newMax : today;
+      const finalMin = newMin <= today ? newMin : new Date(today.setDate(today.getDate() - 6));
+      
+      setFrom(finalMin.toISOString().slice(0, 10));
+      setTo(finalMax.toISOString().slice(0, 10));
       setType("All");
     }
     // eslint-disable-next-line
-  }, [violationDetails.length]);
+  }, [violationDetails.length, todayString]);
 
   useEffect(() => {
     if (!chartRef.current) return;
@@ -252,14 +289,17 @@ const CardLineChartViolations3: React.FC<Props> = ({ violationDetails }) => {
             <input
               type="date"
               value={from}
-              onChange={(e) => setFrom(e.target.value)}
+              max={todayString}
+              onChange={handleFromChange}
               className="border rounded px-2 py-1 text-xs bg-white"
             />
             <label className="text-xs text-white">To</label>
             <input
               type="date"
               value={to}
-              onChange={(e) => setTo(e.target.value)}
+              min={from || undefined}
+              max={todayString}
+              onChange={handleToChange}
               className="border rounded px-2 py-1 text-xs bg-white"
             />
           </div>
