@@ -26,6 +26,7 @@ import {
 } from "lucide-react"
 import { getCookie } from "../../utils/cookieUltil"
 import {API_URL_BE} from "../Link/LinkAPI"
+import BounceLoadingComponent from "../Layout/Loading"
 
 interface UserData {
   userId: number
@@ -375,12 +376,7 @@ export default function UserProfile() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="relative">
-          <div className="w-16 h-16 border-3 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-          <div className="absolute inset-0 w-16 h-16 border-3 border-transparent border-r-purple-600 rounded-full animate-spin animate-reverse"></div>
-        </div>
-      </div>
+    <BounceLoadingComponent fullScreen={false} size="sm"/>
     )
   }
 
