@@ -7,6 +7,7 @@ import CameraDetail from "../../../components/Camera/CameraDetail";
 import { Link } from "react-router-dom";
 import AddButton from "../../../components/Button/AddButton";
 import { API_URL_FAST } from "../../../components/Link/LinkAPI";
+import BounceLoadingComponent from "../../../components/Layout/Loading";
 
 interface CameraType {
   id: string | number;
@@ -34,12 +35,12 @@ export default function CameraDashboard() {
     name: ""
   });
 
- 
+
 
   useEffect(() => {
     // Fetch camera data from backend
     setLoading(true);
-    fetch(API_URL_FAST+"api/cameras")
+    fetch(API_URL_FAST + "api/cameras")
       .then((res) => {
         if (!res.ok) {
           throw new Error("Failed to fetch camera data");
@@ -51,7 +52,7 @@ export default function CameraDashboard() {
           typeof a.id === 'number' && typeof b.id === 'number' ? a.id - b.id : String(a.id).localeCompare(String(b.id))
         );
 
-   
+
         setCameras(sortedData);
 
         // Select first camera if none is selected
@@ -230,9 +231,7 @@ export default function CameraDashboard() {
 
         <div className="flex p-4 gap-6 flex-grow overflow-hidden">
           {loading ? (
-            <div className="w-full flex items-center justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-            </div>
+            <BounceLoadingComponent fullScreen={false} size="sm" />
           ) : error ? (
             <div className="w-full text-center text-red-600 bg-red-50 p-4 rounded-lg">
               {error}
