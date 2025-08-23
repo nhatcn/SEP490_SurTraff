@@ -468,24 +468,27 @@ export default function TableUser() {
             <div className={`h-2 w-2 rounded-full mr-2 ${value ? 'bg-green-400' : 'bg-red-400'}`}></div>
             {value ? 'Active' : 'Inactive'}
           </span>
-          <button
-            type="button"
-            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-all duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-              value ? 'bg-gradient-to-r from-green-400 to-green-500 shadow-lg' : 'bg-gray-300'
-            }`}
-            role="switch"
-            onClick={() => toggleUserActive(record.userId, value, index)}
-          >
-            <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition-all duration-300 ease-in-out ${
-              value ? 'translate-x-5 shadow-lg' : 'translate-x-0'
-            }`}>
-              {value && (
-                <svg className="h-3 w-3 text-green-600 absolute top-1 left-1" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-              )}
-            </span>
-          </button>
+          {/* Ẩn switch toggle nếu là chính mình */}
+          {record.userId !== currentUserId && (
+            <button
+              type="button"
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-all duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                value ? 'bg-gradient-to-r from-green-400 to-green-500 shadow-lg' : 'bg-gray-300'
+              }`}
+              role="switch"
+              onClick={() => toggleUserActive(record.userId, value, index)}
+            >
+              <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition-all duration-300 ease-in-out ${
+                value ? 'translate-x-5 shadow-lg' : 'translate-x-0'
+              }`}>
+                {value && (
+                  <svg className="h-3 w-3 text-green-600 absolute top-1 left-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </span>
+            </button>
+          )}
         </div>
       )
     }
@@ -506,6 +509,7 @@ export default function TableUser() {
         </div>
       ),
       onClick: (record) => {
+        // Chỉ cho phép delete nếu không phải chính mình
         if (record.userId !== currentUserId) {
           handleDeleteUser(record.userId);
         }

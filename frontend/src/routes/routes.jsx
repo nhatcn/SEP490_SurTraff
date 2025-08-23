@@ -33,6 +33,7 @@ import VehicleCustomerList from '../Pages/Violations/VehicleCustomerList';
 import ProtectedRoute from './ProtectedRoute';
 import ViolationDetailForUser from '../Pages/Violations/ViolationDetailForUser';
 import NotificationsPage from '../Pages/Notification/notificationlist';
+import NotFound from '../Pages/Home/NotFound';
 
 const RoutesConfig = () => {
   return (
@@ -68,7 +69,7 @@ const RoutesConfig = () => {
       <Route path="/vehiclelistuser" element={<ProtectedRoute path="/vehiclelistuser" element={<VehicleCustomerList />} />} />
       <Route path="/violationsuser/:id" element={<ProtectedRoute path="/violationsuser/:id" element={<ViolationDetailForUser />} />} />
       <Route path="/notificationlist" element={<ProtectedRoute path="/notificationlist" element={<NotificationsPage />} />} />
-
+      <Route path="*" element={<ProtectedRoute path="/notificationlist" element={<NotFound />} />} />
 
     </Routes>
   );

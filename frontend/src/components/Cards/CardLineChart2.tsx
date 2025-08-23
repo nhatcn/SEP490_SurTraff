@@ -116,6 +116,7 @@ export default function CardLineChartAccidents2({ accidents }: Props) {
 
     const currentYear = new Date().getFullYear();
 
+
     const datasets = years.map((year) => {
       const color = year === currentYear ? "#4c51bf" : "#ed64a6";
       return {
@@ -127,6 +128,7 @@ export default function CardLineChartAccidents2({ accidents }: Props) {
         tension: 0.3,
       };
     });
+
 
     const config: ChartConfiguration<"line"> = {
       type: "line",
