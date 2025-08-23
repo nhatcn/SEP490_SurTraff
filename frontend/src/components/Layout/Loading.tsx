@@ -33,7 +33,7 @@ const BounceLoadingComponent: React.FC<BounceLoadingComponentProps> = ({
         {/* Logo với hiệu ứng bounce */}
         <div className="relative">
           <img
-            src="screenshot_1749087176-removebg-preview.png"
+            src="/screenshot_1749087176-removebg-preview.png"
             alt="Loading logo"
             className={`${config.logo} object-contain animate-bounce drop-shadow-lg`}
             style={{

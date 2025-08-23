@@ -28,7 +28,8 @@ import {
   X,
 } from "lucide-react"
 import { format } from "date-fns"
-import ExportAccidentPDF from "../../components/Accidents/export-accident-pdf" // Import the new component
+import ExportAccidentPDF from "../../components/Accidents/export-accident-pdf"
+import BounceLoadingComponent from "../../components/Layout/Loading"
 import {API_URL_BE} from "../Link/LinkAPI"
 
 // Types
@@ -254,7 +255,7 @@ function GenericTable<T extends Record<string, any>>({
       <div className="overflow-hidden">
         {loading ? (
           <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mx-auto"></div>
+            <BounceLoadingComponent />
             <p className="mt-3 text-gray-600">Loading...</p>
           </div>
         ) : error ? (
@@ -389,9 +390,7 @@ function GenericTable<T extends Record<string, any>>({
   )
 }
 
-// Constant
-
-// ConfirmDialog Component (Placeholder, assuming it's defined elsewhere)
+// ConfirmDialog Component
 const ConfirmDialog: React.FC<{
   isOpen: boolean
   title: string
@@ -444,7 +443,7 @@ export default function AccidentTable() {
   const navigate = useNavigate()
 
   // Authorization header
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null // Check for window
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
   const authHeader = {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -452,7 +451,7 @@ export default function AccidentTable() {
     },
   }
 
-  // Fetch Accident Data
+  // Fetch Accident Data with 2-second delay
   const fetchAccidentData = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -462,6 +461,10 @@ export default function AccidentTable() {
         throw new Error(`HTTP error! status: ${res.status}`)
       }
       const data: AccidentType[] = await res.json()
+      
+      // Add 2-second delay
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+      
       setAccidents(data)
       const uniqueStatuses = Array.from(new Set(data.map((acc) => acc.status)))
       setStatusOptions(uniqueStatuses.map((status) => ({ value: status, label: status })))
@@ -485,13 +488,13 @@ export default function AccidentTable() {
     } finally {
       setLoading(false)
     }
-  }, [refreshKey]) // Added refreshKey to dependency array
+  }, [refreshKey])
 
   useEffect(() => {
     fetchAccidentData()
   }, [fetchAccidentData])
 
-  // Apply Filters (aligned with TableUser's applyFilters)
+  // Apply Filters
   const filteredAccidents = useMemo(() => {
     let filtered = accidents
     if (filterValues.status) {
@@ -503,16 +506,16 @@ export default function AccidentTable() {
     if (filterValues.location) {
       filtered = filtered.filter((acc) => acc.location === filterValues.location)
     }
-    console.log("Filtered Accidents:", filtered) // Debugging
+    console.log("Filtered Accidents:", filtered)
     return filtered
   }, [accidents, filterValues])
 
-  // Paginate Data (aligned with TableUser's getPaginatedData)
+  // Paginate Data
   const getPaginatedData = useCallback(() => {
     const startIndex = (currentPage - 1) * pageSize
     const endIndex = startIndex + pageSize
     const paginatedData = filteredAccidents.slice(startIndex, endIndex)
-    console.log("Paginated Data:", paginatedData) // Debugging
+    console.log("Paginated Data:", paginatedData)
     return paginatedData
   }, [filteredAccidents, currentPage, pageSize])
 
@@ -522,13 +525,13 @@ export default function AccidentTable() {
   // Handle filter change and reset page
   const handleFilterChange = useCallback((key: string, value: any) => {
     setFilterValues((prev) => ({ ...prev, [key]: value }))
-    setCurrentPage(1) // Reset to first page on filter change
+    setCurrentPage(1)
   }, [])
 
   // Reset filters and page
   const resetFilters = useCallback(() => {
     setFilterValues({ status: "", cameraId: "", location: "" })
-    setCurrentPage(1) // Reset to first page on filter reset
+    setCurrentPage(1)
   }, [])
 
   // Handle page change
@@ -539,7 +542,7 @@ export default function AccidentTable() {
   // Handle page size change
   const handlePageSizeChange = useCallback((newPageSize: number) => {
     setPageSize(newPageSize)
-    setCurrentPage(1) // Reset to first page on page size change
+    setCurrentPage(1)
   }, [])
 
   // Statistics
@@ -559,7 +562,7 @@ export default function AccidentTable() {
       .map(([location, count]) => ({ location, count }))
       .sort((a, b) => b.count - a.count)
     const cameraInvolvedCount = new Set(filteredAccidents.map((acc) => acc.cameraId)).size
-    const prevWeekAccidents = totalAccidents - Math.floor(Math.random() * 20) // Placeholder for trend
+    const prevWeekAccidents = totalAccidents - Math.floor(Math.random() * 20)
     const trendPercentage =
       totalAccidents > 0 && prevWeekAccidents > 0 ? ((totalAccidents - prevWeekAccidents) / prevWeekAccidents) * 100 : 0
     return { totalAccidents, todayAccidents, locationStats, cameraInvolvedCount, trendPercentage }
@@ -827,7 +830,7 @@ export default function AccidentTable() {
       setIsDeleting(false)
       setModalDeleteId(null)
     }
-  }, [modalDeleteId, fetchAccidentData, authHeader]) // Added authHeader to dependency array
+  }, [modalDeleteId, fetchAccidentData, authHeader])
 
   const handleProcess = useCallback(
     async (id: number) => {
@@ -865,7 +868,7 @@ export default function AccidentTable() {
         setIsProcessing(false)
       }
     },
-    [fetchAccidentData, authHeader], // Added authHeader to dependency array
+    [fetchAccidentData, authHeader],
   )
 
   const handleReject = useCallback(
@@ -904,7 +907,7 @@ export default function AccidentTable() {
         setIsRejecting(false)
       }
     },
-    [fetchAccidentData, authHeader], // Added authHeader to dependency array
+    [fetchAccidentData, authHeader],
   )
 
   const handleRefresh = useCallback(async () => {
@@ -1029,7 +1032,6 @@ export default function AccidentTable() {
             >
               <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
                 <div className="flex flex-wrap items-center gap-3">
-                  {/* Use the new ExportAccidentPDF component here */}
                   <ExportAccidentPDF accidents={filteredAccidents} />
                   <motion.button
                     whileHover={{ scale: 1.05 }}
