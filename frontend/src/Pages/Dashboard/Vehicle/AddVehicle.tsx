@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Save, X, Car, CheckCircle, AlertCircle } from 'lucide-react';
 import { API_URL_BE } from '../../../components/Link/LinkAPI';
+import BounceLoadingComponent from '../../../components/Layout/Loading';
 
 interface VehicleType {
   id: number;
@@ -621,8 +622,8 @@ const AddVehicle = ({ onVehicleAdded }: { onVehicleAdded?: (vehicle: Vehicle) =>
                 >
                   {isLoading ? (
                     <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      <span>Saving...</span>
+<BounceLoadingComponent/>
+                     
                     </>
                   ) : (
                     <>

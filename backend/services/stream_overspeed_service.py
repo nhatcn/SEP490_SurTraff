@@ -49,20 +49,6 @@ app = FastAPI()
 # Thread pool for async violation sending
 violation_executor = ThreadPoolExecutor(max_workers=5)
 
-def initialize_kalman_filter():
-    """Initialize Kalman Filter for tracking position and velocity."""
-    kf = KalmanFilter(dim_x=4, dim_z=2)  # State: [x, y, vx, vy], Measurement: [x, y]
-    kf.F = np.array([[1, 0, 1, 0],  # State transition matrix
-                     [0, 1, 0, 1],
-                     [0, 0, 1, 0],
-                     [0, 0, 0, 1]])
-    kf.H = np.array([[1, 0, 0, 0],  # Measurement function
-                     [0, 1, 0, 0]])
-    kf.P *= 1000.0  # Initial covariance
-    kf.R = np.array([[5, 0], [0, 5]])  # Measurement noise
-    kf.Q = np.eye(4) * 0.1  # Process noise
-    return kf
-
 def fetch_camera_config(cid: int, retries=3, delay=1):
     """Fetch camera configuration from Spring Boot API."""
     url = f"http://localhost:8081/api/cameras/{cid}"
@@ -77,36 +63,24 @@ def fetch_camera_config(cid: int, retries=3, delay=1):
             time.sleep(delay)
     raise ValueError("Failed to fetch camera config after retries")
 
-def extract_license_plate(frame, boxes):
-    """Extract license plate text using EasyOCR."""
+def extract_license_plate(roi):
+    """Extract license plate text from a vehicle ROI using EasyOCR on lower part."""
     license_plate_text = "Unknown"
-    for box in boxes:
-        if class_names.get(int(box.cls), model.names[int(box.cls)]) == "number_plate":
-            x1, y1, x2, y2 = map(int, box.xyxy[0])
-            plate_roi = frame[y1:y2, x1:x2]
-            if plate_roi.size > 0:
-                try:
-                    plate_roi = cv2.cvtColor(plate_roi, cv2.COLOR_BGR2GRAY)
-                    plate_roi = cv2.equalizeHist(plate_roi)
-                    ocr_results = ocr_reader.readtext(plate_roi, detail=0)
-                    license_plate_text = ocr_results[0] if ocr_results else "Unknown"
-                    license_plate_text = "".join(c for c in license_plate_text if c.isalnum()).upper()
-                except Exception as e:
-                    print(f"Error in OCR: {e}")
-                    license_plate_text = "Unknown"
-            break
+    if roi.size > 0:
+        try:
+            # Crop lower third for plate area
+            h, w = roi.shape[:2]
+            plate_roi = roi[int(2*h/3):h, :]
+            plate_roi = cv2.cvtColor(plate_roi, cv2.COLOR_BGR2GRAY)
+            plate_roi = cv2.equalizeHist(plate_roi)
+            ocr_results = ocr_reader.readtext(plate_roi, detail=0)
+            if ocr_results:
+                license_plate_text = ocr_results[0]
+                license_plate_text = "".join(c for c in license_plate_text if c.isalnum()).upper()
+        except Exception as e:
+            print(f"Error in OCR: {e}")
+            license_plate_text = "Unknown"
     return license_plate_text
-
-def calculate_speed(prev_pos, curr_pos, frame_time, pixel_to_meter):
-    """Calculate speed in km/h based on pixel displacement."""
-    if prev_pos is None or curr_pos is None:
-        return 0.0
-    dx = curr_pos[0] - prev_pos[0]
-    dy = curr_pos[1] - prev_pos[1]
-    pixel_distance = np.sqrt(dx**2 + dy**2)
-    meters_per_second = (pixel_distance * pixel_to_meter) / frame_time
-    km_per_hour = meters_per_second * 3.6  # Convert m/s to km/h
-    return km_per_hour
 
 def send_violation_async(violation_data, snapshot_filepath, video_filepath, track_id):
     """Gửi dữ liệu vi phạm đến API bất đồng bộ và xóa file ngay sau khi gửi."""
@@ -136,26 +110,76 @@ def send_violation_async(violation_data, snapshot_filepath, video_filepath, trac
     violation_executor.submit(send_violation)
 
 def stream_overspeed_service(youtube_url: str, camera_id: int):
-    """Stream video and detect overspeed violations."""
+    """Stream video và phát hiện vi phạm quá tốc độ (nâng cấp chính xác)."""
     print(f"Loaded model classes: {model.names}")
     
     camera_config = fetch_camera_config(camera_id)
     if not camera_config:
         raise ValueError("Could not fetch camera config")
 
+    # ===== Homography / Calibration =====
+    H = None
+    try:
+        if "H" in camera_config and camera_config["H"]:
+            H = np.array(camera_config["H"], dtype=np.float32)
+        elif "src_points" in camera_config and "dst_points" in camera_config:
+            src = np.array(camera_config["src_points"], dtype=np.float32)  # [(x,y),...]*4
+            dst = np.array(camera_config["dst_points"], dtype=np.float32)  # [(X,Y),...]*4  (đơn vị: mét)
+            if src.shape == (4,2) and dst.shape == (4,2):
+                H = cv2.getPerspectiveTransform(src, dst)
+    except Exception as e:
+        print(f"[!] Homography config invalid, fallback to pixel scale. Error: {e}")
+
+    def px_to_world_xy(x, y):
+        """Chuyển (x,y) pixel sang (X,Y) mặt phẳng thực (m). Nếu không có H, trả về None."""
+        if H is None:
+            return None
+        pt = np.array([ [x, y, 1.0] ], dtype=np.float32).T  # 3x1
+        wp = H @ pt
+        if wp[2,0] == 0:
+            return None
+        X = float(wp[0,0] / wp[2,0])
+        Y = float(wp[1,0] / wp[2,0])
+        return (X, Y)
+
     stream_url = get_stream_url(youtube_url)
     cap = cv2.VideoCapture(stream_url)
-
     if not cap.isOpened():
         raise ValueError(f"❌ Cannot open stream from {stream_url}")
 
-    vehicle_violations = {}
+    # ===== States =====
+    vehicle_violations = {}  # Tracks if violation has been sent for this track
     frame_buffer = deque(maxlen=30)
     recording_tasks = {}
     kalman_filters = {}
     speed_history = {}
-    pixel_to_meter = DISTANCE_REF / PIXEL_REF  # Conversion factor
-    frame_time = 1.0 / FRAME_RATE
+    last_time = {}               # per-track timestamp
+    vote_counter = {}            # per-track overspeed counter
+    pixel_to_meter = DISTANCE_REF / PIXEL_REF  # fallback scale nếu không có H
+    VOTE_K = 15                  # Tăng để ổn định hơn, yêu cầu nhiều khung hơn để trigger
+    SPEED_MARGIN = 5.0           # biên an toàn (km/h)
+    SMOOTH_WINDOW = 30           # Tăng để smoothing tốt hơn, giảm fluctuation
+
+    # Điều chỉnh Kalman params dựa trên hệ đo để chính xác hơn với xe xa (noisier)
+    if H is not None:
+        KF_R = np.array([[20, 0], [0, 20]], dtype=np.float32)  # Higher measurement noise for world coords to smooth more
+        KF_Q = np.eye(4, dtype=np.float32) * 0.1  # Lower process noise for stable velocity estimate
+    else:
+        KF_R = np.array([[10, 0], [0, 10]], dtype=np.float32)
+        KF_Q = np.eye(4, dtype=np.float32) * 0.5
+
+    def init_kf():
+        kf = KalmanFilter(dim_x=4, dim_z=2)
+        kf.F = np.array([[1, 0, 1, 0],
+                         [0, 1, 0, 1],
+                         [0, 0, 1, 0],
+                         [0, 0, 0, 1]], dtype=np.float32)
+        kf.H = np.array([[1, 0, 0, 0],
+                         [0, 1, 0, 0]], dtype=np.float32)
+        kf.P *= 1000.0
+        kf.R = KF_R
+        kf.Q = KF_Q
+        return kf
 
     try:
         while True:
@@ -170,18 +194,20 @@ def stream_overspeed_service(youtube_url: str, camera_id: int):
             frame_for_video = frame.copy()
             h, w, _ = frame.shape
 
+            # Dùng ByteTrack của Ultralytics
             results = model.track(source=frame, persist=True, conf=0.5, iou=0.5, tracker="bytetrack.yaml")[0]
             if results.boxes is None or results.boxes.id is None:
                 frame_buffer.append(frame_for_video.copy())
                 yield (
                     b"--frame\r\n"
-                    b"Content-Type: image/jpeg\r\n\r\n" + cv2.imencode('.jpg', frame_annotated, [cv2.IMWRITE_JPEG_QUALITY, 85])[1].tobytes() + b"\r\n"
+                    b"Content-Type: image/jpeg\r\n\r\n" +
+                    cv2.imencode('.jpg', frame_annotated, [cv2.IMWRITE_JPEG_QUALITY, 85])[1].tobytes() +
+                    b"\r\n"
                 )
                 continue
 
             active_track_ids = set()
             vehicle_boxes = []
-            plate_boxes = []
 
             for i in range(len(results.boxes)):
                 cls_id = int(results.boxes.cls[i])
@@ -197,31 +223,76 @@ def stream_overspeed_service(youtube_url: str, camera_id: int):
                     continue
 
                 vehicle_boxes.append((x1, y1, x2, y2, track_id, class_name))
-                if class_name == "number_plate":
-                    plate_boxes.append(results.boxes[i])
-
-            license_plate_text = extract_license_plate(frame, plate_boxes)
 
             for x1, y1, x2, y2, track_id, class_name in vehicle_boxes:
+                # Bỏ qua nếu bbox quá nhỏ (xe quá xa, đo tốc độ không chính xác)
+                if (y2 - y1) < MIN_VEHICLE_SIZE * 1.5:  # Tăng ngưỡng để bỏ xe xa hơn
+                    continue
+
+                # Tạo/khởi tạo track state
                 if track_id not in kalman_filters:
-                    kalman_filters[track_id] = initialize_kalman_filter()
-                    speed_history[track_id] = deque(maxlen=10)
+                    kalman_filters[track_id] = init_kf()
+                    speed_history[track_id] = deque(maxlen=SMOOTH_WINDOW)
+                    last_time[track_id] = time.time()
+                    vote_counter[track_id] = 0
 
                 kf = kalman_filters[track_id]
-                center_x, center_y = (x1 + x2) / 2, (y1 + y2) / 2
 
+                # Bottom-center bbox ở ảnh (giả sử chân xe gần mặt đường)
+                cx, cy = (x1 + x2) / 2.0, y2
+
+                # Đo ở hệ tọa độ nào?
+                measure_world = px_to_world_xy(cx, cy)
+                if measure_world is not None:
+                    mx, my = measure_world  # mét
+                    kf_measure = np.array([[mx], [my]], dtype=np.float32)
+                else:
+                    mx, my = cx, cy        # pixel
+                    # Điều chỉnh pixel_to_meter động dựa trên y (giả sử perspective, scale giảm theo y)
+                    # Giả sử horizon tại y=0, scale max tại y=h
+                    dynamic_pixel_to_meter = pixel_to_meter * (h - cy) / h  # Scale nhỏ hơn khi y nhỏ (xa hơn)
+                    kf_measure = np.array([[mx], [my]], dtype=np.float32)
+
+                # dt per-track (ổn định khi drop frame)
+                curr_t = time.time()
+                dt = max(1e-3, curr_t - last_time[track_id])  # tránh 0
+                last_time[track_id] = curr_t
+
+                # Cập nhật F theo dt: vị trí += v*dt
+                kf.F[0, 2] = dt
+                kf.F[1, 3] = dt
+
+                # Predict & Update
                 kf.predict()
-                kf.update(np.array([[center_x], [center_y]]))
+                kf.update(kf_measure)
 
-                smoothed_pos = kf.x[:2].flatten()
-                prev_pos = speed_history[track_id][-1] if speed_history[track_id] else None
-                speed = calculate_speed(prev_pos, smoothed_pos, frame_time, pixel_to_meter)
-                speed_history[track_id].append(smoothed_pos)
+                # Lấy vận tốc từ state
+                vx, vy = float(kf.x[2]), float(kf.x[3])  # đơn vị phụ thuộc hệ đo ở trên
 
-                avg_speed = np.mean([calculate_speed(speed_history[track_id][i-1], speed_history[track_id][i], frame_time, pixel_to_meter) 
-                                     for i in range(1, len(speed_history[track_id]))]) if len(speed_history[track_id]) > 1 else speed
+                # Tính tốc độ theo m/s
+                if measure_world is not None:
+                    meters_per_second = np.hypot(vx, vy)
+                else:
+                    pixels_per_second = np.hypot(vx, vy)
+                    meters_per_second = pixels_per_second * dynamic_pixel_to_meter if 'dynamic_pixel_to_meter' in locals() else pixels_per_second * pixel_to_meter
 
-                if avg_speed > SPEED_LIMIT and track_id not in vehicle_violations and track_id not in recording_tasks:
+                km_per_hour = meters_per_second * 3.6
+
+                # Smoothing tốc độ
+                speed_history[track_id].append(km_per_hour)
+                avg_speed = float(np.mean(speed_history[track_id]))
+
+                # Overspeed voting (giảm false positive)
+                if avg_speed > (SPEED_LIMIT + SPEED_MARGIN):
+                    vote_counter[track_id] += 1
+                else:
+                    vote_counter[track_id] = max(0, vote_counter[track_id] - 3)  # Decrement nhanh hơn để reset khi tốc độ giảm
+
+                # Extract plate per vehicle
+                vehicle_roi = frame[y1:y2, x1:x2]
+                license_plate_text = extract_license_plate(vehicle_roi)
+
+                if vote_counter[track_id] >= VOTE_K and track_id not in vehicle_violations and track_id not in recording_tasks:
                     vehicle_violations[track_id] = "OVERSPEED"
                     print(f"[+] OVERSPEED VIOLATION: Vehicle {track_id}, Plate: {license_plate_text}, Speed: {avg_speed:.2f} km/h")
 
@@ -245,12 +316,12 @@ def stream_overspeed_service(youtube_url: str, camera_id: int):
                     violation_data = {
                         "camera": {"id": camera_id},
                         "vehicle": {"licensePlate": license_plate_text},
-                        "vehicleType": {"id": 1},  # Assuming ID 1 for vehicle
+                        "vehicleType": {"id": 1},
                         "createdAt": datetime.now().isoformat(),
                         "status": "PENDING",
                         "violationDetails": [
                             {
-                                "violationTypeId": 2,  # Assuming ID 2 for OVERSPEED
+                                "violationTypeId": 2,
                                 "location": "Unknown",
                                 "violationTime": datetime.now().isoformat(),
                                 "additionalNotes": f"Track ID: {track_id}, Speed: {avg_speed:.2f} km/h"
@@ -261,14 +332,17 @@ def stream_overspeed_service(youtube_url: str, camera_id: int):
                     print(f"[+] Sending OVERSPEED violation for track {track_id} asynchronously...")
                     send_violation_async(violation_data, snapshot_filepath, video_filepath, track_id)
 
-                color = (0, 0, 255) if vehicle_violations.get(track_id, False) else (0, 255, 0)
-                label = f"ID:{track_id} {class_name} Plate: {license_plate_text} Speed: {avg_speed:.2f} km/h"
+                # Vẽ hiển thị - red only if currently overspeeding
+                color = (0, 0, 255) if avg_speed > (SPEED_LIMIT + SPEED_MARGIN) else (0, 255, 0)
+                label = f"ID:{track_id} {class_name} Plate:{license_plate_text} V:{avg_speed:.1f} km/h"
                 cv2.rectangle(frame_annotated, (x1, y1), (x2, y2), color, 2)
                 cv2.putText(frame_annotated, label, (x1, y1 - 10),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
 
+            # buffer trước-vi phạm
             frame_buffer.append(frame_for_video.copy())
 
+            # ghi nốt video vi phạm
             for track_id in list(recording_tasks.keys()):
                 task = recording_tasks[track_id]
                 if task['frames_remaining'] > 0:
@@ -278,12 +352,16 @@ def stream_overspeed_service(youtube_url: str, camera_id: int):
                     task['writer'].release()
                     del recording_tasks[track_id]
 
-            for track_id in list(vehicle_violations.keys()):
+            # dọn các track biến mất
+            for track_id in list(kalman_filters.keys()):
                 if track_id not in active_track_ids:
-                    vehicle_violations.pop(track_id, None)
                     kalman_filters.pop(track_id, None)
                     speed_history.pop(track_id, None)
+                    last_time.pop(track_id, None)
+                    vote_counter.pop(track_id, None)
+                    vehicle_violations.pop(track_id, None)
 
+            # stream ra
             _, jpeg = cv2.imencode('.jpg', frame_annotated, [cv2.IMWRITE_JPEG_QUALITY, 85])
             yield (
                 b"--frame\r\n"
@@ -298,6 +376,7 @@ def stream_overspeed_service(youtube_url: str, camera_id: int):
         for task in recording_tasks.values():
             task['writer'].release()
         print("[+] Closed stream for camera")
+
 
 def cleanup_on_exit():
     """Dọn dẹp thread pool khi thoát."""

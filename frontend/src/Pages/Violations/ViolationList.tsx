@@ -1,20 +1,20 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import Sidebar from "../../components/Layout/Sidebar";
 import Header from "../../components/Layout/Header";
+import BounceLoadingComponent from "../../components/Layout/Loading";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { AlertDialog } from "./AlertDialog";
 import { format } from "date-fns";
 import { toast } from "react-toastify";
 import ExportViolationsPDF from "./ExportViolationsPDF";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { 
   Eye, Trash2, Camera, MapPin, Clock, Car, Truck, Bike, Circle, AlertTriangle, RefreshCw, TrendingUp, 
-  Filter, BarChart3, Calendar, Search, X, ChevronDown, Sparkles,
-  Target, Zap, Activity, Globe, CheckCircle2, XCircle, ChevronLeft,
-  ChevronRight
+  Search, X, Sparkles, Target, Zap, Activity, Globe, CheckCircle2, XCircle, Calendar, BarChart3
 } from "lucide-react";
-import {API_URL_BE} from "../../components/Link/LinkAPI";
+import { API_URL_BE } from "../../components/Link/LinkAPI";
+import GenericTable, { TableColumn, FilterConfig } from "../../components/Table/GenericTable";
 
 // Types
 interface ViolationType {
@@ -27,7 +27,7 @@ interface VehicleType {
   name: string;
 }
 
-interface Camera {
+interface ViolationCamera {
   id: number;
   name: string;
   location: string;
@@ -56,7 +56,7 @@ interface ViolationDetail {
 
 interface Violation {
   id: number;
-  camera: Camera | null;
+  camera: ViolationCamera | null;
   vehicleType: VehicleType | null;
   vehicle: Vehicle | null;
   createdAt: string | null;
@@ -72,8 +72,6 @@ const vehicleTypes = [
   { id: 3, typeName: "motobike" },
 ];
 
-const ITEMS_PER_PAGE_OPTIONS = [5, 10, 15, 20, 25, 50];
-
 export default function ViolationList() {
   const [violations, setViolations] = useState<Violation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,10 +82,7 @@ export default function ViolationList() {
   const [filterType, setFilterType] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [refreshing, setRefreshing] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
+  const [pageSize] = useState(10); // Fixed page size since GenericTable doesn't support pageSizeOptions
 
   const navigate = useNavigate();
 
@@ -133,11 +128,6 @@ export default function ViolationList() {
   }, [filteredViolations, currentPage, pageSize]);
 
   const totalPages = useMemo(() => Math.ceil(filteredViolations.length / pageSize), [filteredViolations.length, pageSize]);
-
-  const availablePageSizeOptions = useMemo(() => {
-    if (filteredViolations.length === 0) return [ITEMS_PER_PAGE_OPTIONS[0]];
-    return ITEMS_PER_PAGE_OPTIONS.filter(size => size <= filteredViolations.length || size === ITEMS_PER_PAGE_OPTIONS[0]);
-  }, [filteredViolations.length]);
 
   // Statistics
   const stats = useMemo(() => {
@@ -268,6 +258,8 @@ export default function ViolationList() {
       const newTotalPages = Math.ceil(newTotal / pageSize);
       if (currentPage > newTotalPages && newTotalPages > 0) {
         setCurrentPage(newTotalPages);
+      } else if (paginatedViolations.length === 1 && currentPage > 1) {
+        setCurrentPage(currentPage - 1);
       }
     } catch (err) {
       const errorMsg = axios.isAxiosError(err) ? err.response?.data?.message || "Unable to delete violation. Please try again." : "Unknown error.";
@@ -281,19 +273,17 @@ export default function ViolationList() {
         draggable: true,
       });
     }
-  }, [filteredViolations.length, currentPage, pageSize]);
+  }, [filteredViolations.length, currentPage, pageSize, paginatedViolations]);
 
   // Handle refresh
   const handleRefresh = useCallback(async () => {
-    setRefreshing(true);
     await loadViolations();
-    setTimeout(() => setRefreshing(false), 500);
   }, [loadViolations]);
 
   // Handle retry
   const handleRetry = useCallback(() => {
-    setRefreshKey((prev) => prev + 1);
-  }, []);
+    loadViolations();
+  }, [loadViolations]);
 
   // Handle filter changes
   const handleFilterChange = useCallback((key: string, value: any) => {
@@ -315,15 +305,252 @@ export default function ViolationList() {
     setCurrentPage(1);
   }, []);
 
-  // Pagination handlers
+  // Handle page change
   const handlePageChange = useCallback((page: number) => {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)));
   }, [totalPages]);
 
-  const handlePageSizeChange = useCallback((size: number) => {
-    setPageSize(size);
-    setCurrentPage(1);
-  }, []);
+  // Define table columns with adjusted content constraints
+  const columns: TableColumn<Violation>[] = [
+    {
+      key: "image",
+      title: "Image",
+      width: "10%",
+      render: (_: unknown, violation: Violation, index: number) => (
+        <motion.div
+          initial={{ opacity: 0, x: -10 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.3, delay: index * 0.05 }}
+          className="relative group max-w-full overflow-hidden"
+        >
+          {violation.violationDetails?.[0]?.imageUrl ? (
+            <div className="relative overflow-hidden rounded-xl shadow-md hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-gray-50 to-gray-100">
+              <img
+                src={violation.violationDetails[0].imageUrl}
+                alt="Violation"
+                className="h-16 w-full object-cover transition-transform duration-300 group-hover:scale-110"
+                loading="lazy"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = "none";
+                  target.nextElementSibling?.classList.remove("hidden");
+                }}
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
+                <div className="bg-white/90 backdrop-blur-sm rounded-full p-2">
+                  <Eye className="text-gray-700" size={16} />
+                </div>
+              </div>
+              <div className="hidden h-16 w-full bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl flex items-center justify-center">
+                <Camera className="text-gray-400" size={20} />
+              </div>
+            </div>
+          ) : (
+            <div className="h-16 w-full bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl flex items-center justify-center shadow-md group-hover:shadow-xl transition-all duration-300">
+              <Camera className="text-gray-400 group-hover:text-gray-500 transition-colors duration-300" size={20} />
+            </div>
+          )}
+        </motion.div>
+      ),
+    },
+    {
+      key: "violationType",
+      title: "Violation Type",
+      width: "15%",
+      render: (_: unknown, violation: Violation) => {
+        const detail = violation.violationDetails?.[0] || null;
+        const typeName = detail?.violationType?.typeName || "Unidentified";
+        return (
+          <div className="space-y-2 max-w-full">
+            <div className={`inline-flex items-center px-4 py-2 rounded-xl text-sm font-semibold border transition-all duration-300 truncate ${getViolationSeverityColor(typeName)}`}>
+              <div className="w-2 h-2 bg-current rounded-full mr-2 animate-pulse"></div>
+              <span className="truncate">{typeName}</span>
+            </div>
+            {detail?.speed && (
+              <div className="flex items-center text-sm text-red-600 font-medium bg-red-50 px-3 py-1 rounded-lg truncate">
+                <Zap size={14} className="mr-1 flex-shrink-0" />
+                <span className="truncate">{detail.speed} km/h</span>
+              </div>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: "camera",
+      title: "Camera",
+      width: "15%",
+      render: (_: unknown, violation: Violation) => (
+        violation.camera ? (
+          <div className="group max-w-full">
+            <div className="flex items-center space-x-2 mb-1">
+              <div className="p-1 bg-blue-100 rounded-lg flex-shrink-0">
+                <Camera size={14} className="text-blue-600" />
+              </div>
+              <span className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors duration-200 truncate">
+                {violation.camera.name}
+              </span>
+            </div>
+            <div className="flex items-center space-x-1 text-sm text-gray-500 bg-gray-50 px-2 py-1 rounded-lg truncate">
+              <MapPin size={12} className="flex-shrink-0" />
+              <span className="truncate">{violation.camera.location}</span>
+            </div>
+          </div>
+        ) : (
+          <div className="text-gray-400 italic bg-gray-50 px-3 py-2 rounded-lg truncate">Unidentified</div>
+        )
+      ),
+    },
+    {
+      key: "licensePlate",
+      title: "License Plate",
+      width: "15%",
+      render: (_: unknown, violation: Violation) => (
+        <div className="group max-w-full">
+          <div className="flex items-center space-x-2 mb-2">
+            <div className="p-1 bg-green-100 rounded-lg flex-shrink-0">
+              {getVehicleIcon(violation.vehicleType?.id)}
+            </div>
+            <span className="font-mono text-lg font-bold text-gray-900 group-hover:text-green-600 transition-colors duration-200 tracking-wider bg-gradient-to-r from-green-50 to-emerald-50 px-3 py-1 rounded-lg border truncate">
+              {violation.vehicle?.licensePlate || "N/A"}
+            </span>
+          </div>
+          {violation.vehicle?.brand && (
+            <div className="text-sm text-gray-500 flex items-center space-x-1 bg-gray-50 px-2 py-1 rounded-lg truncate">
+              <span className="font-medium truncate">{violation.vehicle.brand}</span>
+              {violation.vehicle.color && (
+                <>
+                  <span className="flex-shrink-0">•</span>
+                  <span className="capitalize truncate">{violation.vehicle.color}</span>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "time",
+      title: "Time",
+      width: "15%",
+      render: (_: unknown, violation: Violation) => {
+        const value = violation.violationDetails?.[0]?.violationTime;
+        if (!value) return <span className="text-gray-400 italic truncate">N/A</span>;
+        try {
+          const date = new Date(value);
+          const isToday = date.toDateString() === new Date().toDateString();
+          return (
+            <div className="space-y-2 max-w-full">
+              <div className="flex items-center space-x-2">
+                <div className="p-1 bg-purple-100 rounded-lg flex-shrink-0">
+                  <Clock size={14} className="text-purple-600" />
+                </div>
+                <span className="font-bold text-purple-700 bg-purple-50 px-2 py-1 rounded-lg truncate">
+                  {format(date, "HH:mm:ss")}
+                </span>
+              </div>
+              <div className={`text-sm flex items-center space-x-2 ${isToday ? "text-green-600 font-bold" : "text-gray-500"} truncate`}>
+                <Calendar size={12} className="flex-shrink-0" />
+                <span className="truncate">{format(date, "dd/MM/yyyy")}</span>
+                {isToday && (
+                  <span className="ml-2 text-xs bg-gradient-to-r from-green-500 to-emerald-500 text-white px-2 py-1 rounded-full animate-pulse truncate">
+                    Today
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        } catch {
+          return <span className="text-gray-400 italic truncate">N/A</span>;
+        }
+      },
+    },
+    {
+      key: "status",
+      title: "Status",
+      width: "12%",
+      render: (_: unknown, violation: Violation) => (
+        <div className={`inline-flex items-center px-3 py-1 rounded-lg ${getStatusColor(violation.status || "Pending").bg} ${getStatusColor(violation.status || "Pending").text} font-medium truncate`}>
+          {getStatusColor(violation.status || "Pending").icon}
+          <span className="ml-2 capitalize truncate">{violation.status || "Pending"}</span>
+        </div>
+      ),
+    },
+    {
+      key: "state",
+      title: "State",
+      width: "12%",
+      render: (_: unknown, violation: Violation) => (
+        <div className={`inline-flex items-center px-3 py-1 rounded-lg ${getStateColor(violation.isDelete).bg} ${getStateColor(violation.isDelete).text} font-medium truncate`}>
+          {getStateColor(violation.isDelete).icon}
+          <span className="ml-2 truncate">{violation.isDelete ? "Inactive" : "Active"}</span>
+        </div>
+      ),
+    },
+    {
+      key: "actions",
+      title: "Actions",
+      width: "8%",
+      render: (_: unknown, violation: Violation) => (
+        <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => navigate(`/violations/${violation.id}`)}
+            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-all duration-200 rounded-lg p-2"
+            title="View Details"
+            aria-label={`View details for violation ${violation.id}`}
+          >
+            <Eye size={16} />
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => {
+              setSelectedId(violation.id);
+              setOpenDialog(true);
+            }}
+            className="text-red-600 hover:text-red-700 hover:bg-red-50 transition-all duration-200 rounded-lg p-2"
+            title="Delete"
+            aria-label={`Delete violation ${violation.id}`}
+          >
+            <Trash2 size={16} />
+          </motion.button>
+        </div>
+      ),
+    },
+  ];
+
+  // Define filters
+  const filters: FilterConfig[] = [
+    {
+      key: "licensePlate",
+      label: "Search License Plate",
+      type: "text",
+      placeholder: "Enter license plate...",
+    },
+    {
+      key: "violationType",
+      label: "Violation Type",
+      type: "select",
+      options: violationTypes.map((type) => ({ value: type.typeName, label: type.typeName })),
+    },
+    {
+      key: "status",
+      label: "Status",
+      type: "select",
+      options: statuses.map((status) => ({ value: status, label: status || "Pending" })),
+    },
+  ];
+
+  const filterValues = useMemo(
+    () => ({
+      licensePlate: searchTerm,
+      violationType: filterType,
+      status: filterStatus,
+    }),
+    [searchTerm, filterType, filterStatus]
+  );
 
   // Loading state
   if (loading) {
@@ -334,8 +561,8 @@ export default function ViolationList() {
           <Header title="Traffic Violation List" />
           <div className="flex-grow flex items-center justify-center">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500 mx-auto mb-4"></div>
-              <p className="text-lg text-gray-600">Loading violations...</p>
+              <BounceLoadingComponent />
+              <p className="text-lg text-gray-600 mt-4">Loading violations...</p>
             </div>
           </div>
         </div>
@@ -503,23 +730,11 @@ export default function ViolationList() {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={handleRefresh}
-                    disabled={refreshing}
-                    className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl hover:from-blue-600 hover:to-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
+                    className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl hover:from-blue-600 hover:to-purple-600 transition-all duration-200 shadow-lg hover:shadow-xl"
                     aria-label="Refresh violation list"
                   >
-                    <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
+                    <RefreshCw size={16} />
                     <span>Refresh</span>
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setShowFilters(!showFilters)}
-                    className="flex items-center space-x-2 px-4 py-2 bg-white text-gray-700 rounded-xl hover:bg-gray-50 border border-gray-200 transition-all duration-200 shadow-sm hover:shadow-md"
-                    aria-label={showFilters ? "Hide filters" : "Show filters"}
-                  >
-                    <Filter size={16} />
-                    <span>Filters</span>
-                    <ChevronDown size={16} className={`transform transition-transform ${showFilters ? "rotate-180" : ""}`} />
                   </motion.button>
                 </div>
                 
@@ -548,431 +763,95 @@ export default function ViolationList() {
                 </div>
               </div>
 
-              {/* Expandable Filter Section */}
-              <AnimatePresence>
-                {showFilters && (
-                  <motion.div 
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className="border-t border-gray-200/50 pt-4 sm:pt-6"
-                  >
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                      <div className="relative">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Search License Plate
-                        </label>
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-                          <input
-                            type="text"
-                            placeholder="Enter license plate..."
-                            value={searchTerm}
-                            onChange={(e) => handleFilterChange("licensePlate", e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 shadow-sm"
-                            aria-label="Search by license plate"
-                          />
-                        </div>
-                      </div>
-                      
-                      <div className="relative">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Violation Type
-                        </label>
-                        <select
-                          value={filterType}
-                          onChange={(e) => handleFilterChange("violationType", e.target.value)}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 shadow-sm"
-                          aria-label="Filter by violation type"
-                        >
-                          <option value="">All Types</option>
-                          {violationTypes.map((type) => (
-                            <option key={type.id} value={type.typeName}>
-                              {type.typeName}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      
-                      <div className="relative">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Status
-                        </label>
-                        <select
-                          value={filterStatus}
-                          onChange={(e) => handleFilterChange("status", e.target.value)}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 shadow-sm"
-                          aria-label="Filter by status"
-                        >
-                          <option value="">All Statuses</option>
-                          {statuses.map((status) => (
-                            <option key={status} value={status}>
-                              {status || "Pending"}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+              {/* Filter Section */}
+              <div className="border-t border-gray-200/50 pt-4 sm:pt-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="relative">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Search License Plate
+                    </label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                      <input
+                        type="text"
+                        placeholder="Enter license plate..."
+                        value={searchTerm}
+                        onChange={(e) => handleFilterChange("licensePlate", e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 shadow-sm"
+                        aria-label="Search by license plate"
+                      />
                     </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </motion.div>
-
-          {/* Enhanced Data Table */}
-          <motion.div 
-            className="bg-white/95 rounded-2xl shadow-2xl border border-gray-200/50 overflow-hidden backdrop-blur-sm"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            <div className="bg-gradient-to-r from-gray-50/95 to-blue-50/95 px-4 sm:px-6 py-4 border-b border-gray-200/50">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg shadow-md">
-                    <BarChart3 className="text-white" size={20} />
                   </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Violation List</h3>
-                    <p className="text-sm text-gray-600">Manage and track traffic violations</p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-4">
-                  <div className="bg-green-100/80 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
-                    {filteredViolations.length} records
-                  </div>
-                  <div className="flex items-center space-x-2 text-sm text-gray-600">
-                    <span>Show:</span>
+                  
+                  <div className="relative">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Violation Type
+                    </label>
                     <select
-                      value={pageSize}
-                      onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                      className="px-2 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                      aria-label="Select number of entries per page"
+                      value={filterType}
+                      onChange={(e) => handleFilterChange("violationType", e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 shadow-sm"
+                      aria-label="Filter by violation type"
                     >
-                      {availablePageSizeOptions.map((size) => (
-                        <option key={size} value={size}>
-                          {size}
+                      <option value="">All Types</option>
+                      {violationTypes.map((type) => (
+                        <option key={type.id} value={type.typeName}>
+                          {type.typeName}
                         </option>
                       ))}
                     </select>
-                    <span>entries</span>
+                  </div>
+                  
+                  <div className="relative">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Status
+                    </label>
+                    <select
+                      value={filterStatus}
+                      onChange={(e) => handleFilterChange("status", e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 shadow-sm"
+                      aria-label="Filter by status"
+                    >
+                      <option value="">All Statuses</option>
+                      {statuses.map((status) => (
+                        <option key={status} value={status}>
+                          {status || "Pending"}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>
             </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full table-auto" role="grid">
-                <thead className="bg-gray-50/80 sticky top-0 z-10">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[80px]">
-                      Image
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
-                      Violation Type
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
-                      Camera
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
-                      License Plate
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
-                      Time
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">
-                      Status
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">
-                      State
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[80px]">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {paginatedViolations.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="px-6 py-12 text-center">
-                        <div className="flex flex-col items-center justify-center space-y-4">
-                          <AlertTriangle className="h-12 w-12 text-gray-400" />
-                          <p className="text-lg text-gray-500">🚫 No violations found</p>
-                          <p className="text-sm text-gray-400">Try adjusting your search criteria</p>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    paginatedViolations.map((violation, index) => (
-                      <motion.tr
-                        key={violation.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3, delay: index * 0.05 }}
-                        className="hover:bg-blue-50/50 transition-colors duration-200 cursor-pointer"
-                        onClick={() => navigate(`/violations/${violation.id}`)}
-                        role="row"
-                      >
-                        {/* Image Column */}
-                        <td className="px-4 py-4">
-                          <div className="relative group">
-                            {violation.violationDetails?.[0]?.imageUrl ? (
-                              <div className="relative overflow-hidden rounded-xl shadow-md hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-gray-50 to-gray-100">
-                                <img
-                                  src={violation.violationDetails[0].imageUrl}
-                                  alt="Violation"
-                                  className="h-16 w-full object-cover transition-transform duration-300 group-hover:scale-110"
-                                  loading="lazy"
-                                  onError={(e) => {
-                                    const target = e.target as HTMLImageElement;
-                                    target.style.display = "none";
-                                    target.nextElementSibling?.classList.remove("hidden");
-                                  }}
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
-                                  <div className="bg-white/90 backdrop-blur-sm rounded-full p-2">
-                                    <Eye className="text-gray-700" size={16} />
-                                  </div>
-                                </div>
-                                <div className="hidden h-16 w-full bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl flex items-center justify-center">
-                                  <Camera className="text-gray-400" size={20} />
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="h-16 w-full bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl flex items-center justify-center shadow-md group-hover:shadow-xl transition-all duration-300">
-                                <Camera className="text-gray-400 group-hover:text-gray-500 transition-colors duration-300" size={20} />
-                              </div>
-                            )}
-                          </div>
-                        </td>
-
-                        {/* Violation Type Column */}
-                        <td className="px-4 py-4">
-                          <div className="space-y-2">
-                            {(() => {
-                              const detail = violation.violationDetails?.[0] || null;
-                              const typeName = detail?.violationType?.typeName || "Unidentified";
-                              return (
-                                <>
-                                  <div className={`inline-flex items-center px-4 py-2 rounded-xl text-sm font-semibold border transition-all duration-300 ${getViolationSeverityColor(typeName)}`}>
-                                    <div className="w-2 h-2 bg-current rounded-full mr-2 animate-pulse"></div>
-                                    {typeName}
-                                  </div>
-                                  {detail?.speed && (
-                                    <div className="flex items-center text-sm text-red-600 font-medium bg-red-50 px-3 py-1 rounded-lg">
-                                      <Zap size={14} className="mr-1" />
-                                      {detail.speed} km/h
-                                    </div>
-                                  )}
-                                </>
-                              );
-                            })()}
-                          </div>
-                        </td>
-
-                        {/* Camera Column */}
-                        <td className="px-4 py-4">
-                          {violation.camera ? (
-                            <div className="group">
-                              <div className="flex items-center space-x-2 mb-1">
-                                <div className="p-1 bg-blue-100 rounded-lg">
-                                  <Camera size={14} className="text-blue-600" />
-                                </div>
-                                <span className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors duration-200">
-                                  {violation.camera.name}
-                                </span>
-                              </div>
-                              <div className="flex items-center space-x-1 text-sm text-gray-500 bg-gray-50 px-2 py-1 rounded-lg">
-                                <MapPin size={12} />
-                                <span className="truncate">{violation.camera.location}</span>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="text-gray-400 italic bg-gray-50 px-3 py-2 rounded-lg">Unidentified</div>
-                          )}
-                        </td>
-
-                        {/* License Plate Column */}
-                        <td className="px-4 py-4">
-                          <div className="group">
-                            <div className="flex items-center space-x-2 mb-2">
-                              <div className="p-1 bg-green-100 rounded-lg">
-                                {getVehicleIcon(violation.vehicleType?.id)}
-                              </div>
-                              <span className="font-mono text-lg font-bold text-gray-900 group-hover:text-green-600 transition-colors duration-200 tracking-wider bg-gradient-to-r from-green-50 to-emerald-50 px-3 py-1 rounded-lg border">
-                                {violation.vehicle?.licensePlate || "N/A"}
-                              </span>
-                            </div>
-                            {violation.vehicle?.brand && (
-                              <div className="text-sm text-gray-500 flex items-center space-x-1 bg-gray-50 px-2 py-1 rounded-lg">
-                                <span className="font-medium truncate">{violation.vehicle.brand}</span>
-                                {violation.vehicle.color && (
-                                  <>
-                                    <span>•</span>
-                                    <span className="capitalize">{violation.vehicle.color}</span>
-                                  </>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </td>
-
-                        {/* Time Column */}
-                        <td className="px-4 py-4">
-                          {(() => {
-                            const value = violation.violationDetails?.[0]?.violationTime;
-                            if (!value) return <span className="text-gray-400 italic">N/A</span>;
-                            try {
-                              const date = new Date(value);
-                              const isToday = date.toDateString() === new Date().toDateString();
-                              return (
-                                <div className="space-y-2">
-                                  <div className="flex items-center space-x-2">
-                                    <div className="p-1 bg-purple-100 rounded-lg">
-                                      <Clock size={14} className="text-purple-600" />
-                                    </div>
-                                    <span className="font-bold text-purple-700 bg-purple-50 px-2 py-1 rounded-lg">
-                                      {format(date, "HH:mm:ss")}
-                                    </span>
-                                  </div>
-                                  <div className={`text-sm flex items-center space-x-2 ${isToday ? "text-green-600 font-bold" : "text-gray-500"}`}>
-                                    <Calendar size={12} />
-                                    <span>{format(date, "dd/MM/yyyy")}</span>
-                                    {isToday && (
-                                      <span className="ml-2 text-xs bg-gradient-to-r from-green-500 to-emerald-500 text-white px-2 py-1 rounded-full animate-pulse">
-                                        Today
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            } catch {
-                              return <span className="text-gray-400 italic">N/A</span>;
-                            }
-                          })()}
-                        </td>
-
-                        {/* Status Column */}
-                        <td className="px-4 py-4">
-                          <div className={`inline-flex items-center px-3 py-1 rounded-lg ${getStatusColor(violation.status || "Pending").bg} ${getStatusColor(violation.status || "Pending").text} font-medium`}>
-                            {getStatusColor(violation.status || "Pending").icon}
-                            <span className="ml-2 capitalize">{violation.status || "Pending"}</span>
-                          </div>
-                        </td>
-
-                        {/* State Column (for isDelete) */}
-                        <td className="px-4 py-4">
-                          <div className={`inline-flex items-center px-3 py-1 rounded-lg ${getStateColor(violation.isDelete).bg} ${getStateColor(violation.isDelete).text} font-medium`}>
-                            {getStateColor(violation.isDelete).icon}
-                            <span className="ml-2">{violation.isDelete ? "Inactive" : "Active"}</span>
-                          </div>
-                        </td>
-
-                        {/* Actions Column */}
-                        <td className="px-4 py-4">
-                          <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
-                            <motion.button
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.9 }}
-                              onClick={() => navigate(`/violations/${violation.id}`)}
-                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-all duration-200 rounded-lg p-2"
-                              title="View Details"
-                              aria-label={`View details for violation ${violation.id}`}
-                            >
-                              <Eye size={16} />
-                            </motion.button>
-                            <motion.button
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.9 }}
-                              onClick={() => {
-                                setSelectedId(violation.id);
-                                setOpenDialog(true);
-                              }}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50 transition-all duration-200 rounded-lg p-2"
-                              title="Delete"
-                              aria-label={`Delete violation ${violation.id}`}
-                            >
-                              <Trash2 size={16} />
-                            </motion.button>
-                          </div>
-                        </td>
-                      </motion.tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex flex-col sm:flex-row items-center justify-between px-4 py-3 border-t border-gray-200">
-                <div className="flex items-center space-x-2 mb-2 sm:mb-0">
-                  <span className="text-sm text-gray-700">
-                    Page {currentPage} of {totalPages}
-                  </span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={currentPage === 1}
-                    className="flex items-center px-3 py-2 text-sm rounded border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
-                    title="Previous page"
-                    aria-label="Previous page"
-                  >
-                    <ChevronLeft size={16} className="mr-1" />
-                    Previous
-                  </motion.button>
-
-                  {/* Page numbers */}
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    let pageNumber: number;
-                    if (totalPages <= 5) {
-                      pageNumber = i + 1;
-                    } else if (currentPage <= 3) {
-                      pageNumber = i + 1;
-                    } else if (currentPage >= totalPages - 2) {
-                      pageNumber = totalPages - 4 + i;
-                    } else {
-                      pageNumber = currentPage - 2 + i;
-                    }
-
-                    return (
-                      <motion.button
-                        key={pageNumber}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => handlePageChange(pageNumber)}
-                        className={`px-3 py-2 text-sm rounded border transition-colors ${
-                          currentPage === pageNumber
-                            ? 'bg-blue-500 text-white border-blue-500'
-                            : 'border-gray-300 hover:bg-gray-50'
-                        }`}
-                        aria-label={`Go to page ${pageNumber}`}
-                      >
-                        {pageNumber}
-                      </motion.button>
-                    );
-                  })}
-
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={currentPage === totalPages}
-                    className="flex items-center px-3 py-2 text-sm rounded border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
-                    title="Next page"
-                    aria-label="Next page"
-                  >
-                    Next
-                    <ChevronRight size={16} className="ml-1" />
-                  </motion.button>
-                </div>
-              </div>
-            )}
           </motion.div>
+
+          {/* Enhanced Data Table with Responsive Wrapper */}
+          <div className="relative w-full overflow-x-auto">
+            <div className="min-w-[640px]">
+              <GenericTable
+                data={violations}
+                filteredData={paginatedViolations}
+                columns={columns}
+                rowKey="id"
+                actions={[]}
+                filters={filters}
+                filterValues={filterValues}
+                onFilterChange={handleFilterChange}
+                onResetFilters={handleResetFilters}
+                pagination={{
+                  enabled: true,
+                  currentPage,
+                  totalPages,
+                  pageSize,
+                  totalItems: filteredViolations.length,
+                  onPageChange: handlePageChange,
+                }}
+                onRowClick={(violation: Violation) => navigate(`/violations/${violation.id}`)}
+                emptyMessage="🚫 No violations found. Try adjusting your search criteria."
+                className="bg-[rgba(255,255,255,0.95)] rounded-[16px] shadow-[0_10px_15px_rgba(0,0,0,0.1)] border border-[rgba(203,213,225,0.5)] backdrop-blur-[10px] w-full table-auto"
+              />
+            </div>
+          </div>
 
           {/* Quick Stats Bar */}
           <motion.div 
@@ -1038,7 +917,7 @@ export default function ViolationList() {
                       {index + 1}
                     </div>
                     <div>
-                      <div className="font-medium text-gray-900">{stat.type}</div>
+                      <div className="font-medium text-gray-900 truncate">{stat.type}</div>
                       <div className="text-sm text-gray-600">{stat.count} cases</div>
                     </div>
                   </div>
@@ -1059,17 +938,16 @@ export default function ViolationList() {
           </motion.div>
         </div>
         
+        <AlertDialog
+          open={openDialog}
+          onOpenChange={setOpenDialog}
+          onConfirm={() => {
+            if (selectedId !== null) handleDelete(selectedId);
+          }}
+          title="⚠️ Confirm Violation Deletion"
+          description="Are you sure you want to delete this violation? This action cannot be undone and will permanently delete all related data."
+        />
       </div>
-      
-      <AlertDialog
-        open={openDialog}
-        onOpenChange={setOpenDialog}
-        onConfirm={() => {
-          if (selectedId !== null) handleDelete(selectedId);
-        }}
-        title="⚠️ Confirm Violation Deletion"
-        description="Are you sure you want to delete this violation? This action cannot be undone and will permanently delete all related data."
-      />
     </div>
   );
 }

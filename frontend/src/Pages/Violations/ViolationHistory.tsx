@@ -9,6 +9,7 @@ import axios, { AxiosError } from "axios";
 import { Header, MobileDropdownMenu } from "../../components/Layout/Menu";
 import Footer from "../../components/Layout/Footer";
 import {API_URL_BE} from "../../components/Link/LinkAPI";
+import BounceLoadingComponent from "../../components/Layout/Loading";
 
 // Define interfaces
 interface ViolationsDTO {
@@ -1281,40 +1282,9 @@ export default function ViolationHistory() {
               <AnimatePresence>
                 {loading ? (
                   <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      height: "100%",
-                      padding: "2rem",
-                    }}
+                    
                   >
-                    <div style={{ position: "relative" }}>
-                      <div style={{ width: "4rem", height: "4rem", border: "4px solid #E5E7EB", borderRadius: "50%" }}></div>
-                      <div
-                        style={{
-                          width: "4rem",
-                          height: "4rem",
-                          border: "4px solid #3B82F6",
-                          borderTopColor: "transparent",
-                          borderRadius: "50%",
-                          position: "absolute",
-                          top: 0,
-                          left: 0,
-                          animation: "spin 1s linear infinite",
-                        }}
-                      ></div>
-                      <div
-                        style={{
-                          position: "absolute",
-                          top: "50%",
-                          left: "50%",
-                          transform: "translate(-50%, -50%)",
-                        }}
-                      >
-                        {getVehicleIcon(1)}
-                      </div>
-                    </div>
+                    <BounceLoadingComponent/>
                   </div>
                 ) : error ? (
                   <ErrorMessage message={error} onRetry={handleRetry} />
