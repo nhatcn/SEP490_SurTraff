@@ -255,7 +255,7 @@ function GenericTable<T extends Record<string, any>>({
       <div className="overflow-hidden">
         {loading ? (
           <div className="text-center py-12">
-            <BounceLoadingComponent />
+            <BounceLoadingComponent fullScreen={false} size="sm"/>
             <p className="mt-3 text-gray-600">Loading...</p>
           </div>
         ) : error ? (

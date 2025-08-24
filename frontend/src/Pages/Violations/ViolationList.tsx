@@ -561,7 +561,7 @@ export default function ViolationList() {
           <Header title="Traffic Violation List" />
           <div className="flex-grow flex items-center justify-center">
             <div className="text-center">
-              <BounceLoadingComponent />
+              <BounceLoadingComponent  size="sm"/>
               <p className="text-lg text-gray-600 mt-4">Loading violations...</p>
             </div>
           </div>

@@ -49,13 +49,11 @@ function timeAgo(dateString: string) {
   return `${months} months ago`
 }
 
-// Function to extract license plate from message
-function extractLicensePlate(message: string): string | null {
-  // Regex pattern to match Vietnamese license plates (e.g., 51A-12345, 29B-123.45, etc.)
-  const licensePlatePattern = /\b\d{2}[A-Z]-?\d{3}\.?\d{2}\b|\b\d{2}[A-Z]-\d{4,5}\b/g;
-  const matches = message.match(licensePlatePattern);
-  return matches ? matches[0] : null;
-}
+const extractLicensePlate = (message: string): string | null => {
+  const licensePlateRegex = /\b\d{2}-[A-Z]{1,2}\d{4,5}\b/;
+  const match = message.match(licensePlateRegex);
+  return match ? match[0] : null;
+};
 
 const getNotificationIcon = (type: string, size = 20) => {
   switch (type) {
