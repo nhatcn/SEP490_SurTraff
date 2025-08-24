@@ -1,6 +1,6 @@
 "use client"
 
-import { Car, AlertTriangle, CheckCircle, XCircle, Activity, ArrowLeft } from "lucide-react"
+import { Car, AlertTriangle, CheckCircle, XCircle, Activity, ArrowLeft, LogIn } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import { getCookie } from "../utils/cookieUltil"
@@ -37,6 +37,7 @@ export default function RecentViolationsSection({
   const [errorRecentViolations, setErrorRecentViolations] = useState<string | null>(null)
   const [requestingId, setRequestingId] = useState<number | null>(null)
   const [requestMessage, setRequestMessage] = useState<string | null>(null)
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false)
   const sectionRef = useRef<HTMLDivElement>(null)
 
   const navigate = useNavigate()
@@ -51,11 +52,18 @@ export default function RecentViolationsSection({
     const fetchRecentViolations = async () => {
       setIsLoadingRecentViolations(true)
       setErrorRecentViolations(null)
+      
       try {
         const userId = getCookie("userId")
         if (!userId) {
-          throw new Error("User ID not found in cookie")
+          // Không có userId nghĩa là chưa đăng nhập
+          setIsLoggedIn(false)
+          setIsLoadingRecentViolations(false)
+          return
         }
+        
+        setIsLoggedIn(true)
+        
         const response = await fetch(API_URL_BE+`api/violations/user/${userId}`)
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`)
@@ -126,6 +134,10 @@ export default function RecentViolationsSection({
     }
   }
 
+  const handleLoginRedirect = () => {
+    navigate('/login')
+  }
+
   const violationsToDisplay = hasSearched ? searchResults : recentViolations
 
   const getStatusClasses = (status: string) => {
@@ -156,6 +168,35 @@ export default function RecentViolationsSection({
       default:
         return null
     }
+  }
+
+  // Nếu chưa đăng nhập, hiển thị thông báo yêu cầu đăng nhập
+  if (!isLoggedIn && !isLoadingRecentViolations) {
+    return (
+      <div ref={sectionRef} className="py-20 relative z-[10]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-xl border border-white/20 overflow-hidden">
+            <div className="text-center py-16">
+              <div className="w-24 h-24 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <LogIn className="h-12 w-12 text-white" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">Login Required</h3>
+              <p className="text-gray-600 text-lg mb-8">
+                Please log in to view your traffic violations and violation history.
+              </p>
+              <button
+                onClick={handleLoginRedirect}
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3 px-8 rounded-2xl transition-all duration-300 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center justify-center mx-auto"
+                aria-label="Go to login page"
+              >
+                <LogIn className="w-5 h-5 mr-2" />
+                Login Now
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (

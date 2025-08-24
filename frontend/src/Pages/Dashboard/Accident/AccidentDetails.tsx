@@ -27,7 +27,7 @@ export default function AccidentDetails() {
         <div className="relative p-6 overflow-y-auto flex-grow">
           {loading && (
             <div className="absolute inset-0 z-40 flex items-center justify-center bg-white/70">
-              <BounceLoadingComponent fullScreen={false} />
+              <BounceLoadingComponent fullScreen={false}  size="sm"/>
             </div>
           )}
 

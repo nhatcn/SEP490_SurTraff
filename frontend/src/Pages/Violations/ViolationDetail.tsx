@@ -281,12 +281,12 @@ export default function ViolationDetail() {
   if (loading) {
     return (
       <div className="flex h-screen bg-gradient-to-br from-blue-100 via-gray-50 to-blue-100">
-        <Sidebar />
+        <Sidebar defaultActiveItem="violations"/>
         <div className="flex flex-col flex-grow overflow-hidden">
           <Header title="Violation Detail" />
           <div className="flex items-center justify-center flex-grow">
             <div className="flex flex-col items-center space-y-4">
-              <BounceLoadingComponent />
+              <BounceLoadingComponent fullScreen={false} size="sm"/>
             </div>
           </div>
         </div>
