@@ -174,7 +174,7 @@ export default function MapDashboard() {
 
   // Fetch cameras data
   useEffect(() => {
-    fetch(API_URL_BE + "api/cameras")
+    fetch(API_URL_FAST + "api/cameras")
       .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch camera data");
         return res.json();
@@ -519,7 +519,7 @@ export default function MapDashboard() {
 
           {selectedCamera && (
             <div className="w-2/5">
-              {/* <CameraDetail camera={selectedCamera} /> */}
+              <CameraDetail camera={selectedCamera} /> 
             </div>
           )}
 
