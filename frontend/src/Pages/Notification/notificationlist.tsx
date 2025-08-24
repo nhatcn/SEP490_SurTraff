@@ -2,26 +2,18 @@
 
 import { useState, useEffect } from "react"
 import axios from "axios"
-import {
-  Bell,
-  AlertTriangle,
-  XCircle,
-  CheckCircle,
-  Search,
-  Filter,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react"
+import { Bell, AlertTriangle, XCircle, CheckCircle, Search, Filter, ChevronLeft, ChevronRight } from "lucide-react"
 import { getCookie } from "../../utils/cookieUltil"
 import { Header, MobileDropdownMenu } from "../../components/Layout/Menu"
 import Footer from "../../components/Layout/Footer"
-import {API_URL_BE} from "../../components/Link/LinkAPI"
+import { API_URL_BE } from "../../components/Link/LinkAPI"
 import { useNavigate } from "react-router-dom"
 
 interface Notification {
   id: number
   userId: number | null
   vehicleId: number | null
+  licensePlate: string
   accidentId: number | null
   violationId: number | null
   message: string
@@ -48,12 +40,6 @@ function timeAgo(dateString: string) {
   const months = Math.floor(days / 30)
   return `${months} months ago`
 }
-
-const extractLicensePlate = (message: string): string | null => {
-  const licensePlateRegex = /\b\d{2}-[A-Z]{1,2}\d{4,5}\b/;
-  const match = message.match(licensePlateRegex);
-  return match ? match[0] : null;
-};
 
 const getNotificationIcon = (type: string, size = 20) => {
   switch (type) {
@@ -130,25 +116,24 @@ export default function NotificationsPage() {
   const handleNotificationClick = async (notification: Notification) => {
     // Mark as read first if not already read
     if (!notification.read) {
-      await markAsRead(notification.id);
+      await markAsRead(notification.id)
     }
-    
-    // Extract license plate from message
-    const licensePlate = extractLicensePlate(notification.message);
-    
+
+    const licensePlate = notification.licensePlate
+
     if (licensePlate) {
       // Navigate to violations history page for all notification types
-      navigate(`/violations/history/${licensePlate}`);
+      navigate(`/violations/history/${licensePlate}`)
     } else {
-      console.warn("Could not extract license plate from notification message");
+      console.warn("License plate not found in notification data")
       // If no license plate found, still navigate to general violations page
-      navigate('/violations');
+      navigate("/violations")
     }
-  };
+  }
 
   const markAsRead = async (notificationId: number) => {
     try {
-      await axios.put(API_URL_BE +`api/notifications/read/${notificationId}`)
+      await axios.put(API_URL_BE + `api/notifications/read/${notificationId}`)
       setNotifications((prev) => prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n)))
     } catch (err) {
       console.error("Failed to mark notification as read", err)

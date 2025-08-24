@@ -4,11 +4,11 @@ import AccidentTable from "../../../components/Accidents/AccidentTable";
 
 export default function AccidentDashboard() {
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen overflow-hidden">
       <Sidebar defaultActiveItem="accidents" />
-      <div className="flex flex-col flex-grow overflow-hidden">
+      <div className="flex flex-col flex-grow min-w-0">
         <Header title="Traffic Accident Management" />
-        <div className="flex-grow overflow-y-auto p-4">
+        <div className="flex-grow overflow-y-auto">
           <AccidentTable />
         </div>
       </div>

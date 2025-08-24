@@ -21,16 +21,17 @@ import {
   Globe,
   CheckCircle2,
   XCircle,
-  ChevronRight,
-  ChevronLeft,
-  Filter,
-  AlertCircle,
+  Search,
   X,
 } from "lucide-react"
 import { format } from "date-fns"
+import Sidebar from "../../components/Layout/Sidebar"
+import Header from "../../components/Layout/Header"
 import ExportAccidentPDF from "../../components/Accidents/export-accident-pdf"
 import BounceLoadingComponent from "../../components/Layout/Loading"
-import {API_URL_BE} from "../Link/LinkAPI"
+import { AlertDialog } from "../../Pages/Violations/AlertDialog"
+import GenericTable, { TableColumn, FilterConfig } from "../../components/Table/GenericTable"
+import {API_URL_BE} from "../../components/Link/LinkAPI"
 
 // Types
 interface AccidentType {
@@ -43,383 +44,7 @@ interface AccidentType {
   accidentTime: string
 }
 
-// Generic interfaces for GenericTable
-export interface TableColumn<T> {
-  key: keyof T | string
-  title: string
-  render?: (value: any, record: T, index: number) => React.ReactNode
-  width?: string
-}
-export interface TableAction<T> {
-  key: string
-  label: string
-  icon?: React.ReactNode
-  onClick: (record: T, index: number) => void
-  className?: string
-}
-export interface FilterConfig {
-  key: string
-  label: string
-  type: "text" | "select"
-  options?: { value: string; label: string }[]
-  placeholder?: string
-}
-export interface GenericTableProps<T> {
-  data: T[]
-  filteredData: T[]
-  columns: TableColumn<T>[]
-  rowKey: keyof T
-  actions?: TableAction<T>[]
-  filters?: FilterConfig[]
-  filterValues?: Record<string, any>
-  onFilterChange?: (key: string, value: any) => void
-  onResetFilters?: () => void
-  loading?: boolean
-  error?: string | null
-  onRetry?: () => void
-  onRowClick?: (record: T, index: number) => void
-  pagination?: {
-    enabled: boolean
-    currentPage: number
-    totalPages: number
-    pageSize: number
-    totalItems: number
-    onPageChange: (page: number) => void
-    onPageSizeChange?: (pageSize: number) => void
-  }
-  className?: string
-  emptyMessage?: string
-}
-
-// GenericTable Component
-function GenericTable<T extends Record<string, any>>({
-  data,
-  filteredData,
-  columns,
-  rowKey,
-  actions = [],
-  filters = [],
-  filterValues = {},
-  onFilterChange,
-  onResetFilters,
-  loading = false,
-  error = null,
-  onRetry,
-  onRowClick,
-  pagination,
-  className = "",
-  emptyMessage = "No data found",
-}: GenericTableProps<T>) {
-  const [showFilters, setShowFilters] = useState(false)
-  // Check if filters are active
-  const hasActiveFilters = Object.values(filterValues).some(
-    (value) => value !== "" && value !== null && value !== undefined,
-  )
-  // Get paginated data
-  const displayData = pagination?.enabled ? data : filteredData
-  // Calculate pagination info
-  const startEntry = pagination?.enabled ? (pagination.currentPage - 1) * pagination.pageSize + 1 : 1
-  const endEntry = pagination?.enabled
-    ? Math.min(pagination.currentPage * pagination.pageSize, filteredData.length)
-    : filteredData.length
-  // Page size options
-  const pageSizeOptions = [10, 25, 50, 100]
-  // Generate page numbers for pagination
-  const getPageNumbers = () => {
-    if (!pagination) return []
-    const { currentPage, totalPages } = pagination
-    const pages = []
-    const maxVisiblePages = 5
-    if (totalPages <= maxVisiblePages) {
-      for (let i = 1; i <= totalPages; i++) {
-        pages.push(i)
-      }
-    } else {
-      const half = Math.floor(maxVisiblePages / 2)
-      let start = Math.max(currentPage - half, 1)
-      const end = Math.min(start + maxVisiblePages - 1, totalPages)
-      if (end - start + 1 < maxVisiblePages) {
-        start = Math.max(end - maxVisiblePages + 1, 1)
-      }
-      for (let i = start; i <= end; i++) {
-        pages.push(i)
-      }
-    }
-    return pages
-  }
-  // Helper function to get nested values
-  const getNestedValue = (obj: any, path: string) => {
-    return path.split(".").reduce((current, key) => current?.[key], obj)
-  }
-  return (
-    <div className={`bg-white rounded-lg shadow-sm ${className}`}>
-      {/* Filter Section */}
-      {filters.length > 0 && (
-        <>
-          <div className="flex flex-wrap p-4 gap-2 border-b border-gray-200">
-            <div
-              className="border rounded-lg p-2 bg-gray-50 hover:bg-gray-100 cursor-pointer transition-colors"
-              onClick={() => setShowFilters(!showFilters)}
-            >
-              <Filter size={20} className="text-gray-600" />
-            </div>
-            {filters.map((filter) => (
-              <div key={filter.key} className="border rounded-lg bg-gray-50 hover:bg-gray-100 flex-grow max-w-xs">
-                {filter.type === "text" && (
-                  <div className="flex items-center px-4 py-2">
-                    <input
-                      type="text"
-                      placeholder={filter.placeholder || `Search ${filter.label.toLowerCase()}...`}
-                      value={filterValues[filter.key] || ""}
-                      onChange={(e) => onFilterChange?.(filter.key, e.target.value)}
-                      className="bg-transparent outline-none text-gray-700 placeholder-gray-500 w-full"
-                    />
-                  </div>
-                )}
-                {filter.type === "select" && (
-                  <select
-                    value={filterValues[filter.key] || ""}
-                    onChange={(e) => onFilterChange?.(filter.key, e.target.value)}
-                    className="w-full px-4 py-2 bg-transparent outline-none text-gray-700"
-                  >
-                    <option value="">All {filter.label}</option>
-                    {filter.options?.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-            ))}
-            {hasActiveFilters && onResetFilters && (
-              <button
-                className="flex items-center text-red-500 hover:text-red-600 px-3 py-2 transition-colors"
-                onClick={onResetFilters}
-              >
-                <X size={16} className="mr-1" />
-                Reset Filters
-              </button>
-            )}
-          </div>
-          {hasActiveFilters && (
-            <div className="p-4 border-b border-gray-200 flex flex-wrap gap-2">
-              {filters.map((filter) => {
-                const value = filterValues[filter.key]
-                if (!value) return null
-                return (
-                  <span
-                    key={filter.key}
-                    className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800"
-                  >
-                    {filter.label}: {String(value)}
-                    <button onClick={() => onFilterChange?.(filter.key, "")} className="ml-2 hover:text-blue-600">
-                      <X size={14} />
-                    </button>
-                  </span>
-                )
-              })}
-            </div>
-          )}
-        </>
-      )}
-      {/* Table Header Info */}
-      <div className="flex justify-between items-center p-4 border-b border-gray-200">
-        <div className="flex items-center space-x-4">
-          <span className="text-sm text-gray-700">
-            Showing {startEntry} to {endEntry} of {filteredData.length} entries
-            {filteredData.length !== data.length && (
-              <span className="text-gray-500"> (filtered from {data.length} total entries)</span>
-            )}
-          </span>
-        </div>
-        {pagination?.enabled && pagination.onPageSizeChange && (
-          <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-700">Show</span>
-            <select
-              value={pagination.pageSize}
-              onChange={(e) => pagination.onPageSizeChange?.(Number(e.target.value))}
-              className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              {pageSizeOptions.map((size) => (
-                <option key={size} value={size}>
-                  {size}
-                </option>
-              ))}
-            </select>
-            <span className="text-sm text-gray-700">entries</span>
-          </div>
-        )}
-      </div>
-      {/* Table */}
-      <div className="overflow-hidden">
-        {loading ? (
-          <div className="text-center py-12">
-            <BounceLoadingComponent fullScreen={false} size="sm"/>
-            <p className="mt-3 text-gray-600">Loading...</p>
-          </div>
-        ) : error ? (
-          <div className="text-center py-12 text-red-500">
-            <AlertCircle className="mx-auto mb-2" size={32} />
-            <p className="font-medium">{error}</p>
-            {onRetry && (
-              <button
-                className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-                onClick={onRetry}
-              >
-                Retry
-              </button>
-            )}
-          </div>
-        ) : displayData.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <p>
-              {emptyMessage}
-              {hasActiveFilters ? " matching your filters" : ""}
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  {columns.map((column) => (
-                    <th
-                      key={String(column.key)}
-                      className="text-xs font-semibold text-gray-600 uppercase px-6 py-3 text-left tracking-wider"
-                      style={{ width: column.width }}
-                    >
-                      {column.title}
-                    </th>
-                  ))}
-                  {actions.length > 0 && (
-                    <th className="text-xs font-semibold text-gray-600 uppercase px-6 py-3 text-left tracking-wider">
-                      Actions
-                    </th>
-                  )}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
-                {displayData.map((record, index) => (
-                  <tr
-                    key={String(record[rowKey])}
-                    className={`hover:bg-gray-50 transition-colors ${onRowClick ? "cursor-pointer" : ""}`}
-                    onClick={() => onRowClick?.(record, index)}
-                  >
-                    {columns.map((column) => (
-                      <td key={String(column.key)} className="px-6 py-4 whitespace-nowrap">
-                        {column.render ? (
-                          column.render(getNestedValue(record, String(column.key)), record, index)
-                        ) : (
-                          <span className="text-sm text-gray-900">
-                            {String(getNestedValue(record, String(column.key)) || "")}
-                          </span>
-                        )}
-                      </td>
-                    ))}
-                    {actions.length > 0 && (
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <div className="flex items-center space-x-2">
-                          {actions.map((action) => (
-                            <button
-                              key={action.key}
-                              className={`p-1 rounded-full transition-colors ${
-                                action.className || "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
-                              }`}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                action.onClick(record, index)
-                              }}
-                              title={action.label}
-                            >
-                              {action.icon}
-                            </button>
-                          ))}
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-      {/* Pagination */}
-      {pagination?.enabled && pagination.totalPages > 1 && (
-        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
-          <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-700">
-              Page {pagination.currentPage} of {pagination.totalPages}
-            </span>
-          </div>
-          <div className="flex items-center space-x-1">
-            <button
-              className="flex items-center px-3 py-2 text-sm rounded border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
-              onClick={() => pagination.onPageChange(pagination.currentPage - 1)}
-              disabled={pagination.currentPage === 1}
-            >
-              <ChevronLeft size={16} className="mr-1" />
-              Previous
-            </button>
-            {getPageNumbers().map((page) => (
-              <button
-                key={page}
-                className={`px-3 py-2 text-sm rounded border transition-colors ${
-                  pagination.currentPage === page
-                    ? "bg-blue-500 text-white border-blue-500"
-                    : "border-gray-300 hover:bg-gray-50"
-                }`}
-                onClick={() => pagination.onPageChange(page)}
-              >
-                {page}
-              </button>
-            ))}
-            <button
-              className="flex items-center px-3 py-2 text-sm rounded border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
-              onClick={() => pagination.onPageChange(pagination.currentPage + 1)}
-              disabled={pagination.currentPage === pagination.totalPages}
-            >
-              Next
-              <ChevronRight size={16} className="ml-1" />
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ConfirmDialog Component
-const ConfirmDialog: React.FC<{
-  isOpen: boolean
-  title: string
-  message: string
-  onConfirm: () => void
-  onCancel: () => void
-  confirmButtonText: string
-  confirmButtonColor: string
-}> = ({ isOpen, title, message, onConfirm, onCancel, confirmButtonText, confirmButtonColor }) => {
-  if (!isOpen) return null
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white p-6 rounded-lg shadow-xl">
-        <h3 className="text-lg font-semibold">{title}</h3>
-        <p className="mt-2 text-gray-600">{message}</p>
-        <div className="mt-4 flex justify-end space-x-2">
-          <button onClick={onCancel} className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">
-            Cancel
-          </button>
-          <button onClick={onConfirm} className={`px-4 py-2 text-white rounded ${confirmButtonColor}`}>
-            {confirmButtonText}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// AccidentTable Component
+// Main AccidentTable Component
 export default function AccidentTable() {
   const [accidents, setAccidents] = useState<AccidentType[]>([])
   const [statusOptions, setStatusOptions] = useState<{ value: string; label: string }[]>([])
@@ -430,16 +55,15 @@ export default function AccidentTable() {
     cameraId: "",
     location: "",
   })
-  const [modalDeleteId, setModalDeleteId] = useState<number | null>(null)
+  const [openDialog, setOpenDialog] = useState(false)
+  const [selectedId, setSelectedId] = useState<number | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [isRejecting, setIsRejecting] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [refreshKey, setRefreshKey] = useState(0)
-  const [refreshing, setRefreshing] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [pageSize] = useState(10) // Fixed page size since GenericTable doesn't support pageSizeOptions
   const navigate = useNavigate()
 
   // Authorization header
@@ -451,25 +75,26 @@ export default function AccidentTable() {
     },
   }
 
-  // Fetch Accident Data with 2-second delay
+  // Fetch Accident Data
   const fetchAccidentData = useCallback(async () => {
-    setLoading(true)
-    setError(null)
     try {
+      setLoading(true)
+      setError(null)
       const res = await fetch(`${API_URL_BE}api/accident`, authHeader)
       if (!res.ok) {
         throw new Error(`HTTP error! status: ${res.status}`)
       }
       const data: AccidentType[] = await res.json()
       
-      // Add 2-second delay
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-      
       setAccidents(data)
+      
+      // Set filter options
       const uniqueStatuses = Array.from(new Set(data.map((acc) => acc.status)))
       setStatusOptions(uniqueStatuses.map((status) => ({ value: status, label: status })))
+      
       const uniqueLocations = Array.from(new Set(data.map((acc) => acc.location)))
       setLocationOptions(uniqueLocations.map((loc) => ({ value: loc, label: loc })))
+      
       const uniqueCameras = new Map<number, string>()
       data.forEach((acc) => {
         if (acc.cameraId && acc.cameraName && !uniqueCameras.has(acc.cameraId)) {
@@ -484,11 +109,10 @@ export default function AccidentTable() {
     } catch (err) {
       console.error("Failed to load accidents:", err)
       setError("Unable to load accident list. Please try again.")
-      toast.error("❌ Failed to load accidents!")
     } finally {
       setLoading(false)
     }
-  }, [refreshKey])
+  }, [])
 
   useEffect(() => {
     fetchAccidentData()
@@ -506,44 +130,17 @@ export default function AccidentTable() {
     if (filterValues.location) {
       filtered = filtered.filter((acc) => acc.location === filterValues.location)
     }
-    console.log("Filtered Accidents:", filtered)
     return filtered
   }, [accidents, filterValues])
 
-  // Paginate Data
-  const getPaginatedData = useCallback(() => {
+  // Paginated data
+  const paginatedAccidents = useMemo(() => {
     const startIndex = (currentPage - 1) * pageSize
     const endIndex = startIndex + pageSize
-    const paginatedData = filteredAccidents.slice(startIndex, endIndex)
-    console.log("Paginated Data:", paginatedData)
-    return paginatedData
+    return filteredAccidents.slice(startIndex, endIndex)
   }, [filteredAccidents, currentPage, pageSize])
 
-  // Calculate total pages
-  const totalPages = Math.ceil(filteredAccidents.length / pageSize)
-
-  // Handle filter change and reset page
-  const handleFilterChange = useCallback((key: string, value: any) => {
-    setFilterValues((prev) => ({ ...prev, [key]: value }))
-    setCurrentPage(1)
-  }, [])
-
-  // Reset filters and page
-  const resetFilters = useCallback(() => {
-    setFilterValues({ status: "", cameraId: "", location: "" })
-    setCurrentPage(1)
-  }, [])
-
-  // Handle page change
-  const handlePageChange = useCallback((page: number) => {
-    setCurrentPage(page)
-  }, [])
-
-  // Handle page size change
-  const handlePageSizeChange = useCallback((newPageSize: number) => {
-    setPageSize(newPageSize)
-    setCurrentPage(1)
-  }, [])
+  const totalPages = useMemo(() => Math.ceil(filteredAccidents.length / pageSize), [filteredAccidents.length, pageSize])
 
   // Statistics
   const stats = useMemo(() => {
@@ -553,6 +150,7 @@ export default function AccidentTable() {
       const accidentDate = new Date(acc.accidentTime)
       return accidentDate.toDateString() === today.toDateString()
     }).length
+    
     const locationStats = Array.from(
       filteredAccidents.reduce((acc, accident) => {
         acc.set(accident.location, (acc.get(accident.location) || 0) + 1)
@@ -561,10 +159,12 @@ export default function AccidentTable() {
     )
       .map(([location, count]) => ({ location, count }))
       .sort((a, b) => b.count - a.count)
+    
     const cameraInvolvedCount = new Set(filteredAccidents.map((acc) => acc.cameraId)).size
     const prevWeekAccidents = totalAccidents - Math.floor(Math.random() * 20)
     const trendPercentage =
       totalAccidents > 0 && prevWeekAccidents > 0 ? ((totalAccidents - prevWeekAccidents) / prevWeekAccidents) * 100 : 0
+    
     return { totalAccidents, todayAccidents, locationStats, cameraInvolvedCount, trendPercentage }
   }, [filteredAccidents])
 
@@ -606,203 +206,34 @@ export default function AccidentTable() {
     )
   }
 
-  const columns: TableColumn<AccidentType>[] = useMemo(
-    () => [
-      {
-        key: "cameraId",
-        title: "Camera",
-        render: (value, record) => {
-          return record.cameraName && record.cameraLocation ? (
-            <div className="group">
-              <div className="flex items-center space-x-2 mb-1">
-                <div className="p-1 bg-blue-100 rounded-lg">
-                  <Camera size={14} className="text-blue-600" />
-                </div>
-                <span className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors duration-200">
-                  {record.cameraName}
-                </span>
-              </div>
-              <div className="flex items-center space-x-1 text-sm text-gray-500 bg-gray-50 px-2 py-1 rounded-lg">
-                <MapPin size={12} />
-                <span>{record.cameraLocation}</span>
-              </div>
-            </div>
-          ) : (
-            <div className="text-gray-400 italic bg-gray-50 px-3 py-2 rounded-lg">Unidentified</div>
-          )
-        },
-      },
-      {
-        key: "location",
-        title: "Location",
-        render: (value) => (
-          <div className="inline-flex items-center px-4 py-2 rounded-xl text-sm font-semibold border transition-all duration-300 bg-gradient-to-r from-orange-500/10 to-red-500/10 text-orange-700 border-orange-200 shadow-sm hover:shadow-md">
-            <MapPin size={14} className="mr-2" />
-            {value}
-          </div>
-        ),
-      },
-      {
-        key: "accidentTime",
-        title: "Time",
-        render: (value: string) => {
-          try {
-            const date = new Date(value)
-            const isToday = date.toDateString() === new Date().toDateString()
-            return (
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <div className="p-1 bg-purple-100 rounded-lg">
-                    <Clock size={14} className="text-purple-600" />
-                  </div>
-                  <span className="font-bold text-purple-700 bg-purple-50 px-2 py-1 rounded-lg">
-                    {format(date, "HH:mm:ss")}
-                  </span>
-                </div>
-                <div
-                  className={`text-sm flex items-center space-x-2 ${
-                    isToday ? "text-green-600 font-bold" : "text-gray-500"
-                  }`}
-                >
-                  <Calendar size={12} />
-                  <span>{format(date, "dd/MM/yyyy")}</span>
-                  {isToday && (
-                    <span className="ml-2 text-xs bg-gradient-to-r from-green-500 to-emerald-500 text-white px-2 py-1 rounded-full animate-pulse">
-                      Today
-                    </span>
-                  )}
-                </div>
-              </div>
-            )
-          } catch {
-            return <span className="text-gray-400 italic">N/A</span>
-          }
-        },
-      },
-      {
-        key: "status",
-        title: "Status",
-        render: (value: string) => {
-          const { bg, text, icon } = getStatusColor(value)
-          return (
-            <div className={`inline-flex items-center px-3 py-1 rounded-lg ${bg} ${text} font-medium`}>
-              {icon}
-              <span className="ml-2 capitalize">{value || "Pending"}</span>
-            </div>
-          )
-        },
-      },
-      {
-        key: "actions",
-        title: "Actions",
-        render: (value, record) => {
-          if (record.status === "Requested") {
-            return (
-              <div className="flex space-x-2">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleProcess(record.id)
-                  }}
-                  disabled={isProcessing}
-                  className="px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isProcessing ? "Processing..." : "Process"}
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleReject(record.id)
-                  }}
-                  disabled={isRejecting}
-                  className="px-3 py-1 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isRejecting ? "Rejecting..." : "Reject"}
-                </button>
-              </div>
-            )
-          } else {
-            return (
-              <div className="flex space-x-2">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    navigate(`/accidents/${record.id}`)
-                  }}
-                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-all duration-200 rounded-lg p-2"
-                  title="View Details"
-                >
-                  <Eye size={16} />
-                  <span className="sr-only">View Details</span>
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setModalDeleteId(record.id)
-                  }}
-                  className="text-red-600 hover:text-red-700 hover:bg-red-50 transition-all duration-200 rounded-lg p-2"
-                  title="Delete"
-                >
-                  <Trash2 size={16} />
-                  <span className="sr-only">Delete</span>
-                </button>
-              </div>
-            )
-          }
-        },
-      },
-    ],
-    [isProcessing, isRejecting, navigate],
-  )
+  // Handle filter change
+  const handleFilterChange = useCallback((key: string, value: any) => {
+    setFilterValues((prev) => ({ ...prev, [key]: value }))
+    setCurrentPage(1)
+  }, [])
 
-  const filters: FilterConfig[] = useMemo(
-    () => [
-      {
-        key: "cameraId",
-        label: "Camera Name",
-        type: "select",
-        options: cameraOptions,
-        placeholder: "Select camera...",
-      },
-      {
-        key: "status",
-        label: "Status",
-        type: "select",
-        options: statusOptions,
-      },
-      {
-        key: "location",
-        label: "Location",
-        type: "select",
-        options: locationOptions,
-      },
-    ],
-    [statusOptions, cameraOptions, locationOptions],
-  )
+  // Reset filters
+  const resetFilters = useCallback(() => {
+    setFilterValues({ status: "", cameraId: "", location: "" })
+    setCurrentPage(1)
+  }, [])
 
-  // Pagination configuration
-  const pagination = useMemo(
-    () => ({
-      enabled: true,
-      currentPage,
-      totalPages,
-      pageSize,
-      totalItems: filteredAccidents.length,
-      onPageChange: handlePageChange,
-      onPageSizeChange: handlePageSizeChange,
-    }),
-    [currentPage, totalPages, pageSize, filteredAccidents.length, handlePageChange, handlePageSizeChange],
-  )
+  // Handle page change
+  const handlePageChange = useCallback((page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)))
+  }, [totalPages])
 
-  const handleDelete = useCallback(async () => {
-    if (modalDeleteId === null) return
-    setIsDeleting(true)
+  // Handle delete
+  const handleDelete = useCallback(async (id: number) => {
     try {
-      const res = await fetch(`${API_URL_BE}api/accident/${modalDeleteId}`, {
+      setIsDeleting(true)
+      const res = await fetch(`${API_URL_BE}api/accident/${id}`, {
         method: "DELETE",
         ...authHeader,
       })
       if (res.ok) {
+        setAccidents((prev) => prev.filter((acc) => acc.id !== id))
+        setOpenDialog(false)
         toast.success("🗑️ Accident deleted successfully!", {
           position: "top-right",
           autoClose: 3000,
@@ -811,7 +242,15 @@ export default function AccidentTable() {
           pauseOnHover: true,
           draggable: true,
         })
-        fetchAccidentData()
+
+        // Adjust pagination if needed
+        const newTotal = filteredAccidents.length - 1
+        const newTotalPages = Math.ceil(newTotal / pageSize)
+        if (currentPage > newTotalPages && newTotalPages > 0) {
+          setCurrentPage(newTotalPages)
+        } else if (paginatedAccidents.length === 1 && currentPage > 1) {
+          setCurrentPage(currentPage - 1)
+        }
       } else {
         const errorData = await res.json()
         throw new Error(errorData.message || "Failed to delete accident.")
@@ -828,10 +267,10 @@ export default function AccidentTable() {
       })
     } finally {
       setIsDeleting(false)
-      setModalDeleteId(null)
     }
-  }, [modalDeleteId, fetchAccidentData, authHeader])
+  }, [filteredAccidents.length, currentPage, pageSize, paginatedAccidents])
 
+  // Handle process
   const handleProcess = useCallback(
     async (id: number) => {
       setIsProcessing(true)
@@ -871,6 +310,7 @@ export default function AccidentTable() {
     [fetchAccidentData, authHeader],
   )
 
+  // Handle reject
   const handleReject = useCallback(
     async (id: number) => {
       setIsRejecting(true)
@@ -910,176 +350,411 @@ export default function AccidentTable() {
     [fetchAccidentData, authHeader],
   )
 
+  // Handle refresh
   const handleRefresh = useCallback(async () => {
-    setRefreshing(true)
-    setRefreshKey((prev) => prev + 1)
-    setTimeout(() => setRefreshing(false), 500)
-  }, [])
+    await fetchAccidentData()
+  }, [fetchAccidentData])
 
+  // Handle retry
   const handleRetry = useCallback(() => {
-    setRefreshKey((prev) => prev + 1)
-  }, [])
+    fetchAccidentData()
+  }, [fetchAccidentData])
+
+  // Define table columns
+  const columns: TableColumn<AccidentType>[] = useMemo(
+    () => [
+      {
+        key: "cameraId",
+        title: "Camera",
+        width: "20%",
+        render: (_, record: AccidentType, index: number) => (
+          <motion.div
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.3, delay: index * 0.05 }}
+            className="relative group max-w-full overflow-hidden"
+          >
+            {record.cameraName && record.cameraLocation ? (
+              <div className="group max-w-full">
+                <div className="flex items-center space-x-2 mb-1">
+                  <div className="p-1 bg-blue-100 rounded-lg flex-shrink-0">
+                    <Camera size={14} className="text-blue-600" />
+                  </div>
+                  <span className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors duration-200 truncate">
+                    {record.cameraName}
+                  </span>
+                </div>
+                <div className="flex items-center space-x-1 text-sm text-gray-500 bg-gray-50 px-2 py-1 rounded-lg truncate">
+                  <MapPin size={12} className="flex-shrink-0" />
+                  <span className="truncate">{record.cameraLocation}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="text-gray-400 italic bg-gray-50 px-3 py-2 rounded-lg truncate">Unidentified</div>
+            )}
+          </motion.div>
+        ),
+      },
+      {
+        key: "location",
+        title: "Location",
+        width: "20%",
+        render: (value: string) => (
+          <div className="inline-flex items-center px-4 py-2 rounded-xl text-sm font-semibold border transition-all duration-300 bg-gradient-to-r from-orange-500/10 to-red-500/10 text-orange-700 border-orange-200 shadow-sm hover:shadow-md truncate max-w-full">
+            <MapPin size={14} className="mr-2 flex-shrink-0" />
+            <span className="truncate">{value}</span>
+          </div>
+        ),
+      },
+      {
+        key: "accidentTime",
+        title: "Time",
+        width: "20%",
+        render: (value: string) => {
+          try {
+            const date = new Date(value)
+            const isToday = date.toDateString() === new Date().toDateString()
+            return (
+              <div className="space-y-2 max-w-full">
+                <div className="flex items-center space-x-2">
+                  <div className="p-1 bg-purple-100 rounded-lg flex-shrink-0">
+                    <Clock size={14} className="text-purple-600" />
+                  </div>
+                  <span className="font-bold text-purple-700 bg-purple-50 px-2 py-1 rounded-lg truncate">
+                    {format(date, "HH:mm:ss")}
+                  </span>
+                </div>
+                <div
+                  className={`text-sm flex items-center space-x-2 ${
+                    isToday ? "text-green-600 font-bold" : "text-gray-500"
+                  } truncate`}
+                >
+                  <Calendar size={12} className="flex-shrink-0" />
+                  <span className="truncate">{format(date, "dd/MM/yyyy")}</span>
+                  {isToday && (
+                    <span className="ml-2 text-xs bg-gradient-to-r from-green-500 to-emerald-500 text-white px-2 py-1 rounded-full animate-pulse truncate">
+                      Today
+                    </span>
+                  )}
+                </div>
+              </div>
+            )
+          } catch {
+            return <span className="text-gray-400 italic truncate">N/A</span>
+          }
+        },
+      },
+      {
+        key: "status",
+        title: "Status",
+        width: "15%",
+        render: (value: string) => {
+          const { bg, text, icon } = getStatusColor(value)
+          return (
+            <div className={`inline-flex items-center px-3 py-1 rounded-lg ${bg} ${text} font-medium truncate`}>
+              {icon}
+              <span className="ml-2 capitalize truncate">{value || "Pending"}</span>
+            </div>
+          )
+        },
+      },
+      {
+        key: "actions",
+        title: "Actions",
+        width: "15%",
+        render: (_, record: AccidentType) => {
+          if (record.status === "Requested") {
+            return (
+              <div className="flex space-x-2" onClick={(e) => e.stopPropagation()}>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => handleProcess(record.id)}
+                  disabled={isProcessing}
+                  className="px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                >
+                  {isProcessing ? "Processing..." : "Process"}
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => handleReject(record.id)}
+                  disabled={isRejecting}
+                  className="px-3 py-1 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                >
+                  {isRejecting ? "Rejecting..." : "Reject"}
+                </motion.button>
+              </div>
+            )
+          } else {
+            return (
+              <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => navigate(`/accidents/${record.id}`)}
+                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-all duration-200 rounded-lg p-2"
+                  title="View Details"
+                  aria-label={`View details for accident ${record.id}`}
+                >
+                  <Eye size={16} />
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => {
+                    setSelectedId(record.id)
+                    setOpenDialog(true)
+                  }}
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50 transition-all duration-200 rounded-lg p-2"
+                  title="Delete"
+                  aria-label={`Delete accident ${record.id}`}
+                >
+                  <Trash2 size={16} />
+                </motion.button>
+              </div>
+            )
+          }
+        },
+      },
+    ],
+    [isProcessing, isRejecting, navigate, handleProcess, handleReject],
+  )
+
+  // Define filters
+  const filters: FilterConfig[] = useMemo(
+    () => [
+      {
+        key: "cameraId",
+        label: "Camera Name",
+        type: "select",
+        options: cameraOptions,
+        placeholder: "Select camera...",
+      },
+      {
+        key: "status",
+        label: "Status",
+        type: "select",
+        options: statusOptions,
+      },
+      {
+        key: "location",
+        label: "Location",
+        type: "select",
+        options: locationOptions,
+      },
+    ],
+    [statusOptions, cameraOptions, locationOptions],
+  )
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+        {/* <Sidebar defaultActiveItem="accidents" /> */}
+        <div className="flex flex-col flex-grow">
+          {/* <Header title="Traffic Accident List" /> */}
+          <div className="flex-grow flex items-center justify-center">
+            <div className="text-center">
+              <BounceLoadingComponent size="sm"/>
+              <p className="text-lg text-gray-600 mt-4">Loading accidents...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="flex h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+        {/* <Sidebar defaultActiveItem="accidents" /> */}
+        <div className="flex flex-col flex-grow">
+          {/* <Header title="Traffic Accident List" /> */}
+          <div className="flex-grow flex items-center justify-center">
+            <div className="text-center">
+              <AlertTriangle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Error Loading Data</h3>
+              <p className="text-gray-600 mb-4">{error}</p>
+              <button
+                onClick={handleRetry}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                aria-label="Retry loading data"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div>
-      <div className="flex flex-col flex-grow overflow-hidden">
-        <div>
-          <div className="max-w-full space-y-8">
-            {/* Enhanced Statistics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <motion.div
-                className="bg-gradient-to-br from-white/90 to-blue-50/90 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-6 border border-blue-200/70 hover:border-blue-300/70 transform hover:-translate-y-2"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.5, delay: 0.1 }}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center space-x-2 mb-2">
-                      <Target size={16} className="text-blue-500" />
-                      <p className="text-sm font-medium text-gray-600">Total Accidents</p>
-                    </div>
-                    <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                      {stats.totalAccidents}
-                    </p>
-                  </div>
-                  <div className="bg-gradient-to-r from-blue-500 to-purple-500 p-3 rounded-xl shadow-lg">
-                    <AlertTriangle className="text-white" size={24} />
-                  </div>
-                </div>
-              </motion.div>
-              <motion.div
-                className="bg-gradient-to-br from-white/90 to-green-50/90 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-6 border border-green-200/70 hover:border-green-300/70 transform hover:-translate-y-2"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.5, delay: 0.2 }}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center space-x-2 mb-2">
-                      <Clock size={16} className="text-green-500" />
-                      <p className="text-sm font-medium text-gray-600">Today</p>
-                    </div>
-                    <p className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-                      {stats.todayAccidents}
-                    </p>
-                    <div className="flex items-center space-x-1 mt-2">
-                      <span className="text-sm text-gray-500">
-                        {((stats.todayAccidents / stats.totalAccidents) * 100).toFixed(1)}% of total
-                      </span>
-                    </div>
-                  </div>
-                  <div className="bg-gradient-to-r from-green-500 to-emerald-500 p-3 rounded-xl shadow-lg">
-                    <Activity className="text-white" size={24} />
-                  </div>
-                </div>
-              </motion.div>
-              <motion.div
-                className="bg-gradient-to-br from-white/90 to-orange-50/90 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-6 border border-orange-200/70 hover:border-orange-300/70 transform hover:-translate-y-2"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.5, delay: 0.3 }}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center space-x-2 mb-2">
-                      <BarChart3 size={16} className="text-orange-500" />
-                      <p className="text-sm font-medium text-gray-600">Most Common Location</p>
-                    </div>
-                    <p className="text-lg font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
-                      {stats.locationStats[0]?.location || "N/A"}
-                    </p>
-                    <div className="flex items-center space-x-1 mt-2">
-                      <span className="text-sm text-gray-500">{stats.locationStats[0]?.count || 0} cases</span>
-                    </div>
-                  </div>
-                  <div className="bg-gradient-to-r from-orange-500 to-red-500 p-3 rounded-xl shadow-lg">
-                    <TrendingUp className="text-white" size={24} />
-                  </div>
-                </div>
-              </motion.div>
-              <motion.div
-                className="bg-gradient-to-br from-white/90 to-purple-50/90 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-6 border border-purple-200/70 hover:border-purple-300/70 transform hover:-translate-y-2"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.5, delay: 0.4 }}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center space-x-2 mb-2">
-                      <Camera size={16} className="text-purple-500" />
-                      <p className="text-sm font-medium text-gray-600">Cameras Involved</p>
-                    </div>
-                    <p className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                      {stats.cameraInvolvedCount}
-                    </p>
-                    <div className="flex items-center space-x-1 mt-2">
-                      <span className="text-sm text-gray-600 font-medium">Total unique cameras</span>
-                    </div>
-                  </div>
-                  <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-3 rounded-xl shadow-lg">
-                    <Globe className="text-white" size={24} />
-                  </div>
-                </div>
-              </motion.div>
-            </div>
-            {/* Enhanced Controls Section */}
+  <div className="min-h-full bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+    <div className="p-4 sm:p-6 space-y-6">
+          {/* Enhanced Statistics Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
             <motion.div
-              className="bg-gradient-to-r from-white/90 to-slate-50/90 rounded-2xl shadow-xl border border-slate-200/70 p-6 backdrop-blur-md"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
+              className="bg-gradient-to-br from-white/95 to-blue-50/95 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-4 sm:p-6 border border-blue-200/50 hover:border-blue-300/50 transform hover:-translate-y-1"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
             >
-              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Target size={16} className="text-blue-500" />
+                    <p className="text-sm font-medium text-gray-600">Total Accidents</p>
+                  </div>
+                  <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                    {stats.totalAccidents}
+                  </p>
+                  
+                </div>
+                <div className="bg-gradient-to-r from-blue-500 to-purple-500 p-3 rounded-xl shadow-lg">
+                  <AlertTriangle className="text-white" size={24} />
+                </div>
+              </div>
+            </motion.div>
+
+            <motion.div
+              className="bg-gradient-to-br from-white/95 to-green-50/95 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-4 sm:p-6 border border-green-200/50 hover:border-green-300/50 transform hover:-translate-y-1"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Clock size={16} className="text-green-500" />
+                    <p className="text-sm font-medium text-gray-600">Today</p>
+                  </div>
+                  <p className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+                    {stats.todayAccidents}
+                  </p>
+                  <div className="flex items-center space-x-1 mt-2">
+                    <span className="text-sm text-gray-500">
+                      {stats.totalAccidents > 0 ? ((stats.todayAccidents / stats.totalAccidents) * 100).toFixed(1) : 0}% of total
+                    </span>
+                  </div>
+                </div>
+                <div className="bg-gradient-to-r from-green-500 to-emerald-500 p-3 rounded-xl shadow-lg">
+                  <Activity className="text-white" size={24} />
+                </div>
+              </div>
+            </motion.div>
+
+            <motion.div
+              className="bg-gradient-to-br from-white/95 to-orange-50/95 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-4 sm:p-6 border border-orange-200/50 hover:border-orange-300/50 transform hover:-translate-y-1"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center space-x-2 mb-2">
+                    <BarChart3 size={16} className="text-orange-500" />
+                    <p className="text-sm font-medium text-gray-600">Most Common Location</p>
+                  </div>
+                  <p className="text-lg font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
+                    {stats.locationStats[0]?.location || "N/A"}
+                  </p>
+                  <div className="flex items-center space-x-1 mt-2">
+                    <span className="text-sm text-gray-500">{stats.locationStats[0]?.count || 0} cases</span>
+                  </div>
+                </div>
+                <div className="bg-gradient-to-r from-orange-500 to-red-500 p-3 rounded-xl shadow-lg">
+                  <TrendingUp className="text-white" size={24} />
+                </div>
+              </div>
+            </motion.div>
+
+            <motion.div
+              className="bg-gradient-to-br from-white/95 to-purple-50/95 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-4 sm:p-6 border border-purple-200/50 hover:border-purple-300/50 transform hover:-translate-y-1"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, delay: 0.4 }}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Camera size={16} className="text-purple-500" />
+                    <p className="text-sm font-medium text-gray-600">Active Cameras</p>
+                  </div>
+                  <p className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                    {stats.cameraInvolvedCount}
+                  </p>
+                  <div className="flex items-center space-x-1 mt-2">
+                    <span className="text-sm text-gray-500">
+                      Monitoring active
+                    </span>
+                  </div>
+                </div>
+                <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-3 rounded-xl shadow-lg">
+                  <Globe className="text-white" size={24} />
+                </div>
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Controls Section */}
+          <motion.div 
+            className="bg-gradient-to-r from-white/95 to-slate-50/95 rounded-2xl shadow-xl border border-slate-200/50 backdrop-blur-sm"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <div className="p-4 sm:p-6">
+              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
                 <div className="flex flex-wrap items-center gap-3">
                   <ExportAccidentPDF accidents={filteredAccidents} />
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={handleRefresh}
-                    disabled={refreshing}
-                    className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl hover:from-blue-600 hover:to-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
+                    className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl hover:from-blue-600 hover:to-purple-600 transition-all duration-200 shadow-lg hover:shadow-xl"
+                    aria-label="Refresh accident list"
                   >
-                    <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
+                    <RefreshCw size={16} />
                     <span>Refresh</span>
                   </motion.button>
                 </div>
+                
                 <div className="flex items-center space-x-4">
                   <div className="flex items-center space-x-2 bg-blue-50/80 px-4 py-2 rounded-xl">
                     <Sparkles size={16} className="text-blue-500" />
-                    <span className="text-sm font-medium text-blue-700">{filteredAccidents.length} results</span>
+                    <span className="text-sm font-medium text-blue-700">
+                      {filteredAccidents.length} results
+                    </span>
                   </div>
+                  {(filterValues.status || filterValues.cameraId || filterValues.location) && (
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm text-gray-600">Filtered from {accidents.length} total</span>
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={resetFilters}
+                        className="flex items-center space-x-1 px-3 py-1 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors duration-200"
+                        aria-label="Clear all filters"
+                      >
+                        <X size={14} />
+                        <span className="text-sm">Clear</span>
+                      </motion.button>
+                    </div>
+                  )}
                 </div>
               </div>
-            </motion.div>
-            {/* Enhanced Data Table */}
-            <motion.div
-              className="bg-white/90 rounded-2xl shadow-2xl border border-gray-200/70 overflow-hidden backdrop-blur-sm"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-            >
-              <div className="bg-gradient-to-r from-gray-50/90 to-blue-50/90 px-6 py-4 border-b border-gray-200/70">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg shadow-md">
-                      <BarChart3 className="text-white" size={20} />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">Accident List</h3>
-                      <p className="text-sm text-gray-600">Manage and track accident incidents</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="bg-green-100/80 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
-                      {filteredAccidents.length} records
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <GenericTable<AccidentType>
-                data={getPaginatedData()}
-                filteredData={filteredAccidents}
+            </div>
+          </motion.div>
+
+          {/* Enhanced Data Table with Responsive Wrapper */}
+          <div className="relative w-full overflow-x-auto">
+            <div className="min-w-[640px]">
+              <GenericTable
+                data={accidents}
+                filteredData={paginatedAccidents}
                 columns={columns}
                 rowKey="id"
                 actions={[]}
@@ -1087,27 +762,31 @@ export default function AccidentTable() {
                 filterValues={filterValues}
                 onFilterChange={handleFilterChange}
                 onResetFilters={resetFilters}
-                loading={loading}
-                error={error}
-                onRetry={handleRetry}
-                onRowClick={(record) => navigate(`/accidents/${record.id}`)}
-                pagination={pagination}
-                emptyMessage="🚫 No accident data available"
-                className="border-0"
+                pagination={{
+                  enabled: true,
+                  currentPage,
+                  totalPages,
+                  pageSize,
+                  totalItems: filteredAccidents.length,
+                  onPageChange: handlePageChange,
+                }}
+                onRowClick={(accident: AccidentType) => navigate(`/accidents/${accident.id}`)}
+                emptyMessage="🚫 No accidents found. Try adjusting your search criteria."
+                className="bg-[rgba(255,255,255,0.95)] rounded-[16px] shadow-[0_10px_15px_rgba(0,0,0,0.1)] border border-[rgba(203,213,225,0.5)] backdrop-blur-[10px] w-full table-auto"
               />
-            </motion.div>
+            </div>
           </div>
         </div>
+        
+        <AlertDialog
+          open={openDialog}
+          onOpenChange={setOpenDialog}
+          onConfirm={() => {
+            if (selectedId !== null) handleDelete(selectedId);
+          }}
+          title="⚠️ Confirm Accident Deletion"
+          description="Are you sure you want to delete this accident? This action cannot be undone and will permanently delete all related data."
+        />
       </div>
-      <ConfirmDialog
-        isOpen={modalDeleteId !== null}
-        title="⚠️ Confirm Accident Deletion"
-        message="Are you sure you want to delete this accident? This action cannot be undone and will permanently delete all related data."
-        onConfirm={handleDelete}
-        onCancel={() => setModalDeleteId(null)}
-        confirmButtonText={isDeleting ? "Deleting..." : "Confirm"}
-        confirmButtonColor="bg-red-500 hover:bg-red-600"
-      />
-    </div>
   )
 }
