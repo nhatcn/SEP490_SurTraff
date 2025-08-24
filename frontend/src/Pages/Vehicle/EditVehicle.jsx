@@ -1,11 +1,12 @@
 "use client"
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getCookie } from "../../utils/cookieUltil"
 import { Header, MobileDropdownMenu } from '../../components/Layout/Menu';
 import Footer from '../../components/Layout/Footer';
+import BounceLoadingComponent from '../../components/Layout/Loading';
 import {API_URL_BE} from '../../components/Link/LinkAPI';
 
 const EditVehicle = () => {
@@ -30,8 +31,16 @@ const EditVehicle = () => {
   const [existingPlates, setExistingPlates] = useState([]);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false); // New state for delete confirmation modal
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const hasFetchedVehicles = useRef(false);
+
+  // Clean up preview URL to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
 
   // Fetch userId using cookie and localStorage
   useEffect(() => {
@@ -42,7 +51,6 @@ const EditVehicle = () => {
         if (!userId) {
           setFormData((prev) => ({ ...prev, userId: "" }));
           setErrorMessage("No user ID found in cookies");
-          setIsLoading(false);
           return;
         }
 
@@ -79,7 +87,7 @@ const EditVehicle = () => {
         const response = await fetch(`${API_URL_BE}api/violations/vehicle-types`, {
           headers: { 'Content-Type': 'application/json' },
         });
-        if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+        if (!response.ok) throw new Error(`Failed to fetch vehicle types: ${response.status}`);
         const data = await response.json();
         setVehicleTypes(data);
       } catch (error) {
@@ -96,7 +104,7 @@ const EditVehicle = () => {
         const response = await fetch(`${API_URL_BE}api/vehicle/user/${formData.userId}`, {
           headers: { 'Content-Type': 'application/json' },
         });
-        if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+        if (!response.ok) throw new Error(`Failed to fetch vehicles: ${response.status}`);
         const data = await response.json();
         setVehicles(data);
         setExistingPlates(data.map((vehicle) => vehicle.licensePlate));
@@ -104,7 +112,8 @@ const EditVehicle = () => {
         setErrorMessage(`Error loading vehicles: ${error.message}`);
       }
     };
-    if (formData.userId) {
+    if (formData.userId && !hasFetchedVehicles.current) {
+      hasFetchedVehicles.current = true;
       fetchVehicles();
     }
   }, [formData.userId]);
@@ -121,7 +130,7 @@ const EditVehicle = () => {
         const response = await fetch(`${API_URL_BE}api/vehicle/${id}`, {
           headers: { 'Content-Type': 'application/json' },
         });
-        if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+        if (!response.ok) throw new Error(`Failed to fetch vehicle details: ${response.status}`);
         const data = await response.json();
         setFormData({
           id: data.id ? data.id.toString() : '',
@@ -149,9 +158,9 @@ const EditVehicle = () => {
 
   const validateForm = () => {
     const newErrors = {};
-    const plateRegex = /^(\d{2,3}[A-Z]{0,2}-\d{4,5}(?:\.\d{2})?|\d{3,5}-[A-Z]{2,3}|[A-Z]{2,3}-\d{4,5}|\d{2}-[A-Z]{2}-\d{5}|[A-Z]{2}-\d{3}-\d{2})$/;
+    const plateRegex = /^[A-Za-z0-9\s.-]{3,15}$/;
     const textRegex = /^[a-zA-Z0-9\s]+$/;
-    const specialCharRegex = /[!@#$%^&*(),.?":{}|<>]/;
+    const specialCharRegex = /[!@#$%^&*(),?":{}|<>]/;
     const numberRegex = /^\d+$/;
 
     if (!formData.name || formData.name.trim() === '') {
@@ -164,11 +173,11 @@ const EditVehicle = () => {
 
     if (!formData.licensePlate || formData.licensePlate.trim() === '') {
       newErrors.licensePlate = 'License plate is required';
-    } else if (!plateRegex.test(formData.licensePlate)) {
-      newErrors.licensePlate = 'Invalid format (e.g., 30A-12345, 123-12345, 12345-AB, AB-12345, 30-AB-12345, NG-123-45, 30A-12345.67)';
+    } else if (!plateRegex.test(formData.licensePlate.trim())) {
+      newErrors.licensePlate = 'License plate must be 3-15 characters (letters, numbers, spaces, dots, or dashes)';
     } else if (
-      existingPlates.includes(formData.licensePlate) &&
-      formData.licensePlate !== vehicles.find((v) => v.id === parseInt(id))?.licensePlate
+      existingPlates.some(plate => plate.toLowerCase() === formData.licensePlate.trim().toLowerCase()) &&
+      formData.licensePlate.trim().toLowerCase() !== vehicles.find((v) => v.id === parseInt(id))?.licensePlate?.toLowerCase()
     ) {
       newErrors.licensePlate = 'License plate already exists';
     }
@@ -199,6 +208,15 @@ const EditVehicle = () => {
       newErrors.brand = 'Brand must contain only letters, numbers, and spaces';
     }
 
+    if (formData.image) {
+      const validImageTypes = ['image/jpeg', 'image/png', 'image/gif'];
+      if (!validImageTypes.includes(formData.image.type)) {
+        newErrors.image = 'Image must be JPEG, PNG, or GIF';
+      } else if (formData.image.size > 5 * 1024 * 1024) {
+        newErrors.image = 'Image size must not exceed 5MB';
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -219,12 +237,12 @@ const EditVehicle = () => {
     const formDataToSend = new FormData();
     const vehicleDTO = {
       id: parseInt(id),
-      name: formData.name,
-      licensePlate: formData.licensePlate,
+      name: formData.name.trim(),
+      licensePlate: formData.licensePlate.trim(),
       userId: parseInt(formData.userId),
       vehicleTypeId: parseInt(formData.vehicleTypeId),
-      color: formData.color,
-      brand: formData.brand,
+      color: formData.color.trim(),
+      brand: formData.brand.trim(),
       isDelete: false,
       image: formData.image ? undefined : previewUrl,
     };
@@ -239,8 +257,14 @@ const EditVehicle = () => {
         body: formDataToSend,
       });
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `HTTP error: ${response.status}`);
+        let errorMessage = `HTTP error: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch (jsonError) {
+          console.error("Failed to parse error response:", jsonError);
+        }
+        throw new Error(errorMessage);
       }
       const data = await response.json();
       setSuccessMessage(`Vehicle ${data.licensePlate} updated successfully!`);
@@ -251,6 +275,7 @@ const EditVehicle = () => {
         )
       );
       if (data.image) {
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
         setPreviewUrl(data.image);
       }
       setTimeout(() => setSuccessMessage(''), 5000);
@@ -275,9 +300,10 @@ const EditVehicle = () => {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
       });
-      if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+      if (!response.ok) throw new Error(`Failed to delete vehicle: ${response.status}`);
       setSuccessMessage('Vehicle deleted successfully!');
       setFormData({ id: '', name: '', licensePlate: '', userId: formData.userId, vehicleTypeId: '', color: '', brand: '', image: null });
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(null);
       setVehicles((prev) => prev.filter((v) => v.id !== parseInt(id)));
       setExistingPlates((prev) => prev.filter((p) => p !== formData.licensePlate));
@@ -287,7 +313,7 @@ const EditVehicle = () => {
       setTimeout(() => setErrorMessage(''), 5000);
     } finally {
       setIsLoading(false);
-      setIsDeleteModalOpen(false); // Close the modal after deletion
+      setIsDeleteModalOpen(false);
     }
   };
 
@@ -310,6 +336,7 @@ const EditVehicle = () => {
     setFormData((prev) => ({ ...prev, image: file }));
     setErrors((prev) => ({ ...prev, image: '' }));
     if (file) {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
       const imageUrl = URL.createObjectURL(file);
       setPreviewUrl(imageUrl);
       setIsModalOpen(true);
@@ -367,6 +394,7 @@ const EditVehicle = () => {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-gray-600 to-gray-500 text-white rounded-xl font-semibold text-sm shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-gray-200 transition-all duration-300"
+                aria-label="Back to vehicle list"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
@@ -393,6 +421,7 @@ const EditVehicle = () => {
                 onChange={(e) => navigate(`/editv/${e.target.value}`)}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-300 bg-gray-50/50 hover:bg-white cursor-pointer"
                 disabled={isLoading}
+                aria-label="Select vehicle to edit"
               >
                 <option value="0">Select a vehicle</option>
                 {vehicles.map((vehicle) => (
@@ -405,21 +434,7 @@ const EditVehicle = () => {
 
             {isLoading && !formData.licensePlate && id !== '0' && (
               <div className="flex justify-center items-center py-4">
-                <motion.div
-                  className="w-2 h-2 bg-blue-500 rounded-full mr-1"
-                  animate={{ opacity: [0.4, 1, 0.4] }}
-                  transition={{ duration: 1.5, repeat: Infinity, delay: 0 }}
-                />
-                <motion.div
-                  className="w-2 h-2 bg-blue-500 rounded-full mr-1"
-                  animate={{ opacity: [0.4, 1, 0.4] }}
-                  transition={{ duration: 1.5, repeat: Infinity, delay: 0.2 }}
-                />
-                <motion.div
-                  className="w-2 h-2 bg-blue-500 rounded-full"
-                  animate={{ opacity: [0.4, 1, 0.4] }}
-                  transition={{ duration: 1.5, repeat: Infinity, delay: 0.4 }}
-                />
+                <BounceLoadingComponent />
               </div>
             )}
 
@@ -427,7 +442,7 @@ const EditVehicle = () => {
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2">
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    <label htmlFor="name" className="block text-sm font-semibold text-gray-700 mb-2">
                       <div className="flex items-center space-x-2">
                         <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path
@@ -441,13 +456,16 @@ const EditVehicle = () => {
                       </div>
                     </label>
                     <input
+                      id="name"
                       type="text"
                       name="name"
                       value={formData.name}
                       onChange={handleChange}
-                      placeholder="e.g., BMW X"
+                      placeholder="e.g., Toyota Camry 2023"
                       className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-300 bg-gray-50/50 hover:bg-white"
                       disabled={isLoading}
+                      aria-invalid={!!errors.name}
+                      aria-describedby={errors.name ? "name-error" : undefined}
                     />
                     <AnimatePresence>
                       {errors.name && (
@@ -455,6 +473,7 @@ const EditVehicle = () => {
                           initial={{ opacity: 0, y: -10 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -10 }}
+                          id="name-error"
                           className="text-red-500 text-xs flex items-center space-x-1"
                         >
                           <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -471,7 +490,7 @@ const EditVehicle = () => {
                   </motion.div>
 
                   <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2">
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    <label htmlFor="licensePlate" className="block text-sm font-semibold text-gray-700 mb-2">
                       <div className="flex items-center space-x-2">
                         <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path
@@ -485,13 +504,16 @@ const EditVehicle = () => {
                       </div>
                     </label>
                     <input
+                      id="licensePlate"
                       type="text"
                       name="licensePlate"
                       value={formData.licensePlate}
                       onChange={handleChange}
-                      placeholder="e.g., 30A-12345, 123-12345, 12345-AB, AB-12345, 30-AB-12345, NG-123-45, 30A-12345.67"
+                      placeholder="e.g., ABC123 or 30A-12345"
                       className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all duration-300 bg-gray-50/50 hover:bg-white font-mono"
                       disabled={isLoading}
+                      aria-invalid={!!errors.licensePlate}
+                      aria-describedby={errors.licensePlate ? "licensePlate-error" : undefined}
                     />
                     <AnimatePresence>
                       {errors.licensePlate && (
@@ -499,6 +521,7 @@ const EditVehicle = () => {
                           initial={{ opacity: 0, y: -10 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -10 }}
+                          id="licensePlate-error"
                           className="text-red-500 text-xs flex items-center space-x-1"
                         >
                           <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -515,7 +538,7 @@ const EditVehicle = () => {
                   </motion.div>
 
                   <motion.div hidden variants={inputVariants} whileFocus="focused" className="space-y-2">
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    <label htmlFor="userId" className="block text-sm font-semibold text-gray-700 mb-2">
                       <div className="flex items-center space-x-2">
                         <svg className="w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path
@@ -529,6 +552,7 @@ const EditVehicle = () => {
                       </div>
                     </label>
                     <input
+                      id="userId"
                       type="text"
                       name="userId"
                       value={formData.userId}
@@ -537,6 +561,8 @@ const EditVehicle = () => {
                       className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-300 bg-gray-50/50 hover:bg-white"
                       disabled={isLoading}
                       hidden
+                      aria-invalid={!!errors.userId}
+                      aria-describedby={errors.userId ? "userId-error" : undefined}
                     />
                     <AnimatePresence>
                       {errors.userId && (
@@ -544,6 +570,7 @@ const EditVehicle = () => {
                           initial={{ opacity: 0, y: -10 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -10 }}
+                          id="userId-error"
                           className="text-red-500 text-xs flex items-center space-x-1"
                         >
                           <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -560,7 +587,7 @@ const EditVehicle = () => {
                   </motion.div>
 
                   <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2">
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    <label htmlFor="vehicleTypeId" className="block text-sm font-semibold text-gray-700 mb-2">
                       <div className="flex items-center space-x-2">
                         <svg className="w-4 h-4 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path
@@ -574,11 +601,14 @@ const EditVehicle = () => {
                       </div>
                     </label>
                     <select
+                      id="vehicleTypeId"
                       name="vehicleTypeId"
                       value={formData.vehicleTypeId}
                       onChange={handleChange}
                       className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-100 transition-all duration-300 bg-gray-50/50 hover:bg-white cursor-pointer"
                       disabled={isLoading}
+                      aria-invalid={!!errors.vehicleTypeId}
+                      aria-describedby={errors.vehicleTypeId ? "vehicleTypeId-error" : undefined}
                     >
                       <option value="">Select vehicle type</option>
                       {vehicleTypes.map((type) => (
@@ -593,6 +623,7 @@ const EditVehicle = () => {
                           initial={{ opacity: 0, y: -10 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -10 }}
+                          id="vehicleTypeId-error"
                           className="text-red-500 text-xs flex items-center space-x-1"
                         >
                           <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -609,7 +640,7 @@ const EditVehicle = () => {
                   </motion.div>
 
                   <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2">
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    <label htmlFor="color" className="block text-sm font-semibold text-gray-700 mb-2">
                       <div className="flex items-center space-x-2">
                         <svg className="w-4 h-4 text-pink-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path
@@ -623,6 +654,7 @@ const EditVehicle = () => {
                       </div>
                     </label>
                     <input
+                      id="color"
                       type="text"
                       name="color"
                       value={formData.color}
@@ -630,6 +662,8 @@ const EditVehicle = () => {
                       placeholder="e.g., Red"
                       className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-pink-500 focus:ring-4 focus:ring-pink-100 transition-all duration-300 bg-gray-50/50 hover:bg-white"
                       disabled={isLoading}
+                      aria-invalid={!!errors.color}
+                      aria-describedby={errors.color ? "color-error" : undefined}
                     />
                     <AnimatePresence>
                       {errors.color && (
@@ -637,6 +671,7 @@ const EditVehicle = () => {
                           initial={{ opacity: 0, y: -10 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -10 }}
+                          id="color-error"
                           className="text-red-500 text-xs flex items-center space-x-1"
                         >
                           <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -653,7 +688,7 @@ const EditVehicle = () => {
                   </motion.div>
 
                   <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2">
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    <label htmlFor="brand" className="block text-sm font-semibold text-gray-700 mb-2">
                       <div className="flex items-center space-x-2">
                         <svg className="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path
@@ -667,6 +702,7 @@ const EditVehicle = () => {
                       </div>
                     </label>
                     <input
+                      id="brand"
                       type="text"
                       name="brand"
                       value={formData.brand}
@@ -674,6 +710,8 @@ const EditVehicle = () => {
                       placeholder="e.g., Toyota"
                       className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all duration-300 bg-gray-50/50 hover:bg-white"
                       disabled={isLoading}
+                      aria-invalid={!!errors.brand}
+                      aria-describedby={errors.brand ? "brand-error" : undefined}
                     />
                     <AnimatePresence>
                       {errors.brand && (
@@ -681,6 +719,7 @@ const EditVehicle = () => {
                           initial={{ opacity: 0, y: -10 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -10 }}
+                          id="brand-error"
                           className="text-red-500 text-xs flex items-center space-x-1"
                         >
                           <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -697,7 +736,7 @@ const EditVehicle = () => {
                   </motion.div>
 
                   <motion.div variants={inputVariants} whileFocus="focused" className="space-y-2 md:col-span-2">
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    <label htmlFor="vehicleImage" className="block text-sm font-semibold text-gray-700 mb-2">
                       <div className="flex items-center space-x-2">
                         <svg className="w-4 h-4 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path
@@ -712,17 +751,19 @@ const EditVehicle = () => {
                     </label>
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/jpeg,image/png,image/gif"
                       id="vehicleImage"
                       onChange={handleImageChange}
                       className="hidden"
                       disabled={isLoading}
+                      aria-describedby={errors.image ? "image-error" : undefined}
                     />
                     {formData.image || previewUrl ? (
                       <div className="flex space-x-2 w-full">
                         <label
                           htmlFor="vehicleImage"
                           className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-teal-500 text-sm font-medium text-teal-700 bg-teal-50 hover:bg-teal-100 hover:text-teal-800 transition-all duration-300 cursor-pointer"
+                          aria-label="Choose another image"
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                             <path
@@ -737,6 +778,7 @@ const EditVehicle = () => {
                           type="button"
                           onClick={() => setIsModalOpen(true)}
                           className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-red-500 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 hover:text-red-800 transition-all duration-300"
+                          aria-label="Preview selected image"
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                             <path
@@ -754,6 +796,7 @@ const EditVehicle = () => {
                         className={`flex items-center justify-center gap-2 w-full px-4 py-3 rounded-xl border-2 border-teal-500 text-sm font-medium text-teal-700 bg-teal-50 hover:bg-teal-100 hover:text-teal-800 transition-all duration-300 cursor-pointer ${
                           isLoading ? 'opacity-50 cursor-not-allowed' : 'focus:outline-none focus:ring-4 focus:ring-teal-200'
                         }`}
+                        aria-label="Choose image"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                           <path
@@ -771,6 +814,7 @@ const EditVehicle = () => {
                           initial={{ opacity: 0, y: -10 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -10 }}
+                          id="image-error"
                           className="text-red-500 text-xs flex items-center space-x-1"
                         >
                           <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -790,7 +834,7 @@ const EditVehicle = () => {
                           <button
                             onClick={() => setIsModalOpen(false)}
                             className="absolute top-3 right-3 text-gray-500 hover:text-red-500 transition-colors duration-200"
-                            aria-label="Close"
+                            aria-label="Close image preview modal"
                           >
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -799,7 +843,7 @@ const EditVehicle = () => {
                           <div className="w-full h-[300px] flex items-center justify-center rounded-xl overflow-hidden bg-gray-50">
                             <img
                               src={previewUrl}
-                              alt="Preview"
+                              alt="Vehicle preview"
                               className="max-w-full max-h-full object-contain rounded-md"
                             />
                           </div>
@@ -815,6 +859,7 @@ const EditVehicle = () => {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   className="w-full py-4 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 text-white rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-blue-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 relative overflow-hidden"
+                  aria-label="Update vehicle"
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-blue-500 via-purple-500 to-indigo-500 opacity-0 hover:opacity-100 transition-opacity duration-300" />
                   <div className="relative z-10 flex items-center justify-center space-x-2">
@@ -845,6 +890,7 @@ const EditVehicle = () => {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   className="w-full py-4 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-red-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 relative overflow-hidden"
+                  aria-label="Delete vehicle"
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-red-600 to-red-700 opacity-0 hover:opacity-100 transition-opacity duration-300" />
                   <div className="relative z-10 flex items-center justify-center space-x-2">
@@ -855,7 +901,6 @@ const EditVehicle = () => {
                   </div>
                 </motion.button>
 
-                {/* Delete Confirmation Modal */}
                 {isDeleteModalOpen && (
                   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/10 backdrop-blur-sm">
                     <motion.div
@@ -867,7 +912,7 @@ const EditVehicle = () => {
                       <button
                         onClick={closeDeleteModal}
                         className="absolute top-3 right-3 text-gray-500 hover:text-red-500 transition-colors duration-200"
-                        aria-label="Close"
+                        aria-label="Close delete confirmation modal"
                       >
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -884,6 +929,7 @@ const EditVehicle = () => {
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
                             className="px-4 py-2 bg-gray-200 text-gray-700 rounded-xl font-semibold text-sm shadow hover:bg-gray-300 transition-all duration-200"
+                            aria-label="Cancel deletion"
                           >
                             Cancel
                           </motion.button>
@@ -892,6 +938,7 @@ const EditVehicle = () => {
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
                             className="px-4 py-2 bg-red-600 text-white rounded-xl font-semibold text-sm shadow hover:bg-red-700 transition-all duration-200"
+                            aria-label="Confirm deletion"
                           >
                             Delete
                           </motion.button>
