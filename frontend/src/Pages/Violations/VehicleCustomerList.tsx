@@ -25,6 +25,7 @@ import { getCookie } from '../../utils/cookieUltil'
 import { Header, MobileDropdownMenu } from '../../components/Layout/Menu'
 import Footer from '../../components/Layout/Footer'
 import {API_URL_BE} from '../../components/Link/LinkAPI'
+import BounceLoadingComponent from '../../components/Layout/Loading'
 
 interface VehicleDTO {
   id: number
@@ -393,14 +394,8 @@ const VehicleCustomerList: React.FC<VehicleCustomerListProps> = ({
 
   if (isLoading) {
     return (
-      <div className='flex justify-center items-center h-screen bg-gray-50'>
-        <div className='relative'>
-          <div className='w-16 h-16 border-4 border-gray-200 rounded-full'></div>
-          <div className='w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full absolute top-0 left-0 animate-spin'></div>
-          <div className='absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2'>
-            {getVehicleIcon(1)}
-          </div>
-        </div>
+      <div >
+       <BounceLoadingComponent/>
       </div>
     )
   }

@@ -9,7 +9,8 @@ import { Eye, RefreshCw, CheckCircle2, XCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import {API_URL_BE} from "../../components/Link/LinkAPI";
+import { API_URL_BE } from "../../components/Link/LinkAPI";
+import BounceLoadingComponent from "../../components/Layout/Loading";
 
 interface Camera {
   id: number;
@@ -76,7 +77,6 @@ export default function ViolationDetail() {
   const [detailFormData, setDetailFormData] = useState<Partial<ViolationDetail>>({});
   const [imageExpanded, setImageExpanded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-
 
   useEffect(() => {
     if (!id || isNaN(Number(id))) {
@@ -242,11 +242,9 @@ export default function ViolationDetail() {
   const getStatusColor = (status: string) => {
     const statusMap: { [key: string]: { bg: string; text: string; icon: React.ReactNode } } = {
       pending: { bg: "bg-gray-100", text: "text-gray-500", icon: <div className="w-2 h-2 bg-gray-400 rounded-full" /> },
-      // requested: { bg: "bg-yellow-100", text: "text-yellow-700", icon: <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" /> },
       approved: { bg: "bg-green-100", text: "text-green-700", icon: <CheckCircle2 className="text-green-500" size={14} /> },
       rejected: { bg: "bg-red-100", text: "text-red-700", icon: <XCircle className="text-red-500" size={14} /> },
-      processed: { bg: "bg-teal-100", text: "text-teal-700", icon: <CheckCircle2 className="text-teal-500" size={14} /> }
-      ,
+      processed: { bg: "bg-teal-100", text: "text-teal-700", icon: <CheckCircle2 className="text-teal-500" size={14} /> },
     };
     return statusMap[status.toLowerCase()] || { bg: "bg-gray-100", text: "text-gray-500", icon: <div className="w-2 h-2 bg-gray-400 rounded-full" /> };
   };
@@ -288,13 +286,7 @@ export default function ViolationDetail() {
           <Header title="Violation Detail" />
           <div className="flex items-center justify-center flex-grow">
             <div className="flex flex-col items-center space-y-4">
-              <div className="relative">
-                <div className="animate-spin rounded-full h-16 w-16 border-4 border-gradient-to-r from-blue-400 to-cyan-400 border-t-transparent"></div>
-                <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-400 to-cyan-400 opacity-20 animate-pulse"></div>
-              </div>
-              <p className="text-blue-800 font-semibold bg-white/50 backdrop-blur-md px-6 py-3 rounded-full shadow-lg">
-                Loading data...
-              </p>
+              <BounceLoadingComponent />
             </div>
           </div>
         </div>
@@ -480,7 +472,7 @@ export default function ViolationDetail() {
                 >
                   <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></span>
                   <RefreshCw size={16} className={refreshing ? "animate-spin mr-2" : "mr-2"} />
-                  Refresh
+                  {refreshing ? <BounceLoadingComponent /> : "Refresh"}
                 </button>
                 {!isEditingDetail && (
                   <button
@@ -515,23 +507,25 @@ export default function ViolationDetail() {
                     >
                       <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></span>
                       {loading ? (
-                        <div className="w-4 h-4 mr-2 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                        <BounceLoadingComponent />
                       ) : (
-                        <svg
-                          className="w-4 h-4 mr-2"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M5 13l4 4L19 7"
-                          />
-                        </svg>
+                        <>
+                          <svg
+                            className="w-4 h-4 mr-2"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M5 13l4 4L19 7"
+                            />
+                          </svg>
+                          Save Changes
+                        </>
                       )}
-                      Save Changes
                     </button>
                     <button
                       onClick={() => setIsEditingDetail(false)}
@@ -607,23 +601,25 @@ export default function ViolationDetail() {
                   >
                     <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></span>
                     {loading ? (
-                      <div className="w-4 h-4 mr-2 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                      <BounceLoadingComponent />
                     ) : (
-                      <svg
-                        className="w-4 h-4 mr-2"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
+                      <>
+                        <svg
+                          className="w-4 h-4 mr-2"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                        Update Status
+                      </>
                     )}
-                    Update Status
                   </button>
                 </div>
               </motion.div>
@@ -703,88 +699,88 @@ export default function ViolationDetail() {
 
                 {/* Video */}
                 {violation.violationDetails[0].videoUrl ? (
-  <motion.div 
-    className="bg-gradient-to-br from-white/95 to-blue-100/95 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-blue-200/50 transform hover:scale-[1.02] transition-all duration-300"
-    initial={{ opacity: 0, x: -20 }}
-    animate={{ opacity: 1, x: 0 }}
-    transition={{ duration: 0.5, delay: 0.1 }}
-  >
-    <h3 className="text-xl font-bold bg-gradient-to-r from-blue-800 to-cyan-600 bg-clip-text text-transparent mb-4 flex items-center">
-      <div className="w-6 h-6 mr-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center animate-pulse-slow">
-        <svg
-          className="w-4 h-4 text-white"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-          />
-        </svg>
-      </div>
-      Violation Video
-    </h3>
-    <div className="relative group">
-      <video
-        src={violation.violationDetails[0].videoUrl}
-        controls
-        className="w-full rounded-xl border-2 border-blue-200/50 transition-all duration-300 group-hover:border-blue-400 group-hover:shadow-2xl group-hover:shadow-blue-400/40"
-      />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent rounded-xl opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center pointer-events-none">
-        <div className="bg-white/90 backdrop-blur-sm rounded-full p-3 transform scale-90 group-hover:scale-100 transition-all duration-300">
-          <svg
-            className="w-8 h-8 text-blue-600"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
-            />
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-        </div>
-      </div>
-    </div>
-  </motion.div>
-) : (
-  <motion.div 
-    className="bg-gradient-to-br from-white/95 to-gray-100/95 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-gray-200/50"
-    initial={{ opacity: 0, x: -20 }}
-    animate={{ opacity: 1, x: 0 }}
-    transition={{ duration: 0.5, delay: 0.1 }}
-  >
-    <div className="text-center py-16 text-gray-500">
-      <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-gray-400 to-blue-400 rounded-full flex items-center justify-center animate-pulse">
-        <svg
-          className="w-10 h-10 text-white"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-          />
-        </svg>
-      </div>
-      <p className="font-medium text-gray-600">No video available</p>
-    </div>
-  </motion.div>
-)}
+                  <motion.div 
+                    className="bg-gradient-to-br from-white/95 to-blue-100/95 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-blue-200/50 transform hover:scale-[1.02] transition-all duration-300"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.5, delay: 0.1 }}
+                  >
+                    <h3 className="text-xl font-bold bg-gradient-to-r from-blue-800 to-cyan-600 bg-clip-text text-transparent mb-4 flex items-center">
+                      <div className="w-6 h-6 mr-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center animate-pulse-slow">
+                        <svg
+                          className="w-4 h-4 text-white"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+                          />
+                        </svg>
+                      </div>
+                      Violation Video
+                    </h3>
+                    <div className="relative group">
+                      <video
+                        src={violation.violationDetails[0].videoUrl}
+                        controls
+                        className="w-full rounded-xl border-2 border-blue-200/50 transition-all duration-300 group-hover:border-blue-400 group-hover:shadow-2xl group-hover:shadow-blue-400/40"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent rounded-xl opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center pointer-events-none">
+                        <div className="bg-white/90 backdrop-blur-sm rounded-full p-3 transform scale-90 group-hover:scale-100 transition-all duration-300">
+                          <svg
+                            className="w-8 h-8 text-blue-600"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+                            />
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                            />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <motion.div 
+                    className="bg-gradient-to-br from-white/95 to-gray-100/95 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-gray-200/50"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.5, delay: 0.1 }}
+                  >
+                    <div className="text-center py-16 text-gray-500">
+                      <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-gray-400 to-blue-400 rounded-full flex items-center justify-center animate-pulse">
+                        <svg
+                          className="w-10 h-10 text-white"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+                          />
+                        </svg>
+                      </div>
+                      <p className="font-medium text-gray-600">No video available</p>
+                    </div>
+                  </motion.div>
+                )}
               </div>
 
               {/* Details Section */}
@@ -884,15 +880,13 @@ export default function ViolationDetail() {
                       <label className="block text-blue-700 font-medium mb-1">
                         Violation Type:
                       </label>
-                      
-                        <span
-                          className={`px-4 py-2 rounded-xl text-sm font-semibold transform hover:scale-105 transition-all duration-300 ${getSeverityBadge(
-                            violation.violationDetails[0].violationType?.typeName || ""
-                          )}`}
-                        >
-                          {violation.violationDetails[0].violationType?.typeName || "N/A"}
-                        </span>
-                      
+                      <span
+                        className={`px-4 py-2 rounded-xl text-sm font-semibold transform hover:scale-105 transition-all duration-300 ${getSeverityBadge(
+                          violation.violationDetails[0].violationType?.typeName || ""
+                        )}`}
+                      >
+                        {violation.violationDetails[0].violationType?.typeName || "N/A"}
+                      </span>
                     </div>
                     <div>
                       <label className="block text-blue-700 font-medium mb-1">
