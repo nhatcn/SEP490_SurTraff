@@ -7,7 +7,6 @@ import { getCookie } from "../../utils/cookieUltil"
 import { Header, MobileDropdownMenu } from '../../components/Layout/Menu';
 import Footer from '../../components/Layout/Footer';
 import {API_URL_BE} from '../../components/Link/LinkAPI';
-
 const AddVehicle = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
