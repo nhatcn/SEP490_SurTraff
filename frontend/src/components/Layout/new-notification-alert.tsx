@@ -55,8 +55,8 @@ export default function NewNotificationAlert({ notification, onClose }: NewNotif
   }, [notification, onClose])
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] animate-fade-in">
-      <div className="bg-white rounded-lg shadow-2xl p-8 max-w-md w-full relative transform scale-100 transition-all duration-300 ease-out">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+      <div className="relative bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full transform scale-100 transition-all duration-300 ease-out border border-gray-200 animate-fade-in">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors duration-200"
