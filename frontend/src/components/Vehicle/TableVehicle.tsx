@@ -232,7 +232,7 @@ export default function TableVehicle({ vehicles = [], setVehicles, isLoading: pa
       width: "28%",
       render: (_, vehicle) => (
         <div className="flex flex-col gap-1">
-          <span className="text-gray-900 font-medium">{userData[vehicle.userId]?.userName || "N/A"}</span>
+          <span className="text-gray-900 font-medium">@{userData[vehicle.userId]?.userName || "N/A"}</span>
           <span className="text-gray-600 text-sm">{userData[vehicle.userId]?.fullName || "N/A"}</span>
           <span className="text-gray-500 text-xs">{userData[vehicle.userId]?.email || "N/A"}</span>
         </div>
@@ -247,7 +247,7 @@ export default function TableVehicle({ vehicles = [], setVehicles, isLoading: pa
           <motion.button
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
-            className="text-blue-600 hover:text-blue-800 p-2 rounded-lg border border-gray-300 transition-colors hover:bg-blue-50"
+            className="text-blue-600 hover:text-blue-800 p-2 rounded-lg   transition-colors hover:bg-blue-50"
             onClick={() => navigate(`/vehicles/${vehicle.id}`)}
             title="View Details"
           >
@@ -256,7 +256,7 @@ export default function TableVehicle({ vehicles = [], setVehicles, isLoading: pa
           <motion.button
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
-            className="text-red-600 hover:text-red-800 p-2 rounded-lg border border-gray-300 transition-colors hover:bg-red-50"
+            className="text-red-600 hover:text-red-800 p-2 rounded-lg   transition-colors hover:bg-red-50"
             onClick={() => {
               setSelectedId(vehicle.id);
               setOpenDialog(true);
