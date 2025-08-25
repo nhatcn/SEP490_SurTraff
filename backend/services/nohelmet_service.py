@@ -170,32 +170,66 @@ def save_temp_violation_video(frames, fps, output_path, width, height, violation
     Lưu video vi phạm từ danh sách frames, lấy 1 giây trước và 2 giây sau frame vi phạm
     """
     try:
-        out = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))
-        
+        # Ensure we have enough frames and proper indices
+        if len(frames) == 0:
+            print(f"[-] No frames available for video creation")
+            return False
+            
         # Calculate frame indices: 1s before and 2s after
         frames_before = int(1 * fps)  # 1 second of frames before
         frames_after = int(2 * fps)   # 2 seconds of frames after
-        start_idx = max(0, violation_frame_idx - frames_before)
-        end_idx = min(len(frames), violation_frame_idx + frames_after + 1)
+        
+        # Fix violation_frame_idx to be relative to buffer
+        buffer_violation_idx = min(violation_frame_idx, len(frames) - 1)
+        start_idx = max(0, buffer_violation_idx - frames_before)
+        end_idx = min(len(frames), buffer_violation_idx + frames_after + 1)
+        
+        print(f"[DEBUG] Video creation: buffer_size={len(frames)}, violation_idx={buffer_violation_idx}, range=[{start_idx}:{end_idx}]")
+
+        out = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))
+        if not out.isOpened():
+            print(f"[-] Failed to open video writer for {output_path}")
+            return False
 
         frames_written = 0
         for i in range(start_idx, end_idx):
+            if i >= len(frames):
+                break
+                
             frame = frames[i]
-            if frame is not None and frame.shape[1] == width and frame.shape[0] == height:
-                out.write(frame)
-                frames_written += 1
-            else:
-                print(f"⚠️ Skipping invalid frame at index {i}: shape={frame.shape if frame is not None else None}")
+            if frame is None:
+                print(f"⚠️ Frame at index {i} is None, skipping...")
+                continue
+                
+            # Validate frame dimensions and type
+            if len(frame.shape) != 3 or frame.shape[2] != 3:
+                print(f"⚠️ Invalid frame format at index {i}: shape={frame.shape}")
+                continue
+                
+            frame_h, frame_w = frame.shape[:2]
+            if frame_w != width or frame_h != height:
+                print(f"⚠️ Frame dimension mismatch at index {i}: expected ({width}x{height}), got ({frame_w}x{frame_h})")
+                # Resize frame to match expected dimensions
+                frame = cv2.resize(frame, (width, height))
+                
+            out.write(frame)
+            frames_written += 1
 
         out.release()
-        if frames_written > 0 and os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+        
+        # Verify the output file
+        if frames_written > 0 and os.path.exists(output_path) and os.path.getsize(output_path) > 1024:  # At least 1KB
             print(f"[+] Saved violation video: {output_path} ({frames_written} frames)")
             return True
         else:
-            print(f"[-] Failed to save valid violation video: {output_path}")
+            print(f"[-] Failed to save valid violation video: {output_path} (frames_written: {frames_written})")
+            if os.path.exists(output_path):
+                os.remove(output_path)
             return False
+            
     except Exception as e:
         print(f"[-] Error saving violation video: {str(e)}")
+        traceback.print_exc()
         return False
 
 def send_violation_async(violation_data, image_path, video_path, track_id):
@@ -204,13 +238,22 @@ def send_violation_async(violation_data, image_path, video_path, track_id):
     """
     def send_violation():
         try:
+            # Verify files exist before sending
+            if not os.path.exists(image_path) or not os.path.exists(video_path):
+                print(f"❌ Missing files for track {track_id}: img={os.path.exists(image_path)}, vid={os.path.exists(video_path)}")
+                return
+                
+            if os.path.getsize(image_path) == 0 or os.path.getsize(video_path) == 0:
+                print(f"❌ Empty files for track {track_id}: img_size={os.path.getsize(image_path)}, vid_size={os.path.getsize(video_path)}")
+                return
+                
             with open(image_path, 'rb') as img_file, open(video_path, 'rb') as vid_file:
                 files = {
                     'imageFile': ('violation.jpg', img_file, 'image/jpeg'),
                     'videoFile': ('violation.mp4', vid_file, 'video/mp4'),
                     'Violation': (None, json.dumps(violation_data), 'application/json')
                 }
-                response = requests.post(VIOLATION_API_URL, files=files, timeout=10)
+                response = requests.post(VIOLATION_API_URL, files=files, timeout=30)
                 response.raise_for_status()
                 print(f"✅ Violation sent successfully for track {track_id}: {response.status_code}")
         except Exception as e:
@@ -270,7 +313,7 @@ async def stream_no_helmet_service(youtube_url: str, camera_id: int):
     print(f"[+] Video properties: {frame_width}x{frame_height} @ {fps} FPS")
 
     vehicle_violations = {}
-    frame_buffer = deque(maxlen=int(fps * 3))  # Buffer for 3 seconds to cover 1s before + 2s after
+    frame_buffer = deque(maxlen=int(fps * 4))  # Buffer for 4 seconds to ensure we have enough frames
     reconnect_attempts = 0
     max_reconnect_attempts = RECONNECT_ATTEMPTS * 2  # Hard limit for reconnection attempts
     last_valid_frame_time = time.time()
@@ -312,7 +355,13 @@ async def stream_no_helmet_service(youtube_url: str, camera_id: int):
             reconnect_attempts = 0
             last_valid_frame_time = current_time
 
+            # Validate frame dimensions and format
+            if len(frame.shape) != 3 or frame.shape[2] != 3:
+                print(f"[-] Invalid frame format: shape={frame.shape}")
+                continue
+                
             frame_annotated = frame.copy()
+            # Create a deep copy for buffer to avoid reference issues
             frame_for_buffer = frame.copy()
             h, w, _ = frame.shape
             frame_count += 1
@@ -321,8 +370,11 @@ async def stream_no_helmet_service(youtube_url: str, camera_id: int):
             if w != frame_width or h != frame_height:
                 frame_width, frame_height = w, h
                 print(f"[+] Updated frame dimensions: {frame_width}x{frame_height}")
+                # Clear buffer when dimensions change to avoid issues
+                frame_buffer.clear()
 
-            frame_buffer.append(frame_for_buffer.copy())
+            # Add frame to buffer AFTER validation
+            frame_buffer.append(frame_for_buffer)
 
             # Detect license plates
             current_plates = {}
@@ -378,7 +430,7 @@ async def stream_no_helmet_service(youtube_url: str, camera_id: int):
 
             except Exception as e:
                 print(f"[-] License plate detection error: {str(e)}")
-                continue
+                # Just log the error and continue with helmet detection
 
             # Clean up license plate cache
             current_time = time.time()
@@ -388,37 +440,38 @@ async def stream_no_helmet_service(youtube_url: str, camera_id: int):
                 print(f"[+] Removing expired plate from cache: {plate_id}")
                 del license_plate_cache[plate_id]
 
+            # Initialize variables before helmet tracking
+            active_track_ids = set()
+            rider_boxes = []
+            
             # YOLO helmet tracking
             try:
                 helmet_results = helmet_model.track(source=frame, persist=True, conf=0.4, iou=0.4, tracker="bytetrack.yaml")[0]
             except Exception as e:
                 print(f"[-] YOLO helmet tracking error: {str(e)}")
-                continue
+                # Continue with frame encoding even if detection failed
+                helmet_results = None
 
-            if helmet_results.boxes is None or helmet_results.boxes.id is None:
-                print(f"[-] No valid helmet detection results")
-                ret, jpeg = cv2.imencode(".jpg", frame_annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
-                if ret and jpeg is not None:
-                    yield (b"--frame\r\n" + b"Content-Type: image/jpeg\r\n\r\n" + jpeg.tobytes() + b"\r\n")
-                continue
+            # Handle case when no helmet detection results
+            if helmet_results is None or helmet_results.boxes is None or helmet_results.boxes.id is None:
+                print(f"[DEBUG] No valid helmet detection results")
+            else:
+                # Process helmet detection results
 
-            active_track_ids = set()
-            rider_boxes = []
+                for i in range(len(helmet_results.boxes)):
+                    cls_id = int(helmet_results.boxes.cls[i])
+                    if cls_id not in helmet_class_names:
+                        print(f"[DEBUG] Skipping unknown class ID: {cls_id}")
+                        continue
 
-            for i in range(len(helmet_results.boxes)):
-                cls_id = int(helmet_results.boxes.cls[i])
-                if cls_id not in helmet_class_names:
-                    print(f"[DEBUG] Skipping unknown class ID: {cls_id}")
-                    continue
+                    class_name = helmet_class_names[cls_id]
+                    if class_name in ["helmet", "no helmet"]:
+                        x1, y1, x2, y2 = map(int, helmet_results.boxes.xyxy[i])
+                        track_id = int(helmet_results.boxes.id[i])
+                        active_track_ids.add(track_id)
+                        rider_boxes.append((x1, y1, x2, y2, track_id, class_name))
 
-                class_name = helmet_class_names[cls_id]
-                if class_name in ["helmet", "no helmet"]:
-                    x1, y1, x2, y2 = map(int, helmet_results.boxes.xyxy[i])
-                    track_id = int(helmet_results.boxes.id[i])
-                    active_track_ids.add(track_id)
-                    rider_boxes.append((x1, y1, x2, y2, track_id, class_name))
-
-            # Process pending violations
+            # Process pending violations (moved outside the else block)
             violations_to_process = []
             for track_id, violation_info in list(pending_violations.items()):
                 frames_elapsed = frame_count - violation_info['detected_frame']
@@ -433,18 +486,29 @@ async def stream_no_helmet_service(youtube_url: str, camera_id: int):
                 class_name = violation_info['class_name']
                 violation_frame_idx = violation_info['detected_frame']
 
-                violation_frame = frame_buffer[max(0, violation_frame_idx - int(fps))]  # Use frame from 1s before as reference
+                # Use the current frame buffer for creating violation video
+                if len(frame_buffer) > 0:
+                    # Get a reference frame for the violation image (use the most recent frame)
+                    violation_frame = list(frame_buffer)[-1].copy()  # Use the latest frame
 
-                with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_image, \
-                        tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as temp_video:
-                    image_path = temp_image.name
-                    video_path = temp_video.name
+                    with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_image, \
+                            tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as temp_video:
+                        image_path = temp_image.name
+                        video_path = temp_video.name
 
-                    cv2.imwrite(image_path, violation_frame)
+                        # Save violation image
+                        cv2.imwrite(image_path, violation_frame)
 
-                    violation_frames = list(frame_buffer)
-                    if len(violation_frames) > 0:
-                        save_success = save_temp_violation_video(violation_frames, fps, video_path, frame_width, frame_height, violation_frame_idx)
+                        # Create violation video from current buffer
+                        violation_frames = list(frame_buffer)
+                        # Use relative index within the buffer
+                        buffer_violation_idx = max(0, len(violation_frames) - 1)  # Use recent frames
+                        
+                        save_success = save_temp_violation_video(
+                            violation_frames, fps, video_path, 
+                            frame_width, frame_height, buffer_violation_idx
+                        )
+                        
                         if save_success:
                             violation_data = {
                                 "camera": {"id": camera_id},
@@ -468,69 +532,70 @@ async def stream_no_helmet_service(youtube_url: str, camera_id: int):
                             except Exception as cleanup_error:
                                 print(f"[-] Error cleaning up files after video save failure: {cleanup_error}")
 
-            # Process each rider
-            for x1, y1, x2, y2, track_id, class_name in rider_boxes:
-                rider_center_x = (x1 + x2) // 2
-                rider_center_y = (y1 + y2) // 2
+            # Process each rider (only if we have valid helmet results)
+            if helmet_results is not None and helmet_results.boxes is not None:
+                for x1, y1, x2, y2, track_id, class_name in rider_boxes:
+                    rider_center_x = (x1 + x2) // 2
+                    rider_center_y = (y1 + y2) // 2
 
-                head_height = int((y2 - y1) / 3 * ROI_SCALE)
-                head_width = int((x2 - x1) * ROI_SCALE)
-                head_x1 = max(0, int(x1 - (head_width - (x2 - x1)) / 2))
-                head_y1 = max(0, y1)
-                head_x2 = min(w, head_x1 + head_width)
-                head_y2 = min(h, head_y1 + head_height)
+                    head_height = int((y2 - y1) / 3 * ROI_SCALE)
+                    head_width = int((x2 - x1) * ROI_SCALE)
+                    head_x1 = max(0, int(x1 - (head_width - (x2 - x1)) / 2))
+                    head_y1 = max(0, y1)
+                    head_x2 = min(w, head_x1 + head_width)
+                    head_y2 = min(h, head_y1 + head_height)
 
-                no_helmet = False
-                if head_x2 > head_x1 and head_y2 > head_y1 and (head_x2 - head_x1) >= MIN_HEAD_SIZE and (head_y2 - head_y1) >= MIN_HEAD_SIZE:
-                    for box in helmet_results.boxes:
-                        cls_id = int(box.cls)
-                        if cls_id not in helmet_class_names:
-                            continue
-                        box_class_name = helmet_class_names[cls_id]
-                        if box_class_name in ["helmet", "no helmet"]:
-                            hx1, hy1, hx2, hy2 = map(int, box.xyxy[0])
-                            hcx, hcy = (hx1 + hx2) / 2, (hy1 + hy2) / 2
-                            if (abs(hcx - ((x1 + x2) / 2)) < head_width / 1.5 and
-                                    abs(hcy - ((y1 + y2) / 2)) < head_height / 1.5):
-                                if box_class_name == "no helmet":
-                                    no_helmet = True
-                                break
+                    no_helmet = False
+                    if head_x2 > head_x1 and head_y2 > head_y1 and (head_x2 - head_x1) >= MIN_HEAD_SIZE and (head_y2 - head_y1) >= MIN_HEAD_SIZE:
+                        for box in helmet_results.boxes:
+                            cls_id = int(box.cls)
+                            if cls_id not in helmet_class_names:
+                                continue
+                            box_class_name = helmet_class_names[cls_id]
+                            if box_class_name in ["helmet", "no helmet"]:
+                                hx1, hy1, hx2, hy2 = map(int, box.xyxy[0])
+                                hcx, hcy = (hx1 + hx2) / 2, (hy1 + hy2) / 2
+                                if (abs(hcx - ((x1 + x2) / 2)) < head_width / 1.5 and
+                                        abs(hcy - ((y1 + y2) / 2)) < head_height / 1.5):
+                                    if box_class_name == "no helmet":
+                                        no_helmet = True
+                                    break
 
-                license_plate_text, plate_bbox = find_closest_license_plate((rider_center_x, rider_center_y), license_plate_cache)
+                    license_plate_text, plate_bbox = find_closest_license_plate((rider_center_x, rider_center_y), license_plate_cache)
 
-                if no_helmet:
-                    current_time = time.time()
-                    can_send_violation = True
-                    if track_id in violation_cooldown:
-                        if current_time - violation_cooldown[track_id] < VIOLATION_COOLDOWN_TIME:
-                            can_send_violation = False
+                    if no_helmet:
+                        current_time = time.time()
+                        can_send_violation = True
+                        if track_id in violation_cooldown:
+                            if current_time - violation_cooldown[track_id] < VIOLATION_COOLDOWN_TIME:
+                                can_send_violation = False
 
-                    if can_send_violation:
-                        print(f"🚨 NO HELMET VIOLATION: Rider {track_id}, Plate: {license_plate_text} at ({rider_center_x}, {rider_center_y})")
-                        violation_cooldown[track_id] = current_time
-                        pending_violations[track_id] = {
-                            'detected_frame': frame_count,
-                            'license_plate': license_plate_text,
-                            'rider_center': (rider_center_x, rider_center_y),
-                            'rider_bbox': (x1, y1, x2, y2),
-                            'plate_bbox': plate_bbox,
-                            'class_name': class_name
-                        }
+                        if can_send_violation:
+                            print(f"🚨 NO HELMET VIOLATION: Rider {track_id}, Plate: {license_plate_text} at ({rider_center_x}, {rider_center_y})")
+                            violation_cooldown[track_id] = current_time
+                            pending_violations[track_id] = {
+                                'detected_frame': frame_count,
+                                'license_plate': license_plate_text,
+                                'rider_center': (rider_center_x, rider_center_y),
+                                'rider_bbox': (x1, y1, x2, y2),
+                                'plate_bbox': plate_bbox,
+                                'class_name': class_name
+                            }
 
-                color = (0, 0, 255) if no_helmet else (0, 255, 0)
-                violation_status = "VIOLATION" if no_helmet else "OK"
-                label = f"ID:{track_id} {class_name} {violation_status}"
+                    color = (0, 0, 255) if no_helmet else (0, 255, 0)
+                    violation_status = "VIOLATION" if no_helmet else "OK"
+                    label = f"ID:{track_id} {class_name} {violation_status}"
 
-                cv2.rectangle(frame_annotated, (x1, y1), (x2, y2), color, 2)
-                cv2.putText(frame_annotated, label, (x1, y1 - 30),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
-                plate_label = f"Plate: {license_plate_text}"
-                cv2.putText(frame_annotated, plate_label, (x1, y1 - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
-                if head_x2 > head_x1 and head_y2 > head_y1:
-                    cv2.rectangle(frame_annotated, (head_x1, head_y1), (head_x2, head_y2), color, 1)
+                    cv2.rectangle(frame_annotated, (x1, y1), (x2, y2), color, 2)
+                    cv2.putText(frame_annotated, label, (x1, y1 - 30),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+                    plate_label = f"Plate: {license_plate_text}"
+                    cv2.putText(frame_annotated, plate_label, (x1, y1 - 10),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+                    if head_x2 > head_x1 and head_y2 > head_y1:
+                        cv2.rectangle(frame_annotated, (head_x1, head_y1), (head_x2, head_y2), color, 1)
 
-            # Clean up old data
+            # Clean up old data (moved outside the else block)
             for track_id in list(vehicle_violations.keys()):
                 if track_id not in active_track_ids and time.time() - vehicle_violations[track_id]["last_seen"] > 60:
                     vehicle_violations.pop(track_id, None)
@@ -541,21 +606,47 @@ async def stream_no_helmet_service(youtube_url: str, camera_id: int):
             for tid in cooldowns_to_remove:
                 del violation_cooldown[tid]
 
-            for track_id in list(pending_violations.keys()):
-                if track_id not in active_track_ids:
-                    del pending_violations[track_id]
+            # Only clean pending violations for inactive tracks if we have valid detection results
+            if helmet_results is not None:
+                for track_id in list(pending_violations.keys()):
+                    if track_id not in active_track_ids:
+                        del pending_violations[track_id]
 
             # Display cache info
             cache_info = f"Cached Plates: {len(license_plate_cache)} | Frame: {frame_count} | Active: {len(active_track_ids)}"
             cv2.putText(frame_annotated, cache_info, (10, 30),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
-            ret, jpeg = cv2.imencode(".jpg", frame_annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
-            if ret and jpeg is not None:
-                yield (b"--frame\r\n" + b"Content-Type: image/jpeg\r\n\r\n" + jpeg.tobytes() + b"\r\n")
-            else:
-                print(f"[-] Failed to encode frame to JPEG")
-                continue
+            # Ensure frame encoding always happens - this is the ONLY place we yield frames
+            try:
+                ret_encode, jpeg = cv2.imencode(".jpg", frame_annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                if ret_encode and jpeg is not None and len(jpeg) > 0:
+                    yield (b"--frame\r\n" + b"Content-Type: image/jpeg\r\n\r\n" + jpeg.tobytes() + b"\r\n")
+                else:
+                    print(f"[-] Failed to encode frame {frame_count} to JPEG")
+                    # Try encoding original frame as fallback
+                    ret_fallback, jpeg_fallback = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 60])
+                    if ret_fallback and jpeg_fallback is not None:
+                        yield (b"--frame\r\n" + b"Content-Type: image/jpeg\r\n\r\n" + jpeg_fallback.tobytes() + b"\r\n")
+                    else:
+                        print(f"[-] Complete encoding failure for frame {frame_count}")
+                        # Create a simple error frame
+                        error_frame = np.zeros((frame_height, frame_width, 3), dtype=np.uint8)
+                        cv2.putText(error_frame, f"Encoding Error - Frame {frame_count}", 
+                                   (50, frame_height//2), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                        ret_error, jpeg_error = cv2.imencode(".jpg", error_frame, [cv2.IMWRITE_JPEG_QUALITY, 60])
+                        if ret_error and jpeg_error is not None:
+                            yield (b"--frame\r\n" + b"Content-Type: image/jpeg\r\n\r\n" + jpeg_error.tobytes() + b"\r\n")
+                            
+            except Exception as encode_error:
+                print(f"[-] Critical frame encoding error at frame {frame_count}: {str(encode_error)}")
+                # This is a critical error that might indicate system issues
+                # Don't continue indefinitely, but give it a few more tries
+                encode_error_count = getattr(encode_error, 'count', 0) + 1
+                if encode_error_count > 5:
+                    print(f"[-] Too many encoding errors ({encode_error_count}), stopping stream")
+                    break
+                encode_error.count = encode_error_count
 
     except Exception as e:
         print(f"[-] Error in stream_no_helmet_service: {str(e)}")

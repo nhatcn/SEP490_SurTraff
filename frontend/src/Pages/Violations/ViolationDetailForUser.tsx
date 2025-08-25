@@ -622,7 +622,7 @@ const ViolationDetailForUser: React.FC = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
                     <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg border">
                       <MapPin className="w-5 h-5 text-gray-600" />
-                      <span>{detail.location || "N/A"}</span>
+                      <span>{violation?.camera?.location || "N/A"}</span>
                     </div>
                   </div>
                   {detail.speed && (
