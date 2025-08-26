@@ -21,17 +21,14 @@ import {
   Globe,
   CheckCircle2,
   XCircle,
-  Search,
   X,
 } from "lucide-react"
 import { format } from "date-fns"
-import Sidebar from "../../components/Layout/Sidebar"
-import Header from "../../components/Layout/Header"
 import ExportAccidentPDF from "../../components/Accidents/export-accident-pdf"
 import BounceLoadingComponent from "../../components/Layout/Loading"
 import { AlertDialog } from "../../Pages/Violations/AlertDialog"
-import GenericTable, { TableColumn, FilterConfig } from "../../components/Table/GenericTable"
-import {API_URL_BE} from "../../components/Link/LinkAPI"
+import GenericTable, { type TableColumn, type FilterConfig } from "../../components/Table/GenericTable"
+import { API_URL_BE } from "../../components/Link/LinkAPI"
 
 // Types
 interface AccidentType {
@@ -85,16 +82,16 @@ export default function AccidentTable() {
         throw new Error(`HTTP error! status: ${res.status}`)
       }
       const data: AccidentType[] = await res.json()
-      
+
       setAccidents(data)
-      
+
       // Set filter options
       const uniqueStatuses = Array.from(new Set(data.map((acc) => acc.status)))
       setStatusOptions(uniqueStatuses.map((status) => ({ value: status, label: status })))
-      
+
       const uniqueLocations = Array.from(new Set(data.map((acc) => acc.location)))
       setLocationOptions(uniqueLocations.map((loc) => ({ value: loc, label: loc })))
-      
+
       const uniqueCameras = new Map<number, string>()
       data.forEach((acc) => {
         if (acc.cameraId && acc.cameraName && !uniqueCameras.has(acc.cameraId)) {
@@ -106,11 +103,16 @@ export default function AccidentTable() {
         label: name,
       }))
       setCameraOptions(cameraOptionsArray)
+
+      setTimeout(() => {
+        setLoading(false)
+      }, 2000)
     } catch (err) {
       console.error("Failed to load accidents:", err)
       setError("Unable to load accident list. Please try again.")
-    } finally {
-      setLoading(false)
+      setTimeout(() => {
+        setLoading(false)
+      }, 2000)
     }
   }, [])
 
@@ -150,7 +152,7 @@ export default function AccidentTable() {
       const accidentDate = new Date(acc.accidentTime)
       return accidentDate.toDateString() === today.toDateString()
     }).length
-    
+
     const locationStats = Array.from(
       filteredAccidents.reduce((acc, accident) => {
         acc.set(accident.location, (acc.get(accident.location) || 0) + 1)
@@ -159,12 +161,12 @@ export default function AccidentTable() {
     )
       .map(([location, count]) => ({ location, count }))
       .sort((a, b) => b.count - a.count)
-    
+
     const cameraInvolvedCount = new Set(filteredAccidents.map((acc) => acc.cameraId)).size
     const prevWeekAccidents = totalAccidents - Math.floor(Math.random() * 20)
     const trendPercentage =
       totalAccidents > 0 && prevWeekAccidents > 0 ? ((totalAccidents - prevWeekAccidents) / prevWeekAccidents) * 100 : 0
-    
+
     return { totalAccidents, todayAccidents, locationStats, cameraInvolvedCount, trendPercentage }
   }, [filteredAccidents])
 
@@ -219,22 +221,52 @@ export default function AccidentTable() {
   }, [])
 
   // Handle page change
-  const handlePageChange = useCallback((page: number) => {
-    setCurrentPage(Math.max(1, Math.min(page, totalPages)))
-  }, [totalPages])
+  const handlePageChange = useCallback(
+    (page: number) => {
+      setCurrentPage(Math.max(1, Math.min(page, totalPages)))
+    },
+    [totalPages],
+  )
 
   // Handle delete
-  const handleDelete = useCallback(async (id: number) => {
-    try {
-      setIsDeleting(true)
-      const res = await fetch(`${API_URL_BE}api/accident/${id}`, {
-        method: "DELETE",
-        ...authHeader,
-      })
-      if (res.ok) {
-        setAccidents((prev) => prev.filter((acc) => acc.id !== id))
-        setOpenDialog(false)
-        toast.success("🗑️ Accident deleted successfully!", {
+  const handleDelete = useCallback(
+    async (id: number) => {
+      try {
+        setIsDeleting(true)
+        const res = await fetch(`${API_URL_BE}api/accident/${id}`, {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        })
+        if (res.ok) {
+          setAccidents((prev) => prev.filter((acc) => acc.id !== id))
+          setOpenDialog(false)
+          toast.success("🗑️ Accident deleted successfully!", {
+            position: "top-right",
+            autoClose: 3000,
+            hideProgressBar: false,
+            closeOnClick: true,
+            pauseOnHover: true,
+            draggable: true,
+          })
+
+          // Adjust pagination if needed
+          const newTotal = filteredAccidents.length - 1
+          const newTotalPages = Math.ceil(newTotal / pageSize)
+          if (currentPage > newTotalPages && newTotalPages > 0) {
+            setCurrentPage(newTotalPages)
+          } else if (paginatedAccidents.length === 1 && currentPage > 1) {
+            setCurrentPage(currentPage - 1)
+          }
+        } else {
+          const errorData = await res.json()
+          throw new Error(errorData.message || "Failed to delete accident.")
+        }
+      } catch (error: any) {
+        console.error(error)
+        toast.error(`❌ ${error.message || "An error occurred while deleting the accident."}`, {
           position: "top-right",
           autoClose: 3000,
           hideProgressBar: false,
@@ -242,33 +274,12 @@ export default function AccidentTable() {
           pauseOnHover: true,
           draggable: true,
         })
-
-        // Adjust pagination if needed
-        const newTotal = filteredAccidents.length - 1
-        const newTotalPages = Math.ceil(newTotal / pageSize)
-        if (currentPage > newTotalPages && newTotalPages > 0) {
-          setCurrentPage(newTotalPages)
-        } else if (paginatedAccidents.length === 1 && currentPage > 1) {
-          setCurrentPage(currentPage - 1)
-        }
-      } else {
-        const errorData = await res.json()
-        throw new Error(errorData.message || "Failed to delete accident.")
+      } finally {
+        setIsDeleting(false)
       }
-    } catch (error: any) {
-      console.error(error)
-      toast.error(`❌ ${error.message || "An error occurred while deleting the accident."}`, {
-        position: "top-right",
-        autoClose: 3000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-      })
-    } finally {
-      setIsDeleting(false)
-    }
-  }, [filteredAccidents.length, currentPage, pageSize, paginatedAccidents])
+    },
+    [filteredAccidents.length, currentPage, pageSize, paginatedAccidents],
+  )
 
   // Handle process
   const handleProcess = useCallback(
@@ -277,7 +288,10 @@ export default function AccidentTable() {
       try {
         const res = await fetch(`${API_URL_BE}api/accident/${id}/process`, {
           method: "POST",
-          ...authHeader,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
         })
         if (res.ok) {
           toast.success("✅ Accident processed successfully!", {
@@ -307,7 +321,7 @@ export default function AccidentTable() {
         setIsProcessing(false)
       }
     },
-    [fetchAccidentData, authHeader],
+    [fetchAccidentData],
   )
 
   // Handle reject
@@ -317,7 +331,10 @@ export default function AccidentTable() {
       try {
         const res = await fetch(`${API_URL_BE}api/accident/${id}/reject`, {
           method: "POST",
-          ...authHeader,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
         })
         if (res.ok) {
           toast.success("🚫 Accident rejected successfully!", {
@@ -347,7 +364,7 @@ export default function AccidentTable() {
         setIsRejecting(false)
       }
     },
-    [fetchAccidentData, authHeader],
+    [fetchAccidentData],
   )
 
   // Handle refresh
@@ -550,14 +567,125 @@ export default function AccidentTable() {
   // Loading state
   if (loading) {
     return (
-      <div className="flex h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-        {/* <Sidebar defaultActiveItem="accidents" /> */}
-        <div className="flex flex-col flex-grow">
-          {/* <Header title="Traffic Accident List" /> */}
-          <div className="flex-grow flex items-center justify-center">
-            <div className="text-center">
-              <BounceLoadingComponent size="sm"/>
-              <p className="text-lg text-gray-600 mt-4">Loading accidents...</p>
+      <div className="min-h-full bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+        <div className="p-4 sm:p-6 space-y-6">
+          {/* Enhanced Statistics Cards - Show skeleton or keep visible */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+            <motion.div
+              className="bg-gradient-to-br from-white/95 to-blue-50/95 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-4 sm:p-6 border border-blue-200/50 hover:border-blue-300/50 transform hover:-translate-y-1"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Target size={16} className="text-blue-500" />
+                    <p className="text-sm font-medium text-gray-600">Total Accidents</p>
+                  </div>
+                  <div className="h-8 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+                <div className="bg-gradient-to-r from-blue-500 to-purple-500 p-3 rounded-xl shadow-lg">
+                  <AlertTriangle className="text-white" size={24} />
+                </div>
+              </div>
+            </motion.div>
+
+            <motion.div
+              className="bg-gradient-to-br from-white/95 to-green-50/95 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-4 sm:p-6 border border-green-200/50 hover:border-green-300/50 transform hover:-translate-y-1"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Clock size={16} className="text-green-500" />
+                    <p className="text-sm font-medium text-gray-600">Today</p>
+                  </div>
+                  <div className="h-8 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+                <div className="bg-gradient-to-r from-green-500 to-emerald-500 p-3 rounded-xl shadow-lg">
+                  <Activity className="text-white" size={24} />
+                </div>
+              </div>
+            </motion.div>
+
+            <motion.div
+              className="bg-gradient-to-br from-white/95 to-orange-50/95 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-4 sm:p-6 border border-orange-200/50 hover:border-orange-300/50 transform hover:-translate-y-1"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center space-x-2 mb-2">
+                    <BarChart3 size={16} className="text-orange-500" />
+                    <p className="text-sm font-medium text-gray-600">Most Common Location</p>
+                  </div>
+                  <div className="h-8 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+                <div className="bg-gradient-to-r from-orange-500 to-red-500 p-3 rounded-xl shadow-lg">
+                  <TrendingUp className="text-white" size={24} />
+                </div>
+              </div>
+            </motion.div>
+
+            <motion.div
+              className="bg-gradient-to-br from-white/95 to-purple-50/95 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-4 sm:p-6 border border-purple-200/50 hover:border-purple-300/50 transform hover:-translate-y-1"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, delay: 0.4 }}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Camera size={16} className="text-purple-500" />
+                    <p className="text-sm font-medium text-gray-600">Active Cameras</p>
+                  </div>
+                  <div className="h-8 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+                <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-3 rounded-xl shadow-lg">
+                  <Globe className="text-white" size={24} />
+                </div>
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Controls Section */}
+          <motion.div
+            className="bg-gradient-to-r from-white/95 to-slate-50/95 rounded-2xl shadow-xl border border-slate-200/50 backdrop-blur-sm"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <div className="p-4 sm:p-6">
+              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="h-10 w-32 bg-gray-200 rounded animate-pulse"></div>
+                  <div className="h-10 w-24 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2 bg-blue-50/80 px-4 py-2 rounded-xl">
+                    <Sparkles size={16} className="text-blue-500" />
+                    <span className="text-sm font-medium text-blue-700">Loading...</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          <div className="relative w-full overflow-x-auto">
+            <div className="min-w-[640px]">
+              <div className="bg-[rgba(255,255,255,0.95)] rounded-[16px] shadow-[0_10px_15px_rgba(0,0,0,0.1)] border border-[rgba(203,213,225,0.5)] backdrop-blur-[10px] w-full">
+                <div className="flex items-center justify-center py-20">
+                  <div className="text-center">
+                    <BounceLoadingComponent size="sm" />
+                    <p className="text-lg text-gray-600 mt-4">Loading accidents...</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -592,201 +720,197 @@ export default function AccidentTable() {
   }
 
   return (
-  <div className="min-h-full bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-    <div className="p-4 sm:p-6 space-y-6">
-          {/* Enhanced Statistics Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
-            <motion.div
-              className="bg-gradient-to-br from-white/95 to-blue-50/95 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-4 sm:p-6 border border-blue-200/50 hover:border-blue-300/50 transform hover:-translate-y-1"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="flex items-center space-x-2 mb-2">
-                    <Target size={16} className="text-blue-500" />
-                    <p className="text-sm font-medium text-gray-600">Total Accidents</p>
-                  </div>
-                  <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                    {stats.totalAccidents}
-                  </p>
-                  
-                </div>
-                <div className="bg-gradient-to-r from-blue-500 to-purple-500 p-3 rounded-xl shadow-lg">
-                  <AlertTriangle className="text-white" size={24} />
-                </div>
-              </div>
-            </motion.div>
-
-            <motion.div
-              className="bg-gradient-to-br from-white/95 to-green-50/95 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-4 sm:p-6 border border-green-200/50 hover:border-green-300/50 transform hover:-translate-y-1"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="flex items-center space-x-2 mb-2">
-                    <Clock size={16} className="text-green-500" />
-                    <p className="text-sm font-medium text-gray-600">Today</p>
-                  </div>
-                  <p className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-                    {stats.todayAccidents}
-                  </p>
-                  <div className="flex items-center space-x-1 mt-2">
-                    <span className="text-sm text-gray-500">
-                      {stats.totalAccidents > 0 ? ((stats.todayAccidents / stats.totalAccidents) * 100).toFixed(1) : 0}% of total
-                    </span>
-                  </div>
-                </div>
-                <div className="bg-gradient-to-r from-green-500 to-emerald-500 p-3 rounded-xl shadow-lg">
-                  <Activity className="text-white" size={24} />
-                </div>
-              </div>
-            </motion.div>
-
-            <motion.div
-              className="bg-gradient-to-br from-white/95 to-orange-50/95 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-4 sm:p-6 border border-orange-200/50 hover:border-orange-300/50 transform hover:-translate-y-1"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5, delay: 0.3 }}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="flex items-center space-x-2 mb-2">
-                    <BarChart3 size={16} className="text-orange-500" />
-                    <p className="text-sm font-medium text-gray-600">Most Common Location</p>
-                  </div>
-                  <p className="text-lg font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
-                    {stats.locationStats[0]?.location || "N/A"}
-                  </p>
-                  <div className="flex items-center space-x-1 mt-2">
-                    <span className="text-sm text-gray-500">{stats.locationStats[0]?.count || 0} cases</span>
-                  </div>
-                </div>
-                <div className="bg-gradient-to-r from-orange-500 to-red-500 p-3 rounded-xl shadow-lg">
-                  <TrendingUp className="text-white" size={24} />
-                </div>
-              </div>
-            </motion.div>
-
-            <motion.div
-              className="bg-gradient-to-br from-white/95 to-purple-50/95 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-4 sm:p-6 border border-purple-200/50 hover:border-purple-300/50 transform hover:-translate-y-1"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5, delay: 0.4 }}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="flex items-center space-x-2 mb-2">
-                    <Camera size={16} className="text-purple-500" />
-                    <p className="text-sm font-medium text-gray-600">Active Cameras</p>
-                  </div>
-                  <p className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                    {stats.cameraInvolvedCount}
-                  </p>
-                  <div className="flex items-center space-x-1 mt-2">
-                    <span className="text-sm text-gray-500">
-                      Monitoring active
-                    </span>
-                  </div>
-                </div>
-                <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-3 rounded-xl shadow-lg">
-                  <Globe className="text-white" size={24} />
-                </div>
-              </div>
-            </motion.div>
-          </div>
-
-          {/* Controls Section */}
-          <motion.div 
-            className="bg-gradient-to-r from-white/95 to-slate-50/95 rounded-2xl shadow-xl border border-slate-200/50 backdrop-blur-sm"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
+    <div className="min-h-full bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+      <div className="p-4 sm:p-6 space-y-6">
+        {/* Enhanced Statistics Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+          <motion.div
+            className="bg-gradient-to-br from-white/95 to-blue-50/95 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-4 sm:p-6 border border-blue-200/50 hover:border-blue-300/50 transform hover:-translate-y-1"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
           >
-            <div className="p-4 sm:p-6">
-              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
-                <div className="flex flex-wrap items-center gap-3">
-                  <ExportAccidentPDF accidents={filteredAccidents} />
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={handleRefresh}
-                    className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl hover:from-blue-600 hover:to-purple-600 transition-all duration-200 shadow-lg hover:shadow-xl"
-                    aria-label="Refresh accident list"
-                  >
-                    <RefreshCw size={16} />
-                    <span>Refresh</span>
-                  </motion.button>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center space-x-2 mb-2">
+                  <Target size={16} className="text-blue-500" />
+                  <p className="text-sm font-medium text-gray-600">Total Accidents</p>
                 </div>
-                
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-2 bg-blue-50/80 px-4 py-2 rounded-xl">
-                    <Sparkles size={16} className="text-blue-500" />
-                    <span className="text-sm font-medium text-blue-700">
-                      {filteredAccidents.length} results
-                    </span>
-                  </div>
-                  {(filterValues.status || filterValues.cameraId || filterValues.location) && (
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm text-gray-600">Filtered from {accidents.length} total</span>
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={resetFilters}
-                        className="flex items-center space-x-1 px-3 py-1 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors duration-200"
-                        aria-label="Clear all filters"
-                      >
-                        <X size={14} />
-                        <span className="text-sm">Clear</span>
-                      </motion.button>
-                    </div>
-                  )}
-                </div>
+                <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  {stats.totalAccidents}
+                </p>
+              </div>
+              <div className="bg-gradient-to-r from-blue-500 to-purple-500 p-3 rounded-xl shadow-lg">
+                <AlertTriangle className="text-white" size={24} />
               </div>
             </div>
           </motion.div>
 
-          {/* Enhanced Data Table with Responsive Wrapper */}
-          <div className="relative w-full overflow-x-auto">
-            <div className="min-w-[640px]">
-              <GenericTable
-                data={accidents}
-                filteredData={paginatedAccidents}
-                columns={columns}
-                rowKey="id"
-                actions={[]}
-                filters={filters}
-                filterValues={filterValues}
-                onFilterChange={handleFilterChange}
-                onResetFilters={resetFilters}
-                pagination={{
-                  enabled: true,
-                  currentPage,
-                  totalPages,
-                  pageSize,
-                  totalItems: filteredAccidents.length,
-                  onPageChange: handlePageChange,
-                }}
-                onRowClick={(accident: AccidentType) => navigate(`/accidents/${accident.id}`)}
-                emptyMessage="🚫 No accidents found. Try adjusting your search criteria."
-                className="bg-[rgba(255,255,255,0.95)] rounded-[16px] shadow-[0_10px_15px_rgba(0,0,0,0.1)] border border-[rgba(203,213,225,0.5)] backdrop-blur-[10px] w-full table-auto"
-              />
+          <motion.div
+            className="bg-gradient-to-br from-white/95 to-green-50/95 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-4 sm:p-6 border border-green-200/50 hover:border-green-300/50 transform hover:-translate-y-1"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center space-x-2 mb-2">
+                  <Clock size={16} className="text-green-500" />
+                  <p className="text-sm font-medium text-gray-600">Today</p>
+                </div>
+                <p className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+                  {stats.todayAccidents}
+                </p>
+                <div className="flex items-center space-x-1 mt-2">
+                  <span className="text-sm text-gray-500">
+                    {stats.totalAccidents > 0 ? ((stats.todayAccidents / stats.totalAccidents) * 100).toFixed(1) : 0}%
+                    of total
+                  </span>
+                </div>
+              </div>
+              <div className="bg-gradient-to-r from-green-500 to-emerald-500 p-3 rounded-xl shadow-lg">
+                <Activity className="text-white" size={24} />
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            className="bg-gradient-to-br from-white/95 to-orange-50/95 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-4 sm:p-6 border border-orange-200/50 hover:border-orange-300/50 transform hover:-translate-y-1"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center space-x-2 mb-2">
+                  <BarChart3 size={16} className="text-orange-500" />
+                  <p className="text-sm font-medium text-gray-600">Most Common Location</p>
+                </div>
+                <p className="text-lg font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
+                  {stats.locationStats[0]?.location || "N/A"}
+                </p>
+                <div className="flex items-center space-x-1 mt-2">
+                  <span className="text-sm text-gray-500">{stats.locationStats[0]?.count || 0} cases</span>
+                </div>
+              </div>
+              <div className="bg-gradient-to-r from-orange-500 to-red-500 p-3 rounded-xl shadow-lg">
+                <TrendingUp className="text-white" size={24} />
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            className="bg-gradient-to-br from-white/95 to-purple-50/95 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-4 sm:p-6 border border-purple-200/50 hover:border-purple-300/50 transform hover:-translate-y-1"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, delay: 0.4 }}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center space-x-2 mb-2">
+                  <Camera size={16} className="text-purple-500" />
+                  <p className="text-sm font-medium text-gray-600">Active Cameras</p>
+                </div>
+                <p className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                  {stats.cameraInvolvedCount}
+                </p>
+                <div className="flex items-center space-x-1 mt-2">
+                  <span className="text-sm text-gray-500">Monitoring active</span>
+                </div>
+              </div>
+              <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-3 rounded-xl shadow-lg">
+                <Globe className="text-white" size={24} />
+              </div>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Controls Section */}
+        <motion.div
+          className="bg-gradient-to-r from-white/95 to-slate-50/95 rounded-2xl shadow-xl border border-slate-200/50 backdrop-blur-sm"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <div className="p-4 sm:p-6">
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
+              <div className="flex flex-wrap items-center gap-3">
+                <ExportAccidentPDF accidents={filteredAccidents} />
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleRefresh}
+                  className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl hover:from-blue-600 hover:to-purple-600 transition-all duration-200 shadow-lg hover:shadow-xl"
+                  aria-label="Refresh accident list"
+                >
+                  <RefreshCw size={16} />
+                  <span>Refresh</span>
+                </motion.button>
+              </div>
+
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2 bg-blue-50/80 px-4 py-2 rounded-xl">
+                  <Sparkles size={16} className="text-blue-500" />
+                  <span className="text-sm font-medium text-blue-700">{filteredAccidents.length} results</span>
+                </div>
+                {(filterValues.status || filterValues.cameraId || filterValues.location) && (
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-gray-600">Filtered from {accidents.length} total</span>
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={resetFilters}
+                      className="flex items-center space-x-1 px-3 py-1 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors duration-200"
+                      aria-label="Clear all filters"
+                    >
+                      <X size={14} />
+                      <span className="text-sm">Clear</span>
+                    </motion.button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
+        </motion.div>
+
+        {/* Enhanced Data Table with Responsive Wrapper */}
+        <div className="relative w-full overflow-x-auto">
+          <div className="min-w-[640px]">
+            <GenericTable
+              data={accidents}
+              filteredData={paginatedAccidents}
+              columns={columns}
+              rowKey="id"
+              actions={[]}
+              filters={filters}
+              filterValues={filterValues}
+              onFilterChange={handleFilterChange}
+              onResetFilters={resetFilters}
+              pagination={{
+                enabled: true,
+                currentPage,
+                totalPages,
+                pageSize,
+                totalItems: filteredAccidents.length,
+                onPageChange: handlePageChange,
+              }}
+              onRowClick={(accident: AccidentType) => navigate(`/accidents/${accident.id}`)}
+              emptyMessage="🚫 No accidents found. Try adjusting your search criteria."
+              className="bg-[rgba(255,255,255,0.95)] rounded-[16px] shadow-[0_10px_15px_rgba(0,0,0,0.1)] border border-[rgba(203,213,225,0.5)] backdrop-blur-[10px] w-full table-auto"
+            />
+          </div>
         </div>
-        
-        <AlertDialog
-          open={openDialog}
-          onOpenChange={setOpenDialog}
-          onConfirm={() => {
-            if (selectedId !== null) handleDelete(selectedId);
-          }}
-          title="⚠️ Confirm Accident Deletion"
-          description="Are you sure you want to delete this accident? This action cannot be undone and will permanently delete all related data."
-        />
       </div>
+
+      <AlertDialog
+        open={openDialog}
+        onOpenChange={setOpenDialog}
+        onConfirm={() => {
+          if (selectedId !== null) handleDelete(selectedId)
+        }}
+        title="⚠️ Confirm Accident Deletion"
+        description="Are you sure you want to delete this accident? This action cannot be undone and will permanently delete all related data."
+      />
+    </div>
   )
 }
