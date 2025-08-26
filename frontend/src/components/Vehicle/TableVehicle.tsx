@@ -4,6 +4,7 @@ import { Car, Truck, Bike, Circle, Eye, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import GenericTable, { TableColumn, FilterConfig } from "../Table/GenericTable";
 import AlertDialog from "./AlertDialog";
+import BounceLoadingComponent from "../Layout/Loading";
 import { API_URL_BE } from "../Link/LinkAPI";
 
 interface UserType {
@@ -26,6 +27,7 @@ interface VehicleType {
 interface TableVehicleProps {
   vehicles?: VehicleType[];
   setVehicles?: React.Dispatch<React.SetStateAction<VehicleType[]>>;
+  isLoading?: boolean;
 }
 
 const ITEMS_PER_PAGE_OPTIONS = [5, 10, 15, 20, 25, 50];
@@ -50,7 +52,7 @@ const getVehicleIcon = (vehicleTypeId: number) => {
   }
 };
 
-export default function TableVehicle({ vehicles = [], setVehicles }: TableVehicleProps) {
+export default function TableVehicle({ vehicles = [], setVehicles, isLoading: parentLoading = false }: TableVehicleProps) {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterBrand, setFilterBrand] = useState("");
@@ -59,9 +61,16 @@ export default function TableVehicle({ vehicles = [], setVehicles }: TableVehicl
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [userData, setUserData] = useState<{ [key: number]: UserType }>({});
+  const [isInternalLoading, setIsInternalLoading] = useState(false);
 
   useEffect(() => {
     const fetchUserData = async () => {
+      if (vehicles.length === 0) {
+        setIsInternalLoading(false);
+        return;
+      }
+
+      setIsInternalLoading(true);
       const uniqueUserIds = Array.from(new Set(vehicles.map((v) => v.userId)));
       const fetchPromises = uniqueUserIds.map(async (userId) => {
         try {
@@ -83,11 +92,10 @@ export default function TableVehicle({ vehicles = [], setVehicles }: TableVehicl
         return acc;
       }, {} as { [key: number]: UserType });
       setUserData(newUserData);
+      setIsInternalLoading(false);
     };
 
-    if (vehicles.length > 0) {
-      fetchUserData();
-    }
+    fetchUserData();
   }, [vehicles]);
 
   const brands = useMemo(() => {
@@ -96,8 +104,8 @@ export default function TableVehicle({ vehicles = [], setVehicles }: TableVehicl
 
   const filteredVehicles = useMemo(() => {
     return vehicles.filter((vehicle) => {
-      const matchesSearch = !searchTerm ||
-        vehicle.licensePlate?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch =
+        !searchTerm || vehicle.licensePlate?.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesFilterBrand = !filterBrand || vehicle.brand === filterBrand;
       return matchesSearch && matchesFilterBrand;
     }) || [];
@@ -109,7 +117,10 @@ export default function TableVehicle({ vehicles = [], setVehicles }: TableVehicl
     return filteredVehicles.slice(startIndex, endIndex) || [];
   }, [filteredVehicles, currentPage, pageSize]);
 
-  const totalPages = useMemo(() => Math.ceil((filteredVehicles?.length || 0) / pageSize), [filteredVehicles, pageSize]);
+  const totalPages = useMemo(() => Math.ceil((filteredVehicles?.length || 0) / pageSize), [
+    filteredVehicles,
+    pageSize,
+  ]);
 
   const handleFilterChange = useCallback((key: string, value: any) => {
     if (key === "licensePlate") {
@@ -135,30 +146,38 @@ export default function TableVehicle({ vehicles = [], setVehicles }: TableVehicl
     setCurrentPage(1);
   }, []);
 
-  const handleDelete = useCallback(async (id: number) => {
-    try {
-      const response = await fetch(`${API_URL_BE}api/vehicle/${id}`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-      });
-      if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
-      if (setVehicles) {
-        setVehicles((prev) => prev.filter((v) => v.id !== id));
-        const newTotal = filteredVehicles.length - 1;
-        const newTotalPages = Math.ceil(newTotal / pageSize);
-        if (newTotalPages === 0) {
-          setCurrentPage(1);
-        } else if (currentPage > newTotalPages) {
-          setCurrentPage(newTotalPages);
-        } else if (paginatedVehicles.length === 1 && currentPage > 1) {
-          setCurrentPage(currentPage - 1);
+  const handleDelete = useCallback(
+    async (id: number) => {
+      setIsInternalLoading(true);
+      try {
+        const response = await fetch(`${API_URL_BE}api/vehicle/${id}`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+        });
+        if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+        if (setVehicles) {
+          setVehicles((prev) => prev.filter((v) => v.id !== id));
+          const newTotal = filteredVehicles.length - 1;
+          const newTotalPages = Math.ceil(newTotal / pageSize);
+          if (newTotalPages === 0) {
+            setCurrentPage(1);
+          } else if (currentPage > newTotalPages) {
+            setCurrentPage(newTotalPages);
+          } else if (paginatedVehicles.length === 1 && currentPage > 1) {
+            setCurrentPage(currentPage - 1);
+          }
         }
+        setOpenDialog(false);
+      } catch (err) {
+        console.error("Delete failed:", err);
+      } finally {
+        setIsInternalLoading(false);
       }
-      setOpenDialog(false);
-    } catch (err) {
-      console.error("Delete failed:", err);
-    }
-  }, [setVehicles, filteredVehicles, currentPage, pageSize, paginatedVehicles]);
+    },
+    [setVehicles, filteredVehicles, currentPage, pageSize, paginatedVehicles]
+  );
+
+  const showLoading = parentLoading || isInternalLoading;
 
   const columns: TableColumn<VehicleType>[] = [
     {
@@ -175,9 +194,7 @@ export default function TableVehicle({ vehicles = [], setVehicles }: TableVehicl
           <div className="p-1 bg-green-100 rounded-lg border border-gray-300">
             {getVehicleIcon(vehicle.vehicleTypeId)}
           </div>
-          <span
-            className="font-mono text-lg font-bold text-gray-900 bg-gradient-to-r from-green-50 to-green-100 px-3 py-1 rounded-lg border border-gray-200 transition-colors hover:text-green-600"
-          >
+          <span className="font-mono text-lg font-bold text-gray-900 bg-gradient-to-r from-green-50 to-green-100 px-3 py-1 rounded-lg border border-gray-200 transition-colors hover:text-green-600">
             {vehicle.licensePlate || "N/A"}
           </span>
         </motion.div>
@@ -187,17 +204,13 @@ export default function TableVehicle({ vehicles = [], setVehicles }: TableVehicl
       key: "name",
       title: "Type",
       width: "16%",
-      render: (_, vehicle) => (
-        <span className="text-gray-900">{vehicle.name || "N/A"}</span>
-      ),
+      render: (_, vehicle) => <span className="text-gray-900">{vehicle.name || "N/A"}</span>,
     },
     {
       key: "brand",
       title: "Brand",
       width: "16%",
-      render: (_, vehicle) => (
-        <span className="text-gray-900">{vehicle.brand || "N/A"}</span>
-      ),
+      render: (_, vehicle) => <span className="text-gray-900">{vehicle.brand || "N/A"}</span>,
     },
     {
       key: "color",
@@ -281,30 +294,66 @@ export default function TableVehicle({ vehicles = [], setVehicles }: TableVehicl
   );
 
   return (
-    <div className="relative max-w-full overflow-hidden" style={{ tableLayout: "fixed" }}>
-      <GenericTable
-        data={vehicles}
-        filteredData={paginatedVehicles}
-        columns={columns}
-        rowKey="id"
-        actions={[]}
-        filters={filters}
-        filterValues={filterValues}
-        onFilterChange={handleFilterChange}
-        onResetFilters={handleResetFilters}
-        pagination={{
-          enabled: true,
-          currentPage,
-          totalPages,
-          pageSize,
-          totalItems: filteredVehicles.length,
-          onPageChange: handlePageChange,
-          onPageSizeChange: handlePageSizeChange,
-        }}
-        onRowClick={(vehicle) => navigate(`/vehicles/${vehicle.id}`)}
-        emptyMessage="🚫 No vehicles found. Try adjusting your search criteria."
-        className="bg-[rgba(255,255,255,0.95)] rounded-[16px] shadow-[0_10px_15px_rgba(0,0,0,0.1)] border border-[rgba(203,213,225,0.5)] backdrop-blur-[10px] w-full"
-      />
+    <motion.div
+      className="bg-white/90 rounded-2xl shadow-2xl border border-gray-200/70 overflow-hidden backdrop-blur-sm"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+    >
+      <div className="bg-gradient-to-r from-gray-50/90 to-green-50/90 px-6 py-4 border-b border-gray-200/70">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg shadow-md">
+              <Car className="text-white" size={20} />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Vehicle List</h3>
+              <p className="text-sm text-gray-600">Manage and track vehicles</p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="bg-green-100/80 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+              {filteredVehicles.length} records
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="relative">
+        {showLoading ? (
+          <div className="text-center py-12">
+            <BounceLoadingComponent />
+            <p className="mt-3 text-gray-600">Loading vehicles...</p>
+          </div>
+        ) : vehicles.length === 0 ? (
+          <div className="text-center py-12 text-gray-500">
+            <p>🚫 No vehicles found. Try adjusting your search criteria.</p>
+          </div>
+        ) : (
+          <GenericTable
+            data={paginatedVehicles}
+            filteredData={filteredVehicles}
+            columns={columns}
+            rowKey="id"
+            actions={[]}
+            filters={filters}
+            filterValues={filterValues}
+            onFilterChange={handleFilterChange}
+            onResetFilters={handleResetFilters}
+            pagination={{
+              enabled: true,
+              currentPage,
+              totalPages,
+              pageSize,
+              totalItems: filteredVehicles.length,
+              onPageChange: handlePageChange,
+              onPageSizeChange: handlePageSizeChange,
+            }}
+            onRowClick={(vehicle) => navigate(`/vehicles/${vehicle.id}`)}
+            emptyMessage="🚫 No vehicles found matching your filters"
+            className="border-0"
+          />
+        )}
+      </div>
       <AlertDialog
         open={openDialog}
         onOpenChange={setOpenDialog}
@@ -314,6 +363,6 @@ export default function TableVehicle({ vehicles = [], setVehicles }: TableVehicl
         title="⚠️ Confirm Vehicle Deletion"
         description="Are you sure you want to delete this vehicle? This action cannot be undone and will permanently delete all related data."
       />
-    </div>
+    </motion.div>
   );
 }

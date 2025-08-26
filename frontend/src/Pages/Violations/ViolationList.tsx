@@ -8,10 +8,11 @@ import { AlertDialog } from "./AlertDialog";
 import { format } from "date-fns";
 import { toast } from "react-toastify";
 import ExportViolationsPDF from "./ExportViolationsPDF";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { 
   Eye, Trash2, Camera, MapPin, Clock, Car, Truck, Bike, Circle, AlertTriangle, RefreshCw, TrendingUp, 
-  Search, X, Sparkles, Target, Zap, Activity, Globe, CheckCircle2, XCircle, Calendar, BarChart3
+  Filter, BarChart3, Calendar, Search, X, ChevronDown, Sparkles,
+  Target, Zap, Activity, Globe, CheckCircle2, XCircle
 } from "lucide-react";
 import { API_URL_BE } from "../../components/Link/LinkAPI";
 import GenericTable, { TableColumn, FilterConfig } from "../../components/Table/GenericTable";
@@ -27,7 +28,7 @@ interface VehicleType {
   name: string;
 }
 
-interface ViolationCamera {
+interface Camera {
   id: number;
   name: string;
   location: string;
@@ -56,7 +57,7 @@ interface ViolationDetail {
 
 interface Violation {
   id: number;
-  camera: ViolationCamera | null;
+  camera: Camera | null;
   vehicleType: VehicleType | null;
   vehicle: Vehicle | null;
   createdAt: string | null;
@@ -310,7 +311,7 @@ export default function ViolationList() {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)));
   }, [totalPages]);
 
-  // Define table columns with adjusted content constraints
+  // Define table columns
   const columns: TableColumn<Violation>[] = [
     {
       key: "image",
@@ -321,7 +322,7 @@ export default function ViolationList() {
           initial={{ opacity: 0, x: -10 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.3, delay: index * 0.05 }}
-          className="relative group max-w-full overflow-hidden"
+          className="relative group"
         >
           {violation.violationDetails?.[0]?.imageUrl ? (
             <div className="relative overflow-hidden rounded-xl shadow-md hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-gray-50 to-gray-100">
@@ -361,15 +362,15 @@ export default function ViolationList() {
         const detail = violation.violationDetails?.[0] || null;
         const typeName = detail?.violationType?.typeName || "Unidentified";
         return (
-          <div className="space-y-2 max-w-full">
-            <div className={`inline-flex items-center px-4 py-2 rounded-xl text-sm font-semibold border transition-all duration-300 truncate ${getViolationSeverityColor(typeName)}`}>
+          <div className="space-y-2">
+            <div className={`inline-flex items-center px-4 py-2 rounded-xl text-sm font-semibold border transition-all duration-300 ${getViolationSeverityColor(typeName)}`}>
               <div className="w-2 h-2 bg-current rounded-full mr-2 animate-pulse"></div>
-              <span className="truncate">{typeName}</span>
+              {typeName}
             </div>
             {detail?.speed && (
-              <div className="flex items-center text-sm text-red-600 font-medium bg-red-50 px-3 py-1 rounded-lg truncate">
-                <Zap size={14} className="mr-1 flex-shrink-0" />
-                <span className="truncate">{detail.speed} km/h</span>
+              <div className="flex items-center text-sm text-red-600 font-medium bg-red-50 px-3 py-1 rounded-lg">
+                <Zap size={14} className="mr-1" />
+                {detail.speed} km/h
               </div>
             )}
           </div>
@@ -382,22 +383,22 @@ export default function ViolationList() {
       width: "15%",
       render: (_: unknown, violation: Violation) => (
         violation.camera ? (
-          <div className="group max-w-full">
+          <div className="group">
             <div className="flex items-center space-x-2 mb-1">
-              <div className="p-1 bg-blue-100 rounded-lg flex-shrink-0">
+              <div className="p-1 bg-blue-100 rounded-lg">
                 <Camera size={14} className="text-blue-600" />
               </div>
-              <span className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors duration-200 truncate">
+              <span className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors duration-200">
                 {violation.camera.name}
               </span>
             </div>
-            <div className="flex items-center space-x-1 text-sm text-gray-500 bg-gray-50 px-2 py-1 rounded-lg truncate">
-              <MapPin size={12} className="flex-shrink-0" />
+            <div className="flex items-center space-x-1 text-sm text-gray-500 bg-gray-50 px-2 py-1 rounded-lg">
+              <MapPin size={12} />
               <span className="truncate">{violation.camera.location}</span>
             </div>
           </div>
         ) : (
-          <div className="text-gray-400 italic bg-gray-50 px-3 py-2 rounded-lg truncate">Unidentified</div>
+          <div className="text-gray-400 italic bg-gray-50 px-3 py-2 rounded-lg">Unidentified</div>
         )
       ),
     },
@@ -406,22 +407,22 @@ export default function ViolationList() {
       title: "License Plate",
       width: "15%",
       render: (_: unknown, violation: Violation) => (
-        <div className="group max-w-full">
+        <div className="group">
           <div className="flex items-center space-x-2 mb-2">
-            <div className="p-1 bg-green-100 rounded-lg flex-shrink-0">
+            <div className="p-1 bg-green-100 rounded-lg">
               {getVehicleIcon(violation.vehicleType?.id)}
             </div>
-            <span className="font-mono text-lg font-bold text-gray-900 group-hover:text-green-600 transition-colors duration-200 tracking-wider bg-gradient-to-r from-green-50 to-emerald-50 px-3 py-1 rounded-lg border truncate">
+            <span className="font-mono text-lg font-bold text-gray-900 group-hover:text-green-600 transition-colors duration-200 tracking-wider bg-gradient-to-r from-green-50 to-emerald-50 px-3 py-1 rounded-lg border">
               {violation.vehicle?.licensePlate || "N/A"}
             </span>
           </div>
           {violation.vehicle?.brand && (
-            <div className="text-sm text-gray-500 flex items-center space-x-1 bg-gray-50 px-2 py-1 rounded-lg truncate">
+            <div className="text-sm text-gray-500 flex items-center space-x-1 bg-gray-50 px-2 py-1 rounded-lg">
               <span className="font-medium truncate">{violation.vehicle.brand}</span>
               {violation.vehicle.color && (
                 <>
-                  <span className="flex-shrink-0">•</span>
-                  <span className="capitalize truncate">{violation.vehicle.color}</span>
+                  <span>•</span>
+                  <span className="capitalize">{violation.vehicle.color}</span>
                 </>
               )}
             </div>
@@ -435,25 +436,25 @@ export default function ViolationList() {
       width: "15%",
       render: (_: unknown, violation: Violation) => {
         const value = violation.violationDetails?.[0]?.violationTime;
-        if (!value) return <span className="text-gray-400 italic truncate">N/A</span>;
+        if (!value) return <span className="text-gray-400 italic">N/A</span>;
         try {
           const date = new Date(value);
           const isToday = date.toDateString() === new Date().toDateString();
           return (
-            <div className="space-y-2 max-w-full">
+            <div className="space-y-2">
               <div className="flex items-center space-x-2">
-                <div className="p-1 bg-purple-100 rounded-lg flex-shrink-0">
+                <div className="p-1 bg-purple-100 rounded-lg">
                   <Clock size={14} className="text-purple-600" />
                 </div>
-                <span className="font-bold text-purple-700 bg-purple-50 px-2 py-1 rounded-lg truncate">
+                <span className="font-bold text-purple-700 bg-purple-50 px-2 py-1 rounded-lg">
                   {format(date, "HH:mm:ss")}
                 </span>
               </div>
-              <div className={`text-sm flex items-center space-x-2 ${isToday ? "text-green-600 font-bold" : "text-gray-500"} truncate`}>
-                <Calendar size={12} className="flex-shrink-0" />
-                <span className="truncate">{format(date, "dd/MM/yyyy")}</span>
+              <div className={`text-sm flex items-center space-x-2 ${isToday ? "text-green-600 font-bold" : "text-gray-500"}`}>
+                <Calendar size={12} />
+                <span>{format(date, "dd/MM/yyyy")}</span>
                 {isToday && (
-                  <span className="ml-2 text-xs bg-gradient-to-r from-green-500 to-emerald-500 text-white px-2 py-1 rounded-full animate-pulse truncate">
+                  <span className="ml-2 text-xs bg-gradient-to-r from-green-500 to-emerald-500 text-white px-2 py-1 rounded-full animate-pulse">
                     Today
                   </span>
                 )}
@@ -461,7 +462,7 @@ export default function ViolationList() {
             </div>
           );
         } catch {
-          return <span className="text-gray-400 italic truncate">N/A</span>;
+          return <span className="text-gray-400 italic">N/A</span>;
         }
       },
     },
@@ -470,9 +471,9 @@ export default function ViolationList() {
       title: "Status",
       width: "12%",
       render: (_: unknown, violation: Violation) => (
-        <div className={`inline-flex items-center px-3 py-1 rounded-lg ${getStatusColor(violation.status || "Pending").bg} ${getStatusColor(violation.status || "Pending").text} font-medium truncate`}>
+        <div className={`inline-flex items-center px-3 py-1 rounded-lg ${getStatusColor(violation.status || "Pending").bg} ${getStatusColor(violation.status || "Pending").text} font-medium`}>
           {getStatusColor(violation.status || "Pending").icon}
-          <span className="ml-2 capitalize truncate">{violation.status || "Pending"}</span>
+          <span className="ml-2 capitalize">{violation.status || "Pending"}</span>
         </div>
       ),
     },
@@ -481,9 +482,9 @@ export default function ViolationList() {
       title: "State",
       width: "12%",
       render: (_: unknown, violation: Violation) => (
-        <div className={`inline-flex items-center px-3 py-1 rounded-lg ${getStateColor(violation.isDelete).bg} ${getStateColor(violation.isDelete).text} font-medium truncate`}>
+        <div className={`inline-flex items-center px-3 py-1 rounded-lg ${getStateColor(violation.isDelete).bg} ${getStateColor(violation.isDelete).text} font-medium`}>
           {getStateColor(violation.isDelete).icon}
-          <span className="ml-2 truncate">{violation.isDelete ? "Inactive" : "Active"}</span>
+          <span className="ml-2">{violation.isDelete ? "Inactive" : "Active"}</span>
         </div>
       ),
     },
@@ -551,24 +552,6 @@ export default function ViolationList() {
     }),
     [searchTerm, filterType, filterStatus]
   );
-
-  // Loading state
-  if (loading) {
-    return (
-      <div className="flex h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-        <Sidebar defaultActiveItem="violations"/>
-        <div className="flex flex-col flex-grow">
-          <Header title="Traffic Violation List" />
-          <div className="flex-grow flex items-center justify-center">
-            <div className="text-center">
-              <BounceLoadingComponent />
-              <p className="text-lg text-gray-600 mt-4">Loading violations...</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   // Error state
   if (error) {
@@ -764,7 +747,7 @@ export default function ViolationList() {
               </div>
 
               {/* Filter Section */}
-              <div className="border-t border-gray-200/50 pt-4 sm:pt-6">
+              {/* <div className="border-t border-gray-200/50 pt-4 sm:pt-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   <div className="relative">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -821,13 +804,41 @@ export default function ViolationList() {
                     </select>
                   </div>
                 </div>
-              </div>
+              </div> */}
             </div>
           </motion.div>
 
-          {/* Enhanced Data Table with Responsive Wrapper */}
-          <div className="relative w-full overflow-x-auto">
-            <div className="min-w-[640px]">
+          {/* Enhanced Data Table */}
+          <div className="relative max-w-full overflow-hidden" style={{ tableLayout: "fixed" }}>
+            {loading ? (
+              <div className="flex items-center justify-center h-64 bg-white/95 rounded-[16px] shadow-[0_10px_15px_rgba(0,0,0,0.1)] border border-[rgba(203,213,225,0.5)] backdrop-blur-[10px]">
+                <BounceLoadingComponent />
+              </div>
+            ) : (
+              <motion.div
+                            className="bg-white/90 rounded-2xl shadow-2xl border border-gray-200/70 overflow-hidden backdrop-blur-sm"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.5 }}
+                          >
+              <div className="bg-gradient-to-r from-gray-50/90 to-blue-50/90 px-6 py-4 border-b border-gray-200/70">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-3">
+                                  <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg shadow-md">
+                                    <BarChart3 className="text-white" size={20} />
+                                  </div>
+                                  <div>
+                                    <h3 className="text-lg font-semibold text-gray-900">Violation List</h3>
+                                    <p className="text-sm text-gray-600">Manage and track violation</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <div className="bg-green-100/80 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+                                    {filteredViolations.length} records
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
               <GenericTable
                 data={violations}
                 filteredData={paginatedViolations}
@@ -848,9 +859,9 @@ export default function ViolationList() {
                 }}
                 onRowClick={(violation: Violation) => navigate(`/violations/${violation.id}`)}
                 emptyMessage="🚫 No violations found. Try adjusting your search criteria."
-                className="bg-[rgba(255,255,255,0.95)] rounded-[16px] shadow-[0_10px_15px_rgba(0,0,0,0.1)] border border-[rgba(203,213,225,0.5)] backdrop-blur-[10px] w-full table-auto"
-              />
-            </div>
+                className="bg-[rgba(255,255,255,0.95)] rounded-[16px] shadow-[0_10px_15px_rgba(0,0,0,0.1)] border border-[rgba(203,213,225,0.5)] backdrop-blur-[10px] w-full"
+              />  </motion.div>
+            )}
           </div>
 
           {/* Quick Stats Bar */}
@@ -917,7 +928,7 @@ export default function ViolationList() {
                       {index + 1}
                     </div>
                     <div>
-                      <div className="font-medium text-gray-900 truncate">{stat.type}</div>
+                      <div className="font-medium text-gray-900">{stat.type}</div>
                       <div className="text-sm text-gray-600">{stat.count} cases</div>
                     </div>
                   </div>
