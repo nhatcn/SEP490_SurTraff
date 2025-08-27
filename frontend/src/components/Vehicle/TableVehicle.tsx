@@ -321,7 +321,7 @@ export default function TableVehicle({ vehicles = [], setVehicles, isLoading: pa
       <div className="relative">
         {showLoading ? (
           <div className="text-center py-12">
-            <BounceLoadingComponent />
+            <BounceLoadingComponent fullScreen={false} size="sm"/>
             <p className="mt-3 text-gray-600">Loading vehicles...</p>
           </div>
         ) : vehicles.length === 0 ? (

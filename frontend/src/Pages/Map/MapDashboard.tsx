@@ -773,7 +773,7 @@ export default function MapDashboard() {
           {selectedCamera && (
             <div className="w-2/5">
 
-              <CameraDetail camera={selectedCamera} />
+              <CameraDetail camera={selectedCamera} /> 
 
             </div>
           )}

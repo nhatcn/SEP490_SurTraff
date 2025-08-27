@@ -1,3 +1,3 @@
-const API_URL_BE = "https://surtraff.onrender.com/";
-const API_URL_FAST = "https://optimum-snipe-factual.ngrok-free.app/"; 
+const API_URL_BE = "http://localhost:8081/";
+const API_URL_FAST = "http://localhost:8000/"; 
 export { API_URL_BE, API_URL_FAST }
