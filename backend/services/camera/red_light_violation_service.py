@@ -436,9 +436,9 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
                                                         "status": "PENDING",
                                                         "createdAt": datetime.now().isoformat(),
                                                         "violationDetails": [{
-                                                            "violationTypeId": 1,  # RED_LIGHT
+                                                            "violationTypeId": 1,  
                                                             "violationTime": datetime.now().isoformat(),
-                                                            "licensePlate": f"TRACK_{track_id}"  # Replace with OCR later
+                                                          
                                                         }]
                                                     }
 
@@ -482,7 +482,7 @@ def stream_violation_video_service1(youtube_url: str, camera_id: int):
                                         "violationDetails": [{
                                             "violationTypeId": 4,  # WRONG_LANE
                                             "violationTime": datetime.now().isoformat(),
-                                            "licensePlate": f"TRACK_{track_id}"  # Replace with OCR later
+                                            
                                         }]
                                     }
 
