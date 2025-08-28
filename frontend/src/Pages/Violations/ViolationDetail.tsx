@@ -9,7 +9,6 @@ import { Eye, RefreshCw, CheckCircle2, XCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import { API_URL_BE } from "../../components/Link/LinkAPI";
 import BounceLoadingComponent from "../../components/Layout/Loading";
 
 interface Camera {
@@ -55,6 +54,7 @@ interface ViolationDetail {
   speed: number | null;
   additionalNotes: string | null;
   createdAt: string;
+  licensePlate?: string | null;
 }
 
 interface Violation {
@@ -73,10 +73,19 @@ export default function ViolationDetail() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditingDetail, setIsEditingDetail] = useState(false);
-  const [formData, setFormData] = useState<Partial<Pick<Violation, 'status'>>>({ status: '' });
+  const [formData, setFormData] = useState<Partial<Pick<Violation, 'status'>> & { licensePlate?: string }>({ 
+    status: '',
+    licensePlate: ''
+  });
   const [detailFormData, setDetailFormData] = useState<Partial<ViolationDetail>>({});
   const [imageExpanded, setImageExpanded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const API_URL = "http://localhost:8081";
+
+  const isValidLicensePlate = (licensePlate: string) => {
+    const regex = /^[0-9]{2}[A-Z]{1}-[0-9]{4,5}$/; // Chuẩn biển số Việt Nam, ví dụ: 51B-67897
+    return regex.test(licensePlate);
+  };
 
   useEffect(() => {
     if (!id || isNaN(Number(id))) {
@@ -88,9 +97,12 @@ export default function ViolationDetail() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`${API_URL_BE}api/violations/${id}`);
+        const response = await axios.get(`${API_URL}/api/violations/${id}`);
         setViolation(response.data);
-        setFormData({ status: response.data.status });
+        setFormData({ 
+          status: response.data.status,
+          licensePlate: response.data.violationDetails?.[0]?.licensePlate || response.data.vehicle?.licensePlate || ''
+        });
         const firstDetail = response.data.violationDetails?.[0] || {};
         setDetailFormData({
           violationType: firstDetail.violationType,
@@ -100,6 +112,7 @@ export default function ViolationDetail() {
           violationTime: firstDetail.violationTime,
           speed: firstDetail.speed,
           additionalNotes: firstDetail.additionalNotes,
+          licensePlate: firstDetail.licensePlate,
         });
       } catch (err: any) {
         console.error("Error fetching data:", err);
@@ -113,7 +126,11 @@ export default function ViolationDetail() {
   }, [id]);
 
   const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setFormData({ status: e.target.value });
+    setFormData((prev) => ({ ...prev, status: e.target.value }));
+  };
+
+  const handleLicensePlateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData((prev) => ({ ...prev, licensePlate: e.target.value }));
   };
 
   const handleUpdateStatus = async (newStatus: string) => {
@@ -126,16 +143,16 @@ export default function ViolationDetail() {
 
       switch (statusUpper) {
         case "PROCESSED":
-          response = await axios.post(`${API_URL_BE}api/violations/${id}/process`);
+          response = await axios.post(`${API_URL}/api/violations/${id}/process`);
           break;
         case "APPROVED":
-          response = await axios.post(`${API_URL_BE}api/violations/${id}/approve`);
+          response = await axios.post(`${API_URL}/api/violations/${id}/approve`);
           break;
         case "REJECTED":
-          response = await axios.post(`${API_URL_BE}api/violations/${id}/reject`);
+          response = await axios.post(`${API_URL}/api/violations/${id}/reject`);
           break;
         case "PENDING":
-          response = await axios.put(`${API_URL_BE}api/violations/${id}`, {
+          response = await axios.put(`${API_URL}/api/violations/${id}`, {
             id: Number(id),
             camera: violation?.camera ? { id: violation.camera.id } : null,
             vehicleType: violation?.vehicleType ? { id: violation.vehicleType.id } : null,
@@ -143,13 +160,17 @@ export default function ViolationDetail() {
               ? {
                   id: violation.vehicle.id,
                   name: violation.vehicle.name,
-                  licensePlate: violation.vehicle.licensePlate,
+                  licensePlate: violation.vehicle.licensePlate, // Không dùng formData.licensePlate ở đây
                   vehicleTypeId: violation.vehicle.vehicleTypeId,
                   color: violation.vehicle.color,
                   brand: violation.vehicle.brand,
                 }
               : null,
             status: "PENDING",
+            violationDetails: violation?.violationDetails?.map(detail => ({
+              ...detail,
+              licensePlate: formData.licensePlate || detail.licensePlate || violation.vehicle?.licensePlate,
+            })) || null,
           });
           break;
         default:
@@ -157,7 +178,10 @@ export default function ViolationDetail() {
       }
 
       setViolation(response.data);
-      setFormData({ status: response.data.status });
+      setFormData({ 
+        status: response.data.status,
+        licensePlate: response.data.violationDetails?.[0]?.licensePlate || response.data.vehicle?.licensePlate || ''
+      });
       if (statusUpper === "APPROVED") {
         toast.success("Violation approved! An email with the violation report has been sent.");
       } else {
@@ -170,6 +194,106 @@ export default function ViolationDetail() {
         err.response?.data?.errors?.join(", ") ||
         "Unable to update status. Please try again.";
       toast.error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateLicensePlate = async () => {
+    if (!id || !violation?.violationDetails?.[0]?.id || !formData.licensePlate) {
+      toast.error("No violation, violation detail, or license plate provided.");
+      return;
+    }
+
+    const currentLicensePlate = violation.violationDetails[0]?.licensePlate || violation.vehicle?.licensePlate || '';
+    if (formData.licensePlate === currentLicensePlate) {
+      toast.info("License plate has not changed. No update needed.");
+      setIsEditingDetail(false);
+      return;
+    }
+
+    if (!isValidLicensePlate(formData.licensePlate)) {
+      toast.error("Invalid license plate format. Example: 51B-67897");
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to update license plate to ${formData.licensePlate} for this violation?`)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Kiểm tra licensePlate tồn tại (giả định endpoint tồn tại)
+      try {
+        const checkResponse = await axios.get(`${API_URL}/api/vehicle/by-license-plate/${formData.licensePlate}`);
+        if (checkResponse.data && checkResponse.data.id !== violation.vehicle?.id) {
+          toast.error("License plate already exists for another vehicle. Cannot update to a duplicate value.");
+          return;
+        }
+      } catch (checkErr: any) {
+        if (checkErr.response?.status !== 404) {
+          console.error("Error checking license plate:", checkErr);
+          toast.error("Unable to check if license plate exists. Please try again.");
+          return;
+        }
+        // 404 nghĩa là licensePlate chưa tồn tại, có thể tiếp tục
+      }
+
+      // Cập nhật licensePlate trong ViolationDetail
+      const updateData = {
+        id: violation.violationDetails[0].id,
+        violationId: violation.id,
+        violationType: violation.violationDetails[0].violationType
+          ? { id: violation.violationDetails[0].violationType.id }
+          : null,
+        imageUrl: violation.violationDetails[0].imageUrl || null,
+        videoUrl: violation.violationDetails[0].videoUrl || null,
+        location: violation.violationDetails[0].location || null,
+        violationTime: violation.violationDetails[0].violationTime || null,
+        speed: violation.violationDetails[0].speed || null,
+        additionalNotes: violation.violationDetails[0].additionalNotes || null,
+        licensePlate: formData.licensePlate,
+      };
+
+      const response = await axios.put(
+        `${API_URL}/api/violations/details/${violation.violationDetails[0].id}`,
+        updateData
+      );
+
+      setViolation((prev) => ({
+        ...prev!,
+        violationDetails: [
+          response.data,
+          ...(prev?.violationDetails?.slice(1) || []),
+        ],
+      }));
+      setFormData((prev) => ({
+        ...prev,
+        licensePlate: formData.licensePlate,
+      }));
+      setIsEditingDetail(false);
+      toast.success("License plate updated successfully for this violation!");
+
+      // Kiểm tra lịch sử vi phạm
+      try {
+        const historyResponse = await axios.get(`${API_URL}/api/violations/history/${formData.licensePlate}`);
+        toast.info(`Found ${historyResponse.data.length} violations for license plate ${formData.licensePlate}`);
+      } catch (historyErr: any) {
+        console.error("Error checking violation history:", historyErr);
+        toast.warn("Unable to check violation history.");
+      }
+    } catch (err: any) {
+      console.error("Error updating license plate:", err);
+      const errorMessage =
+        err.response?.data?.message ||
+        err.response?.data?.errors?.join(", ") ||
+        "Unable to update license plate. Please try again.";
+      if (errorMessage.toLowerCase().includes("duplicate")) {
+        toast.error("Duplicate license plate error. The value already exists in the system.");
+      } else {
+        toast.error(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -193,9 +317,10 @@ export default function ViolationDetail() {
         violationTime: detailFormData.violationTime || null,
         speed: detailFormData.speed || null,
         additionalNotes: detailFormData.additionalNotes || null,
+        licensePlate: violation.violationDetails[0].licensePlate || formData.licensePlate || violation.vehicle?.licensePlate,
       };
       const updatedDetail = await axios.put(
-        `${API_URL_BE}api/violations/details/${violation.violationDetails[0].id}`,
+        `${API_URL}/api/violations/details/${violation.violationDetails[0].id}`,
         updateData
       );
       setViolation((prev) => ({
@@ -220,7 +345,6 @@ export default function ViolationDetail() {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
-
     setDetailFormData((prev) => ({
       ...prev,
       [name]: name === "speed" ? (value ? Number(value) : null) : value,
@@ -252,9 +376,12 @@ export default function ViolationDetail() {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const response = await axios.get(`${API_URL_BE}api/violations/${id}`);
+      const response = await axios.get(`${API_URL}/api/violations/${id}`);
       setViolation(response.data);
-      setFormData({ status: response.data.status });
+      setFormData({ 
+        status: response.data.status,
+        licensePlate: response.data.violationDetails?.[0]?.licensePlate || response.data.vehicle?.licensePlate || ''
+      });
       const firstDetail = response.data.violationDetails?.[0] || {};
       setDetailFormData({
         violationType: firstDetail.violationType,
@@ -264,6 +391,7 @@ export default function ViolationDetail() {
         violationTime: firstDetail.violationTime,
         speed: firstDetail.speed,
         additionalNotes: firstDetail.additionalNotes,
+        licensePlate: firstDetail.licensePlate,
       });
       toast.success("Data refreshed successfully!");
     } catch (err: any) {
@@ -285,9 +413,8 @@ export default function ViolationDetail() {
         <div className="flex flex-col flex-grow overflow-hidden">
           <Header title="Violation Detail" />
           <div className="flex items-center justify-center flex-grow">
-            <div className="flex flex-col items-center space-y-4">
               <BounceLoadingComponent fullScreen={false} size="sm"/>
-            </div>
+
           </div>
         </div>
       </div>
@@ -297,7 +424,7 @@ export default function ViolationDetail() {
   if (error) {
     return (
       <div className="flex h-screen bg-gradient-to-br from-blue-100 via-gray-50 to-blue-100">
-        <Sidebar />
+             <Sidebar defaultActiveItem="violations"/>
         <div className="flex flex-col flex-grow overflow-hidden">
           <Header title="Violation Detail" />
           <div className="flex items-center justify-center flex-grow">
@@ -372,7 +499,8 @@ export default function ViolationDetail() {
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-blue-100 via-gray-50 to-blue-100 overflow-hidden">
-      <Sidebar />
+        <Sidebar defaultActiveItem="violations"/>
+
       <div className="flex flex-col flex-grow overflow-hidden">
         <Header title="Violation Detail" />
         <div className="p-6 overflow-y-auto">
@@ -472,7 +600,7 @@ export default function ViolationDetail() {
                 >
                   <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></span>
                   <RefreshCw size={16} className={refreshing ? "animate-spin mr-2" : "mr-2"} />
-                  {refreshing ? <BounceLoadingComponent /> : "Refresh"}
+                  Refresh
                 </button>
                 {!isEditingDetail && (
                   <button
@@ -500,32 +628,30 @@ export default function ViolationDetail() {
                 {isEditingDetail && (
                   <div className="flex space-x-3">
                     <button
-                      onClick={handleUpdateDetail}
+                      onClick={handleUpdateLicensePlate}
                       disabled={loading}
                       className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl hover:from-green-600 hover:to-emerald-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-green-500/40 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none relative overflow-hidden group"
                       aria-label="Save changes"
                     >
                       <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></span>
                       {loading ? (
-                        <BounceLoadingComponent />
+                        <div className="w-4 h-4 mr-2 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
                       ) : (
-                        <>
-                          <svg
-                            className="w-4 h-4 mr-2"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M5 13l4 4L19 7"
-                            />
-                          </svg>
-                          Save Changes
-                        </>
+                        <svg
+                          className="w-4 h-4 mr-2"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
                       )}
+                      Save Changes
                     </button>
                     <button
                       onClick={() => setIsEditingDetail(false)}
@@ -601,25 +727,23 @@ export default function ViolationDetail() {
                   >
                     <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></span>
                     {loading ? (
-                      <BounceLoadingComponent />
+                      <div className="w-4 h-4 mr-2 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
                     ) : (
-                      <>
-                        <svg
-                          className="w-4 h-4 mr-2"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M5 13l4 4L19 7"
-                          />
-                        </svg>
-                        Update Status
-                      </>
+                      <svg
+                        className="w-4 h-4 mr-2"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
                     )}
+                    Update Status
                   </button>
                 </div>
               </motion.div>
@@ -657,7 +781,7 @@ export default function ViolationDetail() {
                     <div className="relative group">
                       <img
                         src={violation.violationDetails[0].imageUrl}
-                        alt="Violation"
+                        alt="Violation Image"
                         className="w-full h-auto rounded-xl border-2 border-blue-200/50 cursor-pointer transition-all duration-300 group-hover:border-blue-400 group-hover:shadow-2xl group-hover:shadow-blue-400/40"
                         loading="lazy"
                         onClick={() => setImageExpanded(true)}
@@ -825,9 +949,20 @@ export default function ViolationDetail() {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-blue-700 font-medium">License Plate:</span>
-                      <span className="font-semibold text-blue-900 font-mono bg-blue-100/80 px-3 py-1 rounded-xl">
-                        {violation.vehicle?.licensePlate || "N/A"}
-                      </span>
+                      {isEditingDetail ? (
+                        <input
+                          type="text"
+                          name="licensePlate"
+                          value={formData.licensePlate || ""}
+                          onChange={handleLicensePlateChange}
+                          className="w-1/2 border border-blue-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/70 backdrop-blur-sm transition-all duration-300 font-mono"
+                          placeholder="Enter license plate"
+                        />
+                      ) : (
+                        <span className="font-semibold text-blue-900 font-mono bg-blue-100/80 px-3 py-1 rounded-xl">
+                          {violation.violationDetails?.[0]?.licensePlate || violation.vehicle?.licensePlate || "N/A"}
+                        </span>
+                      )}
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-blue-700 font-medium">Vehicle Color:</span>
@@ -892,114 +1027,77 @@ export default function ViolationDetail() {
                       <label className="block text-blue-700 font-medium mb-1">
                         Violation Time:
                       </label>
-                      {isEditingDetail ? (
-                        <input
-                          type="datetime-local"
-                          name="violationTime"
-                          value={detailFormData.violationTime?.slice(0, 16) || ""}
-                          onChange={handleDetailInputChange}
-                          className="w-full border border-blue-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/70 backdrop-blur-sm transition-all duration-300"
-                        />
-                      ) : (
-                        <span className="font-semibold text-blue-900 bg-blue-100/80 px-3 py-1 rounded-xl flex items-center">
-                          <svg
-                            className="w-4 h-4 mr-2 text-blue-500"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                            />
-                          </svg>
-                          {violation.violationDetails[0].violationTime
-                            ? format(
-                                new Date(violation.violationDetails[0].violationTime),
-                                "dd/MM/yyyy HH:mm:ss"
-                              )
-                            : "N/A"}
-                        </span>
-                      )}
+                      <span className="font-semibold text-blue-900 bg-blue-100/80 px-3 py-1 rounded-xl flex items-center">
+                        <svg
+                          className="w-4 h-4 mr-2 text-blue-500"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                          />
+                        </svg>
+                        {violation.violationDetails[0].violationTime
+                          ? format(
+                              new Date(violation.violationDetails[0].violationTime),
+                              "dd/MM/yyyy HH:mm:ss"
+                            )
+                          : "N/A"}
+                      </span>
                     </div>
                     <div>
                       <label className="block text-blue-700 font-medium mb-1">Speed:</label>
-                      {isEditingDetail ? (
-                        <div className="relative">
-                          <input
-                            type="number"
-                            name="speed"
-                            value={detailFormData.speed || ""}
-                            onChange={handleDetailInputChange}
-                            className="w-full border border-blue-300 rounded-xl px-4 py-2 pr-12 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/70 backdrop-blur-sm transition-all duration-300"
-                            placeholder="Enter speed"
-                          />
-                          <span className="absolute right-3 top-2 text-blue-600 font-medium">
-                            km/h
+                      <span className="font-semibold text-blue-900">
+                        {violation.violationDetails[0].speed ? (
+                          <span className="inline-flex items-center bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-800 px-3 py-1 rounded-xl text-sm font-medium">
+                            <svg
+                              className="w-4 h-4 mr-2 text-blue-500"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M13 10V3L4 14h7v7l9-11h-7z"
+                              />
+                            </svg>
+                            {violation.violationDetails[0].speed} km/h
                           </span>
-                        </div>
-                      ) : (
-                        <span className="font-semibold text-blue-900">
-                          {violation.violationDetails[0].speed ? (
-                            <span className="inline-flex items-center bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-800 px-3 py-1 rounded-xl text-sm font-medium">
-                              <svg
-                                className="w-4 h-4 mr-2 text-blue-500"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M13 10V3L4 14h7v7l9-11h-7z"
-                                />
-                              </svg>
-                              {violation.violationDetails[0].speed} km/h
-                            </span>
-                          ) : (
-                            "N/A"
-                          )}
-                        </span>
-                      )}
+                        ) : (
+                          "N/A"
+                        )}
+                      </span>
                     </div>
                     <div>
                       <label className="block text-blue-700 font-medium mb-1">Location:</label>
-                      {isEditingDetail ? (
-                        <input
-                          type="text"
-                          name="location"
-                          value={detailFormData.location || ""}
-                          onChange={handleDetailInputChange}
-                          className="w-full border border-blue-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/70 backdrop-blur-sm transition-all duration-300"
-                          placeholder="Enter location"
-                        />
-                      ) : (
-                        <span className="font-semibold text-blue-900 bg-blue-100/80 px-3 py-1 rounded-xl flex items-center">
-                          <svg
-                            className="w-4 h-4 mr-2 text-blue-500"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                            />
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                            />
-                          </svg>
-                          {violation.violationDetails[0].location || "N/A"}
-                        </span>
-                      )}
+                      <span className="font-semibold text-blue-900 bg-blue-100/80 px-3 py-1 rounded-xl flex items-center">
+                        <svg
+                          className="w-4 h-4 mr-2 text-blue-500"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                          />
+                        </svg>
+                        {violation.violationDetails[0].location || "N/A"}
+                      </span>
                     </div>
                   </div>
                 </motion.div>
@@ -1146,22 +1244,11 @@ export default function ViolationDetail() {
                       </div>
                       Additional Notes
                     </h3>
-                    {isEditingDetail ? (
-                      <textarea
-                        name="additionalNotes"
-                        value={detailFormData.additionalNotes || ""}
-                        onChange={handleDetailInputChange}
-                        className="w-full border border-blue-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/70 backdrop-blur-sm transition-all duration-300"
-                        placeholder="Enter additional notes..."
-                        rows={4}
-                      />
-                    ) : (
-                      <div className="bg-blue-50/80 backdrop-blur-sm rounded-xl p-4">
-                        <p className="text-blue-700">
-                          {violation.violationDetails[0].additionalNotes || "No additional notes"}
-                        </p>
-                      </div>
-                    )}
+                    <div className="bg-blue-50/80 backdrop-blur-sm rounded-xl p-4">
+                      <p className="text-blue-700">
+                        {violation.violationDetails[0].additionalNotes || "No additional notes"}
+                      </p>
+                    </div>
                   </motion.div>
                 )}
               </div>
@@ -1192,7 +1279,7 @@ export default function ViolationDetail() {
                   </button>
                   <img
                     src={violation.violationDetails[0].imageUrl}
-                    alt="Violation"
+                    alt="Violation Image"
                     className="max-w-full max-h-full object-contain rounded-xl border-2 border-blue-200/50 shadow-2xl shadow-blue-400/40"
                     onClick={() => setImageExpanded(false)}
                   />
