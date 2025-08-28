@@ -3,7 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from db.session import engine
 from db.base import Base
 from api.v1.api import api_router
-
+import os
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()

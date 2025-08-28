@@ -371,7 +371,7 @@ def stream_violation_wrongway_video_service1(youtube_url: str, camera_id: int):
                                             "violationDetails": [{
                                                 "violationTypeId": 4,  # Assuming 4 is WRONG_LANE
                                                 "violationTime": datetime.now().isoformat(),
-                                                "licensePlate": f"TRACK_{track_id}"  # Placeholder
+                                               
                                             }]
                                         }
                                         # Send violation asynchronously (non-blocking)

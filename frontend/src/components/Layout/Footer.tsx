@@ -4,8 +4,8 @@ export default function Footer()
 {
   return (
       <footer className="bg-gray-800 text-white py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-8 md:grid-cols-4">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="grid grid-cols-4 gap-8">
             <div>
               <div className="mb-4">
                 <Logo expanded={true} />
@@ -15,17 +15,17 @@ export default function Footer()
             <div>
               <h4 className="font-semibold mb-4">Services</h4>
               <ul className="space-y-2 text-gray-300">
-                <li><a href="a" className="hover:text-white transition-colors">Violation Search</a></li>
-                <li><a href="a" className="hover:text-white transition-colors">Notifications</a></li>
-                <li><a href="a" className="hover:text-white transition-colors">Map View</a></li>
+                <li>Violation Search</li>
+                <li>Notifications</li>
+                <li>Map View</li>
               </ul>
             </div>
             <div>
               <h4 className="font-semibold mb-4">Support</h4>
               <ul className="space-y-2 text-gray-300">
-                <li><a href="a" className="hover:text-white transition-colors">Help Guide</a></li>
-                <li><a href="a" className="hover:text-white transition-colors">FAQ</a></li>
-                <li><a href="a" className="hover:text-white transition-colors">Contact Us</a></li>
+                <li>Help Guide</li>
+                <li>FAQ</li>
+                <li>Contact Us</li>
               </ul>
             </div>
             <div>

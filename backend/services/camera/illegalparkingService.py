@@ -382,7 +382,7 @@ def analyze_traffic_video(youtube_url: str, camera_id: int):
                                             "violationDetails": [{
                                                 "violationTypeId": 3,  # WRONG_DIRECTION (reusing ID 3)
                                                 "violationTime": datetime.now().isoformat(),
-                                                "licensePlate": f"TRACK_{track_id}",
+                                             
                                                 "description": f"Vehicle going wrong direction in {zone_details} (dot_product: {dot_product:.3f})"
                                             }]
                                         }
@@ -426,7 +426,7 @@ def analyze_traffic_video(youtube_url: str, camera_id: int):
                                         "violationDetails": [{
                                             "violationTypeId": 3,  # PROLONGED_PRESENCE
                                             "violationTime": datetime.now().isoformat(),
-                                            "licensePlate": f"TRACK_{track_id}",
+                                    
                                             "description": f"Vehicle stayed in {zone_details} for {duration_seconds:.2f}s"
                                         }]
                                     }

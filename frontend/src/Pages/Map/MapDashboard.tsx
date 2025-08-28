@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -6,7 +6,7 @@ import {
   Popup,
   LayersControl,
   ZoomControl,
-  Tooltip
+  Tooltip,
 } from "react-leaflet";
 import L, { Icon } from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -50,6 +50,7 @@ const cameraIcon: Icon = new L.Icon({
   iconSize: [32, 32],
   iconAnchor: [16, 32],
   popupAnchor: [0, -32],
+  className: "camera-marker-normal", // Thêm className
 });
 
 // Camera with obstacle icon
@@ -59,6 +60,7 @@ const cameraWithObstacleIcon: Icon = new L.Icon({
   iconSize: [36, 36],
   iconAnchor: [18, 36],
   popupAnchor: [0, -36],
+  className: "camera-marker-obstacle", // Thêm className
 });
 
 // User location icon
@@ -92,103 +94,117 @@ export default function MapDashboard() {
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isGettingLocation, setIsGettingLocation] = useState<boolean>(false);
   const mapRef = useRef<L.Map | null>(null);
+  const [mapReady, setMapReady] = useState<boolean>(false);
 
   // Add CSS styles for obstacles effect and popup styling
   useEffect(() => {
     const style = document.createElement("style");
     style.textContent = `
-      .has-obstacles .leaflet-marker-icon {
-        border: 3px solid #ef4444 !important;
-        border-radius: 50% !important;
-        box-shadow: 0 0 10px rgba(239, 68, 68, 0.6) !important;
-      }
+    .has-obstacles .leaflet-marker-icon {
+      border: 3px solid #ef4444 !important;
+      border-radius: 50% !important;
+      box-shadow: 0 0 10px rgba(239, 68, 68, 0.6) !important;
+    }
 
-      /* Custom popup styling */
-      .leaflet-popup-content-wrapper {
-        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%) !important;
-        border-radius: 12px !important;
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
-        border: 1px solid rgba(226, 232, 240, 0.5) !important;
-        padding: 0 !important;
-        overflow: hidden !important;
-      }
+    /* Custom popup styling */
+    .leaflet-popup-content-wrapper {
+      background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%) !important;
+      border-radius: 12px !important;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+      border: 1px solid rgba(226, 232, 240, 0.5) !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+    }
 
-      .leaflet-popup-content {
-        margin: 0 !important;
-        padding: 0 !important;
-        width: auto !important;
-        max-width: 420px !important;
-        min-width: 380px !important;
-        max-height: 500px !important;
-        overflow: hidden !important;
-      }
+    .leaflet-popup-content {
+      margin: 0 !important;
+      padding: 0 !important;
+      width: auto !important;
+      max-width: 420px !important;
+      min-width: 380px !important;
+      max-height: 500px !important;
+      overflow: hidden !important;
+    }
 
-      .leaflet-popup-tip {
-        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%) !important;
-        border: 1px solid rgba(226, 232, 240, 0.5) !important;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
-      }
+    .leaflet-popup-tip {
+      background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%) !important;
+      border: 1px solid rgba(226, 232, 240, 0.5) !important;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+    }
 
-      .leaflet-popup-close-button {
-        color: #64748b !important;
-        font-size: 18px !important;
-        font-weight: bold !important;
-        width: 24px !important;
-        height: 24px !important;
-        background: rgba(255, 255, 255, 0.9) !important;
-        border-radius: 50% !important;
-        right: 8px !important;
-        top: 8px !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        backdrop-filter: blur(4px) !important;
-        border: 1px solid rgba(226, 232, 240, 0.5) !important;
-        transition: all 0.2s ease !important;
-        z-index: 1000 !important;
-      }
+    .leaflet-popup-close-button {
+      color: #64748b !important;
+      font-size: 18px !important;
+      font-weight: bold !important;
+      width: 24px !important;
+      height: 24px !important;
+      background: rgba(255, 255, 255, 0.9) !important;
+      border-radius: 50% !important;
+      right: 8px !important;
+      top: 8px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      backdrop-filter: blur(4px) !important;
+      border: 1px solid rgba(226, 232, 240, 0.5) !important;
+      transition: all 0.2s ease !important;
+      z-index: 1000 !important;
+    }
 
-      .leaflet-popup-close-button:hover {
-        background: rgba(239, 68, 68, 0.1) !important;
-        color: #ef4444 !important;
-        transform: scale(1.1) !important;
-      }
+    .leaflet-popup-close-button:hover {
+      background: rgba(239, 68, 68, 0.1) !important;
+      color: #ef4444 !important;
+      transform: scale(1.1) !important;
+    }
 
-      /* Map container z-index control */
-      .map-container-normal {
-        z-index: 1;
-      }
+    /* Map container z-index control */
+    .map-container-normal {
+      z-index: 1;
+    }
 
-      .map-container-hidden {
-        z-index: -1;
-      }
+    .map-container-hidden {
+      z-index: -1;
+    }
 
-      /* Scrollbar styling for obstacles list */
-      .obstacles-scroll::-webkit-scrollbar {
-        width: 4px;
-      }
+    /* Scrollbar styling for obstacles list */
+    .obstacles-scroll::-webkit-scrollbar {
+      width: 4px;
+    }
 
-      .obstacles-scroll::-webkit-scrollbar-track {
-        background: rgba(226, 232, 240, 0.2);
-        border-radius: 4px;
-      }
+    .obstacles-scroll::-webkit-scrollbar-track {
+      background: rgba(226, 232, 240, 0.2);
+      border-radius: 4px;
+    }
 
-      .obstacles-scroll::-webkit-scrollbar-thumb {
-        background: rgba(239, 68, 68, 0.4);
-        border-radius: 4px;
-        transition: background 0.2s ease;
-      }
+    .obstacles-scroll::-webkit-scrollbar-thumb {
+      background: rgba(239, 68, 68, 0.4);
+      border-radius: 4px;
+      transition: background 0.2s ease;
+    }
 
-      .obstacles-scroll::-webkit-scrollbar-thumb:hover {
-        background: rgba(239, 68, 68, 0.6);
-      }
+    .obstacles-scroll::-webkit-scrollbar-thumb:hover {
+      background: rgba(239, 68, 68, 0.6);
+    }
 
-      /* Firefox scrollbar */
-      .obstacles-scroll {
-        scrollbar-width: thin;
-        scrollbar-color: rgba(239, 68, 68, 0.4) rgba(226, 232, 240, 0.2);
-      }
-    `;
+    /* Firefox scrollbar */
+    .obstacles-scroll {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(239, 68, 68, 0.4) rgba(226, 232, 240, 0.2);
+    }
+
+    /* Icon camera tròn - chỉ áp dụng cho camera icons */
+.leaflet-marker-icon[src*="rDwv7jSrMyrexUsSSdYd8wHaHa"] {
+  border-radius: 50% !important;
+  border: 2px solid #ffffff !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Icon camera thông thường */
+.leaflet-marker-icon[src*="rDwv7jSrMyrexUsSSdYd8wHaHa"]:not(.has-obstacles) {
+  border: 2px solid #2563eb !important;
+}
+      
+  `;
     document.head.appendChild(style);
 
     return () => {
@@ -199,7 +215,7 @@ export default function MapDashboard() {
   }, []);
 
   // Get user's current location
-  const getCurrentLocation = () => {
+  const getCurrentLocation = useCallback(() => {
     setIsGettingLocation(true);
     setLocationError(null);
 
@@ -218,9 +234,13 @@ export default function MapDashboard() {
         setMapZoom(13);
         setIsGettingLocation(false);
 
-        // Fly to user location if map is available
-        if (mapRef.current) {
-          mapRef.current.flyTo([lat, lng], 13, { duration: 2 });
+        // Chỉ flyTo khi map đã sẵn sàng
+        if (mapRef.current && mapReady) {
+          try {
+            mapRef.current.flyTo([lat, lng], 13, { duration: 2 });
+          } catch (error) {
+            console.warn("Failed to fly to location:", error);
+          }
         }
       },
       (error) => {
@@ -245,12 +265,15 @@ export default function MapDashboard() {
         maximumAge: 60000,
       }
     );
-  };
+  }, [mapReady]);
 
   // Auto-get location on component mount
   useEffect(() => {
-    getCurrentLocation();
-  }, []);
+    // Chỉ gọi getCurrentLocation khi map đã sẵn sàng
+    if (mapReady) {
+      getCurrentLocation();
+    }
+  }, [mapReady, getCurrentLocation]);
 
   // Listen for fullscreen events from CameraDetail
   useEffect(() => {
@@ -334,10 +357,14 @@ export default function MapDashboard() {
 
   const handleCameraSelect = (camera: CameraType) => {
     setSelectedCamera(camera);
-    if (mapRef.current) {
-      mapRef.current.flyTo([camera.latitude, camera.longitude], 12, {
-        duration: 1.5,
-      });
+    if (mapRef.current && mapReady) {
+      try {
+        mapRef.current.flyTo([camera.latitude, camera.longitude], 12, {
+          duration: 1.5,
+        });
+      } catch (error) {
+        console.warn("Failed to fly to camera location:", error);
+      }
     }
   };
 
@@ -527,7 +554,14 @@ export default function MapDashboard() {
                   zoomControl={false}
                   className="h-full w-full"
                   ref={(mapInstance) => {
-                    if (mapInstance) mapRef.current = mapInstance;
+                    if (mapInstance) {
+                      mapRef.current = mapInstance;
+                      // Set mapReady sau một delay ngắn để đảm bảo map đã render hoàn toàn
+                      setTimeout(() => setMapReady(true), 100);
+                    }
+                  }}
+                  whenReady={() => {
+                    setMapReady(true);
                   }}
                 >
                   <ZoomControl position="bottomright" />
@@ -772,9 +806,7 @@ export default function MapDashboard() {
 
           {selectedCamera && (
             <div className="w-2/5">
-
-              <CameraDetail camera={selectedCamera} /> 
-
+              <CameraDetail camera={selectedCamera} />
             </div>
           )}
         </div>
