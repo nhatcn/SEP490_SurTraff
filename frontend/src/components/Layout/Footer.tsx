@@ -31,7 +31,7 @@ export default function Footer()
             <div>
               <h4 className="font-semibold mb-4">Contact</h4>
               <div className="text-gray-300 space-y-2 text-sm">
-                <p>Email: support@trafficwatch.com</p>
+                <p>Email: st@.com</p>
                 <p>Hotline: 1-800-TRAFFIC</p>
                 <p>Address: Ho Chi Minh City, Vietnam</p>
               </div>
